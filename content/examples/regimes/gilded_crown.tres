@@ -1,0 +1,26 @@
+[gd_resource type="Resource" script_class="RegimeDef" format=3]
+
+[ext_resource type="Script" path="res://content/schema/regime_modifier.gd" id="1_vwj7t"]
+[ext_resource type="Script" path="res://content/schema/regime_def.gd" id="2_w6mb3"]
+
+[sub_resource type="Resource" id="Resource_3m22x"]
+script = ExtResource("1_vwj7t")
+kind = &"garrison_multiplier"
+value = 1.2
+
+[sub_resource type="Resource" id="Resource_42j4j"]
+script = ExtResource("1_vwj7t")
+kind = &"production_multiplier"
+target = &"timber"
+value = 0.85
+
+[resource]
+script = ExtResource("2_w6mb3")
+id = &"gilded_crown"
+display_name = "The Gilded Crown"
+combat_modifier = SubResource("Resource_3m22x")
+economy_quirk = SubResource("Resource_42j4j")
+crest_id = &"crest_gilded_crown"
+ink_ground = Color(0.23, 0.18, 0.12, 1)
+ink_secondary = Color(0.8, 0.64, 0.3, 1)
+flavor_text = "Taxes your timber, fields the walls with archers."

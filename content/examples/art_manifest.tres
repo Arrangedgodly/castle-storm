@@ -1,0 +1,70 @@
+[gd_resource type="Resource" script_class="ArtManifest" format=3]
+
+[ext_resource type="Script" path="res://content/schema/art_asset_def.gd" id="1_5m6i3"]
+[ext_resource type="Script" path="res://content/schema/art_manifest.gd" id="2_7lguh"]
+
+[sub_resource type="Resource" id="Resource_sk06n"]
+script = ExtResource("1_5m6i3")
+id = &"face_peasant"
+source_path = "res://assets/vendor/kenney/toon-characters/vector/character_farmer.svg"
+license = "CC0"
+
+[sub_resource type="Resource" id="Resource_imjnw"]
+script = ExtResource("1_5m6i3")
+id = &"face_worker"
+source_path = "res://assets/vendor/kenney/toon-characters/vector/character_baker.svg"
+license = "CC0"
+
+[sub_resource type="Resource" id="Resource_wlg10"]
+script = ExtResource("1_5m6i3")
+id = &"face_militia"
+source_path = "res://assets/vendor/tzunghaor/cartoon-vector-characters/viking.svg"
+license = "CC0"
+
+[sub_resource type="Resource" id="Resource_2fgg4"]
+script = ExtResource("1_5m6i3")
+id = &"face_trainee"
+source_path = "res://assets/vendor/kenney/toon-characters/vector/character_adventurer.svg"
+license = "CC0"
+
+[sub_resource type="Resource" id="Resource_6bq0i"]
+script = ExtResource("1_5m6i3")
+id = &"face_knight"
+source_path = "res://assets/vendor/tzunghaor/cartoon-vector-characters/knight.svg"
+license = "CC0"
+
+[sub_resource type="Resource" id="Resource_t82vr"]
+script = ExtResource("1_5m6i3")
+id = &"face_archer"
+source_path = "res://assets/vendor/tzunghaor/cartoon-vector-characters/archer.svg"
+license = "CC0"
+
+[sub_resource type="Resource" id="Resource_14wq1"]
+script = ExtResource("1_5m6i3")
+id = &"icon_farm"
+source_path = "res://assets/vendor/kenney/board-game-icons/vector/icons/wheat.svg"
+license = "CC0"
+
+[sub_resource type="Resource" id="Resource_1l02r"]
+script = ExtResource("1_5m6i3")
+id = &"crest_gilded_crown"
+source_path = "res://assets/vendor/armorial/crests/crown_ornate.svg"
+license = "commercial"
+
+[sub_resource type="Resource" id="Resource_y0vub"]
+script = ExtResource("1_5m6i3")
+id = &"icon_sword"
+source_path = "res://assets/vendor/game-icons/lorc/crossed-swords.svg"
+license = "CC-BY-3.0"
+attribution = "Lorc, game-icons.net — CC BY 3.0"
+
+[sub_resource type="Resource" id="Resource_o8cm8"]
+script = ExtResource("1_5m6i3")
+id = &"icon_armor"
+source_path = "res://assets/vendor/game-icons/lorc/leather-armor.svg"
+license = "CC-BY-3.0"
+attribution = "Lorc, game-icons.net — CC BY 3.0"
+
+[resource]
+script = ExtResource("2_7lguh")
+assets = Array[ExtResource("1_5m6i3")]([SubResource("Resource_sk06n"), SubResource("Resource_imjnw"), SubResource("Resource_wlg10"), SubResource("Resource_2fgg4"), SubResource("Resource_6bq0i"), SubResource("Resource_t82vr"), SubResource("Resource_14wq1"), SubResource("Resource_1l02r"), SubResource("Resource_y0vub"), SubResource("Resource_o8cm8")])

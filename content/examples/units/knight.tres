@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="UnitDef" format=3]
+
+[ext_resource type="Script" path="res://content/schema/unit_def.gd" id="1_e7ksk"]
+
+[resource]
+script = ExtResource("1_e7ksk")
+id = &"knight"
+display_name = "Knight"
+training_time_hours = 12.0
+required_gear_slots = Array[StringName]([&"weapon", &"armor"])
+combat_power = 10
+suspicion_on_train = 8
+face_id = &"face_knight"

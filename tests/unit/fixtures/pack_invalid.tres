@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="ContentPack" format=3]
+
+[ext_resource type="Script" path="res://content/schema/building_def.gd" id="1_k40r2"]
+[ext_resource type="Script" path="res://content/schema/gear_def.gd" id="2_ml5y6"]
+[ext_resource type="Script" path="res://content/schema/regime_def.gd" id="3_w0qmw"]
+[ext_resource type="Script" path="res://content/schema/content_pack.gd" id="4_jd6ve"]
+[ext_resource type="Script" path="res://content/schema/unit_def.gd" id="5_cnjc8"]
+
+[sub_resource type="Resource" id="Resource_ixlel"]
+script = ExtResource("5_cnjc8")
+display_name = "No Identity"
+face_id = &"face_knight"
+
+[resource]
+script = ExtResource("4_jd6ve")
+pack_id = &"broken"
+display_name = "Broken fixture"
+resources = Array[StringName]([&"food"])
+gear_slots = Array[StringName]([&"weapon"])
+units = Array[ExtResource("5_cnjc8")]([SubResource("Resource_ixlel")])

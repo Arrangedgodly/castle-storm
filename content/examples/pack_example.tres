@@ -1,0 +1,34 @@
+[gd_resource type="Resource" script_class="ContentPack" format=3]
+
+[ext_resource type="Resource" path="res://content/examples/art_manifest.tres" id="1_l36ma"]
+[ext_resource type="Script" path="res://content/schema/building_def.gd" id="2_ddh76"]
+[ext_resource type="Resource" path="res://content/examples/buildings/farm.tres" id="3_5i6xj"]
+[ext_resource type="Script" path="res://content/schema/gear_def.gd" id="4_2slgn"]
+[ext_resource type="Resource" path="res://content/examples/gear/gear_weapon_t1.tres" id="5_0muba"]
+[ext_resource type="Resource" path="res://content/examples/gear/gear_armor_t1.tres" id="6_opdrp"]
+[ext_resource type="Resource" path="res://content/examples/identity_pools.tres" id="7_mr37k"]
+[ext_resource type="Script" path="res://content/schema/regime_def.gd" id="8_jbnvw"]
+[ext_resource type="Resource" path="res://content/examples/regimes/gilded_crown.tres" id="9_g1wtl"]
+[ext_resource type="Script" path="res://content/schema/content_pack.gd" id="10_xygtr"]
+[ext_resource type="Resource" path="res://content/examples/economy_tunables.tres" id="11_bi0q2"]
+[ext_resource type="Script" path="res://content/schema/unit_def.gd" id="12_ka5pa"]
+[ext_resource type="Resource" path="res://content/examples/units/peasant.tres" id="13_wktj3"]
+[ext_resource type="Resource" path="res://content/examples/units/worker.tres" id="14_ugolb"]
+[ext_resource type="Resource" path="res://content/examples/units/militia.tres" id="15_oyehg"]
+[ext_resource type="Resource" path="res://content/examples/units/trainee.tres" id="16_uow2x"]
+[ext_resource type="Resource" path="res://content/examples/units/knight.tres" id="17_eo4le"]
+[ext_resource type="Resource" path="res://content/examples/units/archer.tres" id="18_31oa8"]
+
+[resource]
+script = ExtResource("10_xygtr")
+pack_id = &"example"
+display_name = "Castle Storm — worked example pack (T-DATA-01 seeds)"
+resources = Array[StringName]([&"food", &"timber", &"iron"])
+gear_slots = Array[StringName]([&"weapon", &"armor"])
+units = Array[ExtResource("12_ka5pa")]([ExtResource("13_wktj3"), ExtResource("14_ugolb"), ExtResource("15_oyehg"), ExtResource("16_uow2x"), ExtResource("17_eo4le"), ExtResource("18_31oa8")])
+buildings = Array[ExtResource("2_ddh76")]([ExtResource("3_5i6xj")])
+gear = Array[ExtResource("4_2slgn")]([ExtResource("5_0muba"), ExtResource("6_opdrp")])
+regimes = Array[ExtResource("8_jbnvw")]([ExtResource("9_g1wtl")])
+identity = ExtResource("7_mr37k")
+tunables = ExtResource("11_bi0q2")
+art = ExtResource("1_l36ma")

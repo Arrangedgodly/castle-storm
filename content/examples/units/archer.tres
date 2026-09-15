@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="UnitDef" format=3]
+
+[ext_resource type="Script" path="res://content/schema/unit_def.gd" id="1_5dluf"]
+
+[resource]
+script = ExtResource("1_5dluf")
+id = &"archer"
+display_name = "Archer"
+training_time_hours = 6.0
+required_gear_slots = Array[StringName]([&"weapon"])
+combat_power = 6
+suspicion_on_train = 4
+face_id = &"face_archer"

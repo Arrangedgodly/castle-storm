@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="IdentityPools" format=3]
+
+[ext_resource type="Script" path="res://content/schema/identity_pools.gd" id="1_nqbus"]
+
+[resource]
+script = ExtResource("1_nqbus")
+leader_first_names = Array[String](["Bran", "Ottilie", "Wick", "Mabel", "Godfrey", "Petronella", "Aldous", "Sybil"])
+leader_epithets = Array[String](["the Unbearable", "the Almost Wise", "of the Leaky Barn", "the Twice-Fooled", "the Modest Avalanche", "of Fine Debt", "the Whispering Shout", "the Patient Torch"])
+personality_tags = Array[StringName]([&"ambitious", &"pious", &"gluttonous", &"paranoid", &"romantic", &"vengeful"])
+recruit_names = Array[String](["Tom", "Hob", "Nell", "Kate", "Wat", "Dick", "Bess", "Gil", "Meg", "Ralph", "Joan", "Sim"])

@@ -91,14 +91,14 @@ for this binary. Either run the editor once (`tools/godot/godot -e`) and use
 | `project.godot` | Engine pin, renderer, R3 root content-scale settings, InputMap action stubs |
 | `ui/` | Screens and components (main scene: `ui/main.tscn`) |
 | `sim/` | Deterministic economy engine — headless-first, no UI imports |
-| `content/` | Declarative content packs (schema: T-DATA-01) |
+| `content/` | Declarative content packs: schema classes in `content/schema/`, load-time validator `content/content_validator.gd`, worked examples `content/examples/` (schema: T-DATA-01, see `docs/content-schema.md`) |
 | `saves/` | Save architecture: versioned, atomic writes (T-ARCH-03) |
 | `tests/` | `unit/`, `property/` (gdUnit4), `acceptance/` (SceneTree runner) per R2 |
 | `addons/gdUnit4/` | Vendored gdUnit4 v6.2.1 test framework (committed) |
 | `scripts/` | `ci.sh` — local CI entry point (stages: unit/property/accept) |
 | `reports/` | gdUnit4 JUnit XML + HTML reports (gitignored) |
 | `tools/godot/` | Vendored engine binary (gitignored) |
-| `docs/` | `DEV_SETUP.md`, `gdscript-conventions.md` |
+| `docs/` | `DEV_SETUP.md`, `gdscript-conventions.md`, `content-schema.md` |
 
 Input actions (bound to **Any Device** so Linux/Deck exports keep controller
 input, per R1/E14): `primary`, `secondary`, `back`, `pause`, `debug_fast_forward`.

@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="UnitDef" format=3]
+
+[ext_resource type="Script" path="res://content/schema/unit_def.gd" id="1_s2q14"]
+
+[resource]
+script = ExtResource("1_s2q14")
+id = &"trainee"
+display_name = "Trainee"
+training_time_hours = 4.0
+promotion_paths = Array[StringName]([&"knight", &"archer"])
+combat_power = 2
+face_id = &"face_trainee"
