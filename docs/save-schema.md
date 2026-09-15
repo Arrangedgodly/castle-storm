@@ -181,7 +181,14 @@ production
 Keyed by `system_name()`; the four above are the full-stack registration
 (heartbeat = the seam-proof placeholder; a leaner engine saves a leaner map —
 the key set is whatever is registered, which is why the restore host
-registers the same systems). Sub-dicts follow.
+registers the same systems). Sub-dicts follow. NOTE (T-SIM-05): an engine
+that registers the suspicion system (opt-in per docs/sim-engine.md §14 —
+the marathon fixture and the future game host do; this doc's machine-checked
+stack does not, yet) carries a fifth `suspicion` sub-dict, whose field-level
+reference lives in sim-engine.md §14 ("Serialization + determinism") until
+it joins this doc's generated stack — the same additive-optional-keys,
+tolerant-reader policy as §8's `regime_quirks` precedent applies (absent
+key = the system was not registered; present = restored verbatim).
 
 ### 4.3 `systems.heartbeat` — `HeartbeatSystem`
 

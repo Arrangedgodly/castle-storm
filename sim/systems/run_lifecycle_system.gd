@@ -292,13 +292,17 @@ func _handle_run_restart(engine: SimEngine) -> void:
 	# run-scoped state implement reset_run(regime) and are reset here,
 	# synchronously at the drain — no half-reset tick. Absent siblings are
 	# skipped (an engine without production is legitimate). T-SIM-05's
-	# suspicion system joins this list when it lands.
+	# suspicion system joined this list at landing: its meter, telegraph,
+	# relief/re-arm windows and watch counters are all run-scoped.
 	var production := engine.get_system(&"production")
 	if production != null and production.has_method("reset_run"):
 		production.reset_run(_regime)
 	var units := engine.get_system(&"units")
 	if units != null and units.has_method("reset_run"):
 		units.reset_run(_regime)
+	var suspicion := engine.get_system(&"suspicion")
+	if suspicion != null and suspicion.has_method("reset_run"):
+		suspicion.reset_run(_regime)
 	# New identity always; new regime only after a VICTORY (town-hall
 	# journeys: defeat/abort restarts under the SAME regime, victory swaps).
 	_fold_new_run(engine, previous_outcome == OUTCOME_VICTORY)

@@ -11,15 +11,18 @@ saving, and wall-clock drive are consumers.
   `sim/systems/heartbeat_system.gd` (placeholder system),
   `sim/systems/production_system.gd` (T-SIM-02 production, §10),
   `sim/systems/unit_lifecycle_system.gd` (T-SIM-03 units, §11),
-  `sim/systems/run_lifecycle_system.gd` (T-SIM-04 run lifecycle, §12)
+  `sim/systems/run_lifecycle_system.gd` (T-SIM-04 run lifecycle, §12),
+  `sim/systems/suspicion_system.gd` (T-SIM-05 suspicion, §14)
 - Tests: `tests/unit/test_sim_engine.gd`, `tests/unit/test_sim_event_log.gd`,
   `tests/unit/test_sim_fixed.gd`, `tests/unit/test_production_system.gd`,
   `tests/unit/test_unit_lifecycle_system.gd`,
   `tests/unit/test_run_lifecycle_system.gd`,
+  `tests/unit/test_suspicion_system.gd`,
   acceptance marathons `tests/acceptance/suites/marathon_sim_1000h.gd`,
   `tests/acceptance/suites/marathon_production_1000h.gd`,
   `tests/acceptance/suites/marathon_units_1000h.gd`,
-  `tests/acceptance/suites/marathon_run_thin_loop.gd`
+  `tests/acceptance/suites/marathon_run_thin_loop.gd`,
+  `tests/acceptance/suites/marathon_suspicion_pressure.gd`
 - Conventions: `docs/gdscript-conventions.md` (sim/ determinism rules)
 
 ## 1. Tick size: 1 tick = 1 sim-minute
@@ -180,7 +183,8 @@ Measured (vendored 4.7.2 binary, Apple silicon, this repo's CI command):
 |---|---|
 | T-SIM-02 production | `sim/systems/production_system.gd` (§10) — the seam + `SimFixed` + `resources` pool + `EconomyTunables` band, live since T-SIM-02 |
 | T-SIM-03 units | `sim/systems/unit_lifecycle_system.gd` (§11) — arrivals draw `rng` in `on_tick`, worker handoff rides the command queue, training/gear state in the save hooks |
-| T-SIM-05 suspicion / T-SIM-06 assault | systems + commands + events + per-tick timers in tick units; suspicion keys off `training_complete` subjects (UnitDef.suspicion_on_train) and `building_upgraded`; assault reads `army_power()`/`gear_tier()` and resolves through `RunLifecycleSystem.resolve_victory` (§12) |
+| T-SIM-05 suspicion | `sim/systems/suspicion_system.gd` (§14) — the pressure curve: act bumps (`training_complete` subjects resolve `UnitDef.suspicion_on_train`; building level gains) + presence drip vs tiered decay, cancellable ≥4h telegraphs, crackdowns that seize floor-40% + scatter unassigned recruits, run death at 100 via `resolve_victory(engine, false)` (§12); joins the restart reset list |
+| T-SIM-06 assault | reads `army_power()`/`gear_tier()` and the regime combat modifier, resolves through `RunLifecycleSystem.resolve_victory` (§12) |
 | T-SIM-04 run lifecycle | `sim/systems/run_lifecycle_system.gd` (§12) — `run_seed` → `rng` for randomized leaders/regimes drawn at the run_start/restart drains; events for chronicle; meta bank in `sim/run_meta.gd` |
 | T-SIM-07 catch-up | `fast_forward` (480 ticks = 8h cap) or linear accrual at the boundary; wall clock stays OUTSIDE sim |
 | T-ARCH-03 save | `to_dict()/apply_state_dict()` + system save hooks |
@@ -480,7 +484,7 @@ quirk lands the moment the draw does — 6/h × 0.85 becomes exactly
 |---|---|
 | `run_start` | draw identity + regime, UNSTARTED → RUNNING, `run_started` (subject = regime id, value = run index) |
 | `grant_resources` | pay the run's starting stipend (boot-injected pack content, `ContentPack.starting_grants`) into the pool, ONCE per run — the F1 bootstrap verb; `resources_granted` per line (subject = resource, value = amount, value2 = new total; lines sorted by resource text). Denied 3 no running run / 4 pack has no stipend / 5 already paid this run; the PAID flag (`stipend_run`) is serialized + hashed so a restore cannot double-pay |
-| `run_abort` | explicit surrender — the THIN failure path (suspicion failure is T-SIM-05); banks + `run_aborted` |
+| `run_abort` | explicit surrender — the THIN failure path (the suspicion crush is T-SIM-05's failure, §14); banks + `run_aborted` |
 | `run_restart` | fold a new identity, reset run-scoped state (below), `run_restarted` |
 | `resolve_victory` | internal (queued by the entry point, below); subject `&"win"`/`&"loss"`, value = army power override |
 
@@ -490,7 +494,9 @@ reads the units system's live `army_power()` at drain. It is
 tick-aligned like every write: it pre-checks (loud `false` when no run
 is active) and queues the resolution command, which drains at the next
 tick. Resolution banks the run into RunMeta and emits `run_won` /
-`run_lost` (value = banked score, value2 = run index).
+`run_lost` (value = banked score, value2 = run index). The suspicion
+crush (meter maxed, §14) resolves through this exact path with
+`resolve_victory(engine, false)` — OUTCOME_DEFEAT, full banking.
 
 **Failure banks FULL progress** (town-hall decision): every ended run
 accrues — victory, assault loss, abort, and a still-running run that
@@ -512,8 +518,9 @@ queued reset commands, because a restart must be atomic within one tick
 (no half-reset overlap) — the same reasoning as T-SIM-03's queue
 handoff, which HAD to queue because it fires mid-tick. Absent siblings
 are skipped (`has_method` guard — an engine without production is
-legitimate); T-SIM-05's suspicion system joins the reset list when it
-lands. The alternative (host-side engine re-init) remains available and
+legitimate); the suspicion system (§14) joined this list at T-SIM-05:
+its meter, telegraph, relief/re-arm windows and audit baseline are all
+run-scoped. The alternative (host-side engine re-init) remains available and
 is the same contract one level up: build a fresh engine and hand it the
 SAME RunMeta instance — the unit tests prove both forms.
 
@@ -615,3 +622,146 @@ from a restarted economy; 324 events over 45 sim-hours (~7/h — a
 UI-friendly chronicle volume); wall time 0.027s; replay hash 3372344018.
 Full findings (pacing, gear cost vs production, UI coverage gaps,
 watchlist for T-SIM-05..08): docs/ultron/m1-findings.md.
+
+## 14. Suspicion system (T-SIM-05)
+
+`sim/systems/suspicion_system.gd` (`SuspicionSystem`, system_name
+`&"suspicion"`) — the pressure curve: revolutionary activity raises the
+Crown's suspicion; a telegraphed crackdown at the tier-2 threshold
+seizes resources and scatters unassigned recruits; a maxed meter crushes
+the revolution and fails the run (failure banks full progress, §12).
+Constructed from content and registered LAST (heartbeat, run, units,
+production, **suspicion** — it watches its siblings' state at the tick
+boundary, so it must tick after them; only ordering consistency is
+contractual):
+
+```gdscript
+var suspicion := SuspicionSystem.new(pack.tunables, pack.units)
+engine.register_system(suspicion)  # after units + production
+```
+
+The shared marathon fixture (`_mvp_pack.full_stack`) does NOT include
+suspicion — sibling suites byte-identical to their T-SIM-02..04 records
+by construction; the suspicion marathon registers it on top
+(`tests/acceptance/suites/marathon_suspicion_pressure.gd`), and the
+real-game host composes it the same way when it lands (T-UI-03+).
+
+**Zero RNG draws** — the meter is exact integer arithmetic end to end
+(act bumps are whole points; fractional presence/decay accrue through a
+SimFixed milli-point-seconds accumulator, the production pattern). All
+content floats cross `SimFixed.milli_from_float` ONCE, at construction.
+
+### The heat profile (the auditable rise formula)
+
+Per sim-hour, suspicion moves by **act bumps** (whole points, the tick
+the act happens, each recorded as a `suspicion_rose` event) plus a
+**presence drip** netted against **passive decay**:
+
+```
+presence = w_army    x army_units                       [milli-points/h]
+         + w_follower x (total_units - army_units)
+         + w_offer   x pending_gate_offers
+         + w_building x SUM(building levels)            (default weight 0)
+decay    = -2.5/h while the meter is >= 70 ("compromised", R4/Hitman),
+           else -5/h;  0 while a decay pause runs
+drift    = presence x relief_mult - decay   -> accumulates fractionally;
+           whole points settle into the meter, clamped at [0, 100]
+```
+
+- **Act sources**: training completions bump `UnitDef.suspicion_on_train`
+  per def (militia +8, knight +8, archer +4 in the MVP pack — completions
+  are detected by set-diffing the units system's `training_uids()`
+  between ticks: a uid that left the running-timer list completed its
+  timer, whatever the promotion graph; held completions read the retained
+  target, auto-completions the promoted def); every building level gained
+  bumps `suspicion_rise_medium` (+4 — R4's "new building level" act, the
+  reason the continuous building-presence weight defaults to 0); every
+  gate arrival while offers exceed `suspicion_recruit_tolerance` (3)
+  bumps `suspicion_rise_loud` (+8 — R4's "recruiting past tolerance";
+  the gate itself stays uncapped, §11). Zero-hour trainings complete at
+  the command drain, invisible to the tick-boundary scan — a def with 0h
+  training AND suspicion_on_train warns at construction.
+- **R4 decay_reset_rule**: a loud act (training bump) above the warn
+  threshold freezes decay for `suspicion_decay_pause_hours` (1h) —
+  re-offending pauses the cooldown, softened to run scale.
+- **Relief window** (24h after a crackdown): all rises — bumps AND
+  presence — multiply by `post_crackdown_rise_multiplier` (x0.5).
+
+### Thresholds, telegraph, crackdown, crush
+
+| Threshold | Behavior |
+|---|---|
+| 35 warn | `suspicion_warn` on zone ENTRY (once per entry — leaving below re-primes it silently; hysteresis) |
+| 70 crackdown | telegraph arms on the rising crossing: `suspicion_telegraph` (value = land tick, value2 = meter), countdown >= 4h (`crackdown_telegraph_hours`, validator-enforced). **Cancellable**: the tick the meter drops below 70 the riders stand down (`crackdown_cancelled`) — lay low and the warning was a warning. Re-arming needs a fresh crossing, gated by the re-arm timer |
+| 100 crush | `run_crushed` (the story beat; subject = regime, value = max, value2 = run index) + `resolve_victory(engine, false)` queued — the run dies at the next drain (`run_lost`, OUTCOME_DEFEAT, banks full progress, §12). The meter freezes while no run is live |
+
+When a telegraph lands: `crackdown_struck` (value = ordinal, value2 =
+meter before), then per-resource `crackdown_seized` lines (sorted by
+resource text; value = seized, value2 = remaining — **seize rounds DOWN**:
+`floor(stock x 0.4)`, you lose at most the declared fraction of each
+pile), then `crackdown_scattered` (value = scattered count, value2 =
+gate offers left). Scatter takes **ceil(fraction)** of the unassigned
+pool — gate offers first (arrival order), then idle peasants (roster
+order) — and NEVER touches committed pipeline (militia/trainee/awaiting),
+workers, trained army, or buildings: set-back, not death. The meter then
+re-opens at `post_crackdown_suspicion` (45) under the relief window +
+the **re-arm timer** (`crackdown_rearm_hours`, 4h — the fastest recur
+cycle is telegraph 4h + re-arm 4h; crackdowns recur only if you climb
+back to 70).
+
+### Events, chronicle lines, read API
+
+Events: `suspicion_rose` (subject = source id: unit def / `building` /
+`gate`; value = points, value2 = meter after), `suspicion_warn`,
+`suspicion_telegraph`, `crackdown_cancelled`, `crackdown_struck`,
+`crackdown_seized`, `crackdown_scattered`, `run_crushed`. The stream
+stays int-payload-only (pooled ring, §3); **human-readable chronicle
+lines are a pure render query** — `chronicle_line(event)` maps each
+beat to its satirical placeholder line (Professor X voice, T-COPY-01
+deepens), the same identity-is-a-query pattern as M1 finding F5.
+
+Read API: `suspicion_points()`, `max_points()`, `is_warned()`,
+`crackdown_land_tick` (UI countdown = land − tick), `crackdowns_total`,
+`relief_until_tick` / `rearm_until_tick` / `decay_paused_until_tick`
+(public fields), `is_decay_paused(at)` / `is_in_relief(at)`.
+`set_suspicion(points)` is a documented TEST/construction seam (mirrors
+`SimEngine.set_resource`); the acceptance marathon drives the meter
+honestly through real acts.
+
+### Serialization + determinism
+
+`to_dict()`/`from_dict()` fully overridden: meter, fractional carry,
+warn flag, telegraph land tick, crackdown count, the three window ticks,
+crush flag, and the **audit baseline** (last-seen units total/army/
+offers/arrivals, per-building levels, the running-training uid set) —
+without the baseline a restore would diff against zeroed counters and
+spawn phantom rises on the first post-restore tick. `state_hash()` mixes
+all of it (the countdown and windows are hashed state — an oracle blind
+to them could call a lost telegraph "identical", the T-ARCH-03 lesson).
+`reset_run(regime)` returns everything to constructed state at the
+`run_restart` drain (§12 reset contract). The system consumes no
+commands (`on_command` always false — a future lay-low verb would land
+there); while no run is RUNNING it is dormant but keeps the audit
+baseline current (arrivals do not stop for your defeat).
+
+**Regime-neutral at MVP** (documented): RegimeDef carries exactly one
+combat modifier + one economy quirk (validator-enforced, both claimed by
+all four flavors); a suspicion-rate angle would need an additive third
+modifier kind — deferred until a pack wants differentiated heat, per the
+content-schema §4 registry's forward compatibility.
+
+### Measured
+
+`marathon_suspicion_pressure` — run A (forced loud: every recruit
+militarized, every gear tier promoted, one upgrade per chunk) crosses
+warn, arms two telegraphs, eats one crackdown (every `crackdown_seized`
+event re-derives its own floor-40% math from its payload), and is
+**crushed at 66h** with 146 lp banked; the restart resets every field
+and the follow-up run stays quiet. Run B (careful-loud, then lay low)
+arms the telegraph at exactly 70 and **cancels it** by dipping below 70 —
+no crackdown ever fires, the meter keeps falling. The whole script
+replays bit-for-bit. ~59k ticks/s full-stack. All sibling marathons held
+their recorded hashes byte-identically (engine 3567881493, production
+3517250863, units 4081412319, run_thin 2708794948, gate 3372344018) —
+suspicion is strictly opt-in per engine until the game host composes the
+full stack.

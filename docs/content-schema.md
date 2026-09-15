@@ -196,6 +196,14 @@ tuned in the simulator), T-SEC-01 (cap/clamp policy).
 | `post_crackdown_suspicion` (45) | C: drop to 45 | < crackdown threshold |
 | `post_crackdown_rise_multiplier` (0.5) | C: ×0.5 | within (0, 1] |
 | `post_crackdown_relief_hours` (24) | C: 24h window | > 0 |
+| `suspicion_presence_army_per_hour` (0.5) | T-SIM-05 heat profile: presence per army unit (additive field) | ≥ 0 |
+| `suspicion_presence_follower_per_hour` (0.1) | T-SIM-05: presence per non-army tracked unit | ≥ 0 |
+| `suspicion_presence_building_per_hour` (0.0) | T-SIM-05: continuous presence per building level — DEFAULT 0 (buildings are loud when they GROW, via the medium act; always-on estate heat would make the tier-2 decay dip unreachable = an un-cancellable telegraph, which R4's tension mechanic forbids) | ≥ 0 |
+| `suspicion_presence_offer_per_hour` (0.25) | T-SIM-05: presence per recruit offer waiting at the gate | ≥ 0 |
+| `suspicion_recruit_tolerance` (3) | T-SIM-05: arrivals while offers EXCEED this are loud acts (+rise_loud); the gate itself stays uncapped | ≥ 0 |
+| `suspicion_decay_pause_hours` (1.0) | T-SIM-05: a loud act above warn freezes decay this long (R4 decay_reset_rule) | ≥ 0 |
+| `crackdown_scatter_fraction` (0.5) | T-SIM-05: fraction of the unassigned pool (offers + idle peasants) a crackdown scatters; rounds UP; never touches army/workers/buildings | within (0, 1] |
+| `crackdown_rearm_hours` (4.0) | T-SIM-05: minimum hours after a crackdown before the next telegraph may arm (recur gate) | ≥ 0 |
 
 R4 rows not carried as fields (`first_session_budget`,
 `per_session_visible_delta`, `run_arc_shape`) are acceptance targets for

@@ -269,6 +269,24 @@ func awaiting_promotion_ids() -> Array[int]:
 	return ids
 
 
+## Uids with a RUNNING training timer (the suspicion system's T-SIM-05 seam:
+## set-diffing this list between ticks detects training completions exactly —
+## a uid that leaves the list completed its timer that tick, whatever the
+## pack's promotion graph looks like). Roster order.
+func training_uids() -> Array[int]:
+	var ids: Array[int] = []
+	for unit in _training:
+		ids.append(unit.uid)
+	return ids
+
+
+## The def id that arrives at the gate (peasant; auto-detected at
+## construction). Read seam for systems/UIs that must not hardcode content
+## ids — T-SIM-05's scatter pool (idle base units) drives off it.
+func base_unit_id() -> StringName:
+	return _base_unit
+
+
 ## Army roster: count per army-eligible def id (terminal combat units).
 func army_roster() -> Dictionary[StringName, int]:
 	var roster: Dictionary[StringName, int] = {}
@@ -636,6 +654,34 @@ func reset_run(_p_regime: RegimeDef = null) -> void:
 	next_uid = 1
 	arrivals_total = 0
 	_arrival_countdown_milli = -1
+
+
+## Scatter seam (T-SIM-05 crackdown): remove up to `count` UNASSIGNED
+## recruits — gate offers first (arrival order), then idle base units
+## (accepted peasants resting without a role, roster order). NEVER touches
+## committed units: militia/trainee pipeline, awaiting promotions, workers,
+## the trained army, or anything else. Returns how many were scattered
+## (0 when the pool is empty / count <= 0). The caller (the suspicion
+## system, mid-on_tick) records the event — this is a pure mutation, the
+## same direct-synchronous-call shape as the reset contract.
+func scatter_recruits(count: int) -> int:
+	if count <= 0:
+		return 0
+	var scattered := 0
+	while scattered < count and not _offers.is_empty():
+		_offers.pop_front()
+		scattered += 1
+	var index := 0
+	while scattered < count and index < _units.size():
+		var unit := _units[index]
+		if unit.def_id == _base_unit and unit.target == &"" and not unit.awaiting_promotion:
+			_units.remove_at(index)  # do not advance: next unit shifted here
+			_by_uid.erase(unit.uid)
+			_counts[unit.def_id] = int(_counts.get(unit.def_id, 1)) - 1
+			scattered += 1
+		else:
+			index += 1
+	return scattered
 
 
 func _deny(engine: SimEngine, command: SimCommand, reason: int) -> void:

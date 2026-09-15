@@ -106,6 +106,16 @@ func idle_workers() -> int:
 	return workers_idle
 
 
+## All building ids in pack order (M1 finding F5 gap, closed for T-SIM-05's
+## heat profile: a system or UI that knows only the engine can now discover
+## what exists instead of mirroring content ids host-side).
+func building_ids() -> Array[StringName]:
+	var ids: Array[StringName] = []
+	for state in _states:
+		ids.append(state.def.id)
+	return ids
+
+
 func building_level(id: StringName) -> int:
 	var state := _by_id.get(id) as BuildingState
 	return 0 if state == null else state.level

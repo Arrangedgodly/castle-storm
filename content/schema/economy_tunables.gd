@@ -89,3 +89,53 @@ extends Resource
 
 ## Sim-hours the relief window lasts (R4: 24h).
 @export var post_crackdown_relief_hours: float = 24.0
+
+## --- Suspicion heat profile (T-SIM-05; presence weights — additive schema
+## extension, documented deviation from R4's per-act-only rise: the task
+## contract requires presence that "scales with visible revolution size".
+## Hour-scale weights are derived, not cited — same derivation status as R4's
+## own hour-scale numbers; T-SIM-08 tunes them in the simulator) ---
+
+## Suspicion points per sim-hour per ARMY unit on the roster (knights,
+## archers — armor and weapons are maximally visible; default 0.5).
+@export var suspicion_presence_army_per_hour: float = 0.5
+
+## Suspicion points per sim-hour per NON-army tracked unit (workers,
+## peasants, militia, trainees — every body in the conspiracy's camp is a
+## co-conspirator to the Crown's eyes, but quietly; default 0.1).
+@export var suspicion_presence_follower_per_hour: float = 0.1
+
+## Suspicion points per sim-hour per TOTAL building level. DEFAULT 0.0 — a
+## design decision, not an omission: buildings are loud when they GROW (the
+## +suspicion_rise_medium act per level gained, R4's "new building level"),
+## and continuous estate presence would make the tier-2 decay dip (−2.5/h)
+## mathematically unreachable once levels stack — an un-cancellable
+## telegraph, which the R4 tension mechanic forbids. The dial stays for
+## T-SIM-08 if the balance pass wants always-on estate visibility.
+@export var suspicion_presence_building_per_hour: float = 0.0
+
+## Suspicion points per sim-hour per recruit OFFER waiting at the gate (a
+## crowd loitering at the gate is louder than a farmer; default 0.25).
+@export var suspicion_presence_offer_per_hour: float = 0.25
+
+## Gate tolerance: pending offers at or below this count are a normal-looking
+## queue; each ARRIVAL while the gate holds MORE than this many is a loud act
+## (+suspicion_rise_loud) — R4 "recruiting past tolerance". The gate itself
+## stays uncapped (docs/sim-engine.md §11); the crowd is what gets noticed.
+@export var suspicion_recruit_tolerance: int = 3
+
+## Sim-hours a LOUD act (training completion with suspicion_on_train > 0)
+## freezes passive decay while suspicion is above the warn threshold (R4
+## decay_reset_rule, GTA's re-offense-resets-cooldown softened to run scale).
+@export var suspicion_decay_pause_hours: float = 1.0
+
+## Fraction of the unassigned-recruit pool (gate offers + idle peasants) a
+## crackdown scatters. Rounds UP (the Crown is thorough). Never touches
+## trained army, workers, or buildings.
+@export var crackdown_scatter_fraction: float = 0.5
+
+## Sim-hours after a crackdown before the NEXT telegraph may arm (the re-arm
+## timer: crackdowns recur only if you stay >= 70, and never faster than
+## this). Default 4.0 — the fastest possible recur cycle is telegraph (4h) +
+## re-arm (4h).
+@export var crackdown_rearm_hours: float = 4.0

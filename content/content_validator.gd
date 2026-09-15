@@ -422,3 +422,18 @@ static func _check_tunables(t: EconomyTunables, errors: Array[String]) -> void:
 		_err(errors, "tunables: post_crackdown_rise_multiplier must be within (0, 1] (got %s)" % t.post_crackdown_rise_multiplier)
 	if t.post_crackdown_relief_hours <= 0.0:
 		_err(errors, "tunables: post_crackdown_relief_hours must be > 0 (got %s)" % t.post_crackdown_relief_hours)
+	# --- Suspicion heat profile (T-SIM-05 additive fields) ---
+	if t.suspicion_presence_army_per_hour < 0.0 or t.suspicion_presence_follower_per_hour < 0.0 \
+			or t.suspicion_presence_building_per_hour < 0.0 or t.suspicion_presence_offer_per_hour < 0.0:
+		_err(errors, "tunables: suspicion presence weights must be >= 0 (got army=%s follower=%s building=%s offer=%s)" % [
+			t.suspicion_presence_army_per_hour, t.suspicion_presence_follower_per_hour,
+			t.suspicion_presence_building_per_hour, t.suspicion_presence_offer_per_hour,
+		])
+	if t.suspicion_recruit_tolerance < 0:
+		_err(errors, "tunables: suspicion_recruit_tolerance must be >= 0 (got %d)" % t.suspicion_recruit_tolerance)
+	if t.suspicion_decay_pause_hours < 0.0:
+		_err(errors, "tunables: suspicion_decay_pause_hours must be >= 0 (got %s)" % t.suspicion_decay_pause_hours)
+	if t.crackdown_scatter_fraction <= 0.0 or t.crackdown_scatter_fraction > 1.0:
+		_err(errors, "tunables: crackdown_scatter_fraction must be within (0, 1] (got %s)" % t.crackdown_scatter_fraction)
+	if t.crackdown_rearm_hours < 0.0:
+		_err(errors, "tunables: crackdown_rearm_hours must be >= 0 (got %s)" % t.crackdown_rearm_hours)
