@@ -35,6 +35,16 @@ var runs_recorded := 0
 ## banked score. Unbounded by design — one small entry per completed run.
 var chronicle: Array[Dictionary] = []
 
+## UTC epoch SECONDS of the last time the host marked the session seen
+## (T-SIM-07 offline catch-up): the anchor the next foreground subtracts
+## `now` from. Lives in the META domain deliberately — away time elapses
+## across run boundaries, so the anchor must outlive any single engine.
+## 0 is the FIRST-LAUNCH SENTINEL (docs/catch-up.md): never marked → no
+## catch-up ever fires off it. Additive-optional key (save-schema §5):
+## pre-feature metas lack it and read back as 0 — first-launch again,
+## which is exactly right.
+var last_seen_epoch := 0
+
 
 func to_dict() -> Dictionary:
 	var entries: Array[Dictionary] = []
@@ -45,6 +55,7 @@ func to_dict() -> Dictionary:
 		"legacy_points": legacy_points,
 		"runs_recorded": runs_recorded,
 		"chronicle": entries,
+		"last_seen_epoch": last_seen_epoch,
 	}
 
 
@@ -61,6 +72,9 @@ func apply_dict(state: Dictionary) -> bool:
 		return false
 	legacy_points = int(state.get("legacy_points", 0))
 	runs_recorded = int(state.get("runs_recorded", 0))
+	# Tolerant read (additive-optional, docs/save-schema.md §5): a pre-T-SIM-07
+	# meta has no anchor — the first-launch sentinel, never a refusal.
+	last_seen_epoch = int(state.get("last_seen_epoch", 0))
 	chronicle.clear()
 	for entry in state.get("chronicle", []):
 		chronicle.append(entry)

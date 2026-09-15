@@ -186,7 +186,7 @@ Measured (vendored 4.7.2 binary, Apple silicon, this repo's CI command):
 | T-SIM-05 suspicion | `sim/systems/suspicion_system.gd` (§14) — the pressure curve: act bumps (`training_complete` subjects resolve `UnitDef.suspicion_on_train`; building level gains) + presence drip vs tiered decay, cancellable ≥4h telegraphs, crackdowns that seize floor-40% + scatter unassigned recruits, run death at 100 via `resolve_victory(engine, false)` (§12); joins the restart reset list |
 | T-SIM-06 assault | `sim/systems/assault_resolver.gd` (§15) — a RESOLVER, not a ticker: `assault_odds` pure query (per-unit breakdown vs garrison), `commit_assault` command resolving at the drain into replayable `assault_beat` events + `resolve_victory` on win / set-back rules on loss |
 | T-SIM-04 run lifecycle | `sim/systems/run_lifecycle_system.gd` (§12) — `run_seed` → `rng` for randomized leaders/regimes drawn at the run_start/restart drains; events for chronicle; meta bank in `sim/run_meta.gd` |
-| T-SIM-07 catch-up | `fast_forward` (480 ticks = 8h cap) or linear accrual at the boundary; wall clock stays OUTSIDE sim |
+| T-SIM-07 catch-up | `sim/catch_up_service.gd` (§16, full contract in docs/catch-up.md) — the host service that turns two UTC timestamps into `fast_forward(≤480 ticks)`: anchor in RunMeta (meta domain), clamp/cap/backwards/freeze rules, one summary event + report; wall clock stays OUTSIDE sim (timestamps are injected) |
 | T-ARCH-03 save | `to_dict()/apply_state_dict()` + system save hooks |
 | T-UI-03/06 The Spread | `event_logged` (live), `events` ring (post-ffwd tail), `pause_changed` |
 | T-SCOPE-01 gate / any UI-CLI host | the command queue as the ONE write entry point + read APIs + both event feeds — the full contract is proven by `tests/acceptance/suites/gate_m1_thin_loop.gd` (§13) |
@@ -921,3 +921,49 @@ fast-forward replay reproduces hash + event count (578 events). Wall
 recorded hashes byte-identically (engine 3567881493, production
 3517250863, units 4081412319, run_thin 2708794948) — the resolver adds
 zero per-tick cost (it does not tick).
+
+## 16. Catch-up service (T-SIM-07)
+
+`sim/catch_up_service.gd` (`CatchUpService`) — offline catch-up: timestamp
+math at the foreground boundary plus one bounded replay through the REAL
+engine. Full contract (away-time semantics, clock policy, DST, crash
+safety): **docs/catch-up.md** — that doc is the source of truth; this
+section is the engine-facing map.
+
+**A HOST SERVICE, not a SimSystem** (the SaveManager discipline): plain
+RefCounted, no scene tree, no autoload, and NO CLOCK READS — every
+timestamp is injected by the platform host (`apply(engine, meta, now)`),
+which is what keeps the wall clock outside sim (§1's boundary rule,
+gdscript-conventions). It never registers on the seam, never ticks, holds
+no engine state; sibling marathons are byte-identical by construction.
+
+```gdscript
+var service := CatchUpService.new(pack.tunables)   # cap from offline_cap_hours
+service.mark_seen(run.meta, now_epoch)             # host: backgrounding/saving
+var report := service.apply(engine, run.meta, now_epoch)  # host: foreground/load
+```
+
+- **Anchor**: `RunMeta.last_seen_epoch` (UTC epoch seconds, META domain,
+  additive-optional key; 0 = first-launch sentinel — no anchor, no
+  catch-up). Every `apply()` refreshes it to `now`.
+- **Math (pure, the T-QA-04 fuzz surface)**: `clamp_elapsed_seconds`,
+  `applied_ticks_for(elapsed, cap)` (= clamp then floor-divide by
+  `TICK_SECONDS`), `elapsed_between` (operands clamped to ±2^40 first, so
+  int64 extremes cannot overflow). Never negative, never uncapped,
+  monotone — pinned over 2000 generated inputs in the unit suite.
+- **Replay**: `engine.fast_forward(applied)` — arrivals, training,
+  production and suspicion all advance by the real deterministic rules
+  (twin-proven: catch-up == the same ticks live, hash-identical, in the
+  unit suite AND `marathon_catch_up_gap`). A paused engine accrues
+  nothing (`skipped_paused` — pause is a world freeze).
+- **Events**: one `catch_up_applied` (value = ticks, value2 = clamped
+  seconds) recorded AFTER the window so the ring tail keeps the raw
+  detail; `catch_up_clock_rewound` (value = rewound seconds) on a
+  backwards clock — zero state change, never punishment. The returned
+  report Dictionary (resource deltas per type, arrivals, completions,
+  promotions, run endings, suspicion delta) is T-UI-09's data;
+  `chronicle_line(report)` renders the placeholder voice.
+- **Measured** (`marathon_catch_up_gap`, full MVP stack + suspicion):
+  capped 8h = 480 ticks resolves in ~7ms (budget 100ms); two away
+  windows + a kill-mid-catch-up revival + first-launch + rewind all
+  twin-verified in ~0.1s total.

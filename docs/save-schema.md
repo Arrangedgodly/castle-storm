@@ -335,6 +335,7 @@ format_version
 legacy_points
 runs_recorded
 chronicle
+last_seen_epoch
 ```
 
 | Field | Type | Meaning / restore notes |
@@ -343,6 +344,7 @@ chronicle
 | `legacy_points` | int | the banked-points reserve across every recorded run — failure banks FULL progress, so every ended run accrues (win, loss, abort, abandoned-on-restart). No spending exists at MVP (L1 unlock tree is post-MVP by the layer gate) |
 | `runs_recorded` | int | the MONOTONIC run number the chronicle displays — unlike engine-local `run_index` it never resets, surviving engine re-inits |
 | `chronicle` | Array[Dictionary] | append-only run records, oldest first. One small entry per completed run; unbounded by design |
+| `last_seen_epoch` | int | UTC epoch SECONDS of the offline catch-up anchor (T-SIM-07, docs/catch-up.md): the timestamp the next foreground subtracts `now` from. META domain deliberately — away time crosses run boundaries, so the anchor must outlive any engine. `0` is the FIRST-LAUNCH SENTINEL: never marked → no catch-up fires off it. Additive-optional with a tolerant reader (absent key reads as 0): a pre-T-SIM-07 meta upgrades to first-launch semantics — exactly right — with no migration |
 
 ### 5.1 `chronicle[*]` — one entry per ended run
 
