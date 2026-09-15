@@ -1,1 +1,8 @@
 docs/ultron/
+
+# Godot
+.godot/
+exports/
+
+# Vendored tooling (tools/godot/godot engine binary — see docs/DEV_SETUP.md)
+tools/
