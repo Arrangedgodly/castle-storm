@@ -175,6 +175,7 @@ Measured (vendored 4.7.2 binary, Apple silicon, this repo's CI command):
 | T-SIM-07 catch-up | `fast_forward` (480 ticks = 8h cap) or linear accrual at the boundary; wall clock stays OUTSIDE sim |
 | T-ARCH-03 save | `to_dict()/apply_state_dict()` + system save hooks |
 | T-UI-03/06 The Spread | `event_logged` (live), `events` ring (post-ffwd tail), `pause_changed` |
+| T-SCOPE-01 gate / any UI-CLI host | the command queue as the ONE write entry point + read APIs + both event feeds — the full contract is proven by `tests/acceptance/suites/gate_m1_thin_loop.gd` (§13) |
 | T-QA-02 economy CI | marathon pattern; asserts via `state_hash()` |
 
 ## 10. Production system (T-SIM-02)
@@ -547,3 +548,47 @@ identities, bank, and hash. This pre-stages the T-SCOPE-01 thin-loop
 gate. The engine/production/units marathons all held their
 T-SIM-01/02/03 hashes byte-identically — the run frame adds no per-tick
 cost (on_tick is empty; all work is at command drains).
+
+## 13. M1 thin-loop gate (T-SCOPE-01) — the UI-seam contract
+
+`tests/acceptance/suites/gate_m1_thin_loop.gd` formalizes the M1
+milestone gate: the whole loop (recruit → assign → train/gear →
+assault → restart, twice — victory then defeat) driven exactly the way
+a future UI/CLI host must drive it. The contract it proves, and that
+T-UI-03..10 and any future CLI should treat as binding:
+
+- **Writes**: ONE entry point — `engine.submit_command(kind, subject,
+  value)`. The assault is the raw `resolve_victory` command (what
+  T-SIM-06 will submit). No system write methods, no internals.
+  Exception (finding F1, docs/ultron/m1-findings.md): the STARTING
+  GRANT must currently use `engine.set_resource` at boot — the command
+  vocabulary has no grant verb and a zero-grant bootstrap is impossible
+  (cheapest producer costs timber+food while no resource flows until a
+  producer is built AND staffed; every restart zeroes the pool). The
+  gate proves the refusal (`upgrade_denied` reason 4) before granting,
+  and counts its grants (2 resources × 2 runs). A data-driven grant
+  should replace this (T-DATA-02).
+- **Reads**: the systems' documented UI-query surfaces only
+  (`offer_ids`, `idle_units`, `missing_gear_slots`, `upgrade_cost`,
+  `army_power`, `leader_name`, ...). A host-side affordability mirror
+  (recipes + idle/assigned counts) keeps doomed commands out of the
+  queue — denial events stay for genuinely contested states.
+- **Events, both feeds**: live play drives `tick()` and subscribes to
+  `event_logged` (copy at receipt — pooled events must never be
+  cached); after `fast_forward` (catch-up/offline) the host polls the
+  ring tail via `next_seq()`/`get_event(seq)` — there is no other way
+  to receive fast-forwarded events. The gate runs run 1 on the signal
+  feed and run 2 on the ring feed and merges both into one session
+  log with strictly +1 seq continuity.
+- **Determinism**: the identical script re-run fast-forward-only
+  (no signals) reproduces the same `state_hash()`, identities, bank
+  and event count — the live drive and the catch-up drive see the
+  same world.
+
+Measured (seed 20260916, honest 60t+40f grants, example-pack
+content): thin knight floor (1 knight + 1 archer, power 23) at ~26.1
+sim-hours; run 2 produced +584 food / +114 timber / +17 iron in 18h
+from a restarted economy; 319 events over 45 sim-hours (~7/h — a
+UI-friendly chronicle volume); wall 0.018s; replay hash 1285341300.
+Full findings (pacing, gear cost vs production, UI coverage gaps,
+watchlist for T-SIM-05..08): docs/ultron/m1-findings.md.
