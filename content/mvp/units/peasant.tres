@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="UnitDef" format=3]
+
+[ext_resource type="Script" path="res://content/schema/unit_def.gd" id="1_a"]
+
+[resource]
+script = ExtResource("1_a")
+id = &"peasant"
+display_name = "Peasant"
+promotion_paths = Array[StringName]([&"worker", &"militia"])
+face_id = &"face_peasant"

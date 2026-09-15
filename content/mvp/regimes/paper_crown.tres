@@ -1,0 +1,26 @@
+[gd_resource type="Resource" script_class="RegimeDef" format=3]
+
+[ext_resource type="Script" path="res://content/schema/regime_modifier.gd" id="1_d"]
+[ext_resource type="Script" path="res://content/schema/regime_def.gd" id="2_d"]
+
+[sub_resource type="Resource" id="RegimeModifier_1"]
+script = ExtResource("1_d")
+kind = &"army_score_multiplier"
+value = 0.95
+
+[sub_resource type="Resource" id="RegimeModifier_2"]
+script = ExtResource("1_d")
+kind = &"building_cost_multiplier"
+target = &"timber"
+value = 0.75
+
+[resource]
+script = ExtResource("2_d")
+id = &"paper_crown"
+display_name = "The Paper Crown"
+combat_modifier = SubResource("RegimeModifier_1")
+economy_quirk = SubResource("RegimeModifier_2")
+crest_id = &"crest_paper_crown"
+ink_ground = Color(0.3, 0.27, 0.2, 1)
+ink_secondary = Color(0.25, 0.32, 0.47, 1)
+flavor_text = "A frugal court of scrap and ledger. Timber is cheap here, and so is glory."

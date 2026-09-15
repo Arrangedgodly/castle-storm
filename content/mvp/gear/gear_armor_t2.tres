@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="GearDef" format=3]
+
+[ext_resource type="Script" path="res://content/schema/gear_def.gd" id="1_c"]
+
+[resource]
+script = ExtResource("1_c")
+id = &"gear_armor_t2"
+display_name = "Riveted Jack"
+slot = &"armor"
+tier = 2
+recipe = Dictionary[StringName, int]({
+&"iron": 35,
+&"timber": 8
+})
+combat_power = 6
+craft_time_hours = 3.0
+icon_id = &"icon_riveted"

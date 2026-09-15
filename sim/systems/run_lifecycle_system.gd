@@ -19,6 +19,10 @@
 ##   run_start            draw leader (first + epithet + 2 distinct tags +
 ##                        trait stub) + regime (uniform over the flavors),
 ##                        status UNSTARTED -> RUNNING, `run_started`
+##   grant_resources      pays the pack's starting stipend (boot-injected
+##                        content) into the pool, ONCE per run — the F1 fix:
+##                        hosts bootstrap runs through this command, never
+##                        backdoor set_resource; `resources_granted` per line
 ##   resolve_victory      entry point for the assault outcome (T-SIM-06 owns
 ##                        the odds; here the outcome arrives as win/loss) —
 ##                        banks the run score to RunMeta, appends the
@@ -56,6 +60,7 @@ const REASON_ALREADY_STARTED := 1
 const REASON_NOT_STARTED := 2
 const REASON_NOT_RUNNING := 3
 const REASON_NO_CONTENT := 4
+const REASON_STIPEND_PAID := 5  # grant_resources: this run already took its stipend
 
 ## Thin run-score stub: score = duration_hours + army_power + win bonus.
 ## Documented placeholder — T-SIM-08's balance pass owns the real formula.
@@ -102,12 +107,15 @@ var _trait_stub := 0
 var _regime: RegimeDef = null
 var _regimes: Array[RegimeDef] = []
 var _identity: IdentityPools = null
+var _starting_grants: Dictionary = {}  # StringName resource id -> int amount (boot-injected content, never serialized)
+var _stipend_run := 0  # run_index that already took its stipend (0 = none; serialized + hashed)
 
 
 func _init(
 	p_regimes: Array[RegimeDef],
 	p_identity: IdentityPools = null,
-	p_meta: RunMeta = null
+	p_meta: RunMeta = null,
+	p_starting_grants: Dictionary = {}
 ) -> void:
 	var seen: Dictionary = {}
 	for regime in p_regimes:
@@ -123,6 +131,7 @@ func _init(
 	_identity = p_identity
 	if _identity == null:
 		push_warning("run: no identity pools in pack — run_start will be refused (reason %d)" % REASON_NO_CONTENT)
+	_starting_grants = p_starting_grants.duplicate()
 	meta = p_meta if p_meta != null else RunMeta.new()
 
 
@@ -244,6 +253,8 @@ func on_command(engine: SimEngine, command: SimCommand) -> bool:
 			_handle_run_abort(engine)
 		&"resolve_victory":
 			_handle_resolve(engine, command)
+		&"grant_resources":
+			_handle_grant(engine, command)
 		_:
 			return false
 	return true
@@ -309,6 +320,52 @@ func _handle_resolve(engine: SimEngine, command: SimCommand) -> void:
 		return
 	var win := command.subject == &"win"
 	_end_run(engine, OUTCOME_VICTORY if win else OUTCOME_DEFEAT, command.value)
+
+
+# --- Starting stipend (F1 fix, T-DATA-02) ------------------------------------
+
+
+## Read API: the pack's starting stipend (resource id -> amount). Content is
+## boot-injected and never serialized; the PAID flag below is the run state.
+func starting_grants() -> Dictionary:
+	return _starting_grants.duplicate()
+
+
+## Read API: the run index that already took its stipend (0 = none).
+func stipend_paid_run() -> int:
+	return _stipend_run
+
+
+## `grant_resources` (subject/value intentionally unused): pays the pack's
+## starting stipend into the engine pool, once per run. This is the
+## host-facing bootstrap verb that replaces backdoor `set_resource` calls
+## (M1 finding F1): the amounts live in CONTENT (boot-injected here), never in
+## the command, so the verb cannot carry arbitrary amounts — it is a stipend,
+## not a cheat vector. Denied loudly when no run is running (3), the pack
+## declares no stipend (4), or this run already took it (5). Emits one
+## `resources_granted` event per resource line (sorted resource order — the
+## dict's file order is not canonical across hand edits), value = amount
+## granted, value2 = new pool total.
+func _handle_grant(engine: SimEngine, command: SimCommand) -> void:
+	if status != STATUS_RUNNING:
+		_deny(engine, command.kind, REASON_NOT_RUNNING)
+		return
+	if _starting_grants.is_empty():
+		_deny(engine, command.kind, REASON_NO_CONTENT)
+		return
+	if _stipend_run == run_index:
+		_deny(engine, command.kind, REASON_STIPEND_PAID)
+		return
+	var ids: Array = _starting_grants.keys()
+	# Sort by STRING text, not the StringName variants themselves: plain
+	# sort() on StringNames is not reliably text-ordered across processes
+	# (observed: same dict, different event order in two runs).
+	ids.sort_custom(func(a, b) -> bool: return String(a) < String(b))
+	for id in ids:
+		var amount := int(_starting_grants[id])
+		engine.add_resource(id, amount)
+		engine.events.record(engine.tick_count, &"resources_granted", id, amount, engine.get_resource(id))
+	_stipend_run = run_index
 
 
 # --- Generation + resolution internals ---------------------------------------
@@ -453,6 +510,7 @@ func state_hash() -> int:
 	hash_value = _mix(hash_value, start_tick)
 	hash_value = _mix(hash_value, end_tick)
 	hash_value = _mix(hash_value, _trait_stub)
+	hash_value = _mix(hash_value, _stipend_run)
 	hash_value = _mix(hash_value, _leader_first.hash())
 	hash_value = _mix(hash_value, _leader_epithet.hash())
 	hash_value = _mix(hash_value, String(regime_id()).hash())
@@ -477,6 +535,7 @@ func to_dict() -> Dictionary:
 		"end_tick": end_tick,
 		"outcome": outcome,
 		"last_score": last_score,
+		"stipend_run": _stipend_run,
 	}
 
 
@@ -501,6 +560,10 @@ func from_dict(state: Dictionary) -> void:
 	end_tick = int(state.get("end_tick", 0))
 	outcome = int(state.get("outcome", OUTCOME_NONE))
 	last_score = int(state.get("last_score", 0))
+	# The stipend PAID flag is run state (the amounts themselves are
+	# boot-injected content, like every def): without it, a restore would
+	# allow a second grant of the stipend and silently double the boot pool.
+	_stipend_run = int(state.get("stipend_run", 0))
 
 
 ## FNV-flavored 32-bit-safe mix (same shape as SimEngine._mix —

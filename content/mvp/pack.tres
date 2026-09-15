@@ -1,0 +1,48 @@
+[gd_resource type="Resource" script_class="ContentPack" format=3]
+
+[ext_resource type="Resource" path="res://content/mvp/art_manifest.tres" id="1_mvp"]
+[ext_resource type="Script" path="res://content/schema/building_def.gd" id="2_mvp"]
+[ext_resource type="Resource" path="res://content/mvp/buildings/farm.tres" id="3_mvp"]
+[ext_resource type="Resource" path="res://content/mvp/buildings/lumber_camp.tres" id="4_mvp"]
+[ext_resource type="Resource" path="res://content/mvp/buildings/smithy.tres" id="5_mvp"]
+[ext_resource type="Resource" path="res://content/mvp/buildings/training_grounds.tres" id="6_mvp"]
+[ext_resource type="Script" path="res://content/schema/gear_def.gd" id="7_mvp"]
+[ext_resource type="Resource" path="res://content/mvp/gear/gear_weapon_t1.tres" id="8_mvp"]
+[ext_resource type="Resource" path="res://content/mvp/gear/gear_weapon_t2.tres" id="9_mvp"]
+[ext_resource type="Resource" path="res://content/mvp/gear/gear_weapon_t3.tres" id="10_mvp"]
+[ext_resource type="Resource" path="res://content/mvp/gear/gear_armor_t1.tres" id="11_mvp"]
+[ext_resource type="Resource" path="res://content/mvp/gear/gear_armor_t2.tres" id="12_mvp"]
+[ext_resource type="Resource" path="res://content/mvp/gear/gear_armor_t3.tres" id="13_mvp"]
+[ext_resource type="Resource" path="res://content/mvp/identity_pools.tres" id="14_mvp"]
+[ext_resource type="Script" path="res://content/schema/regime_def.gd" id="15_mvp"]
+[ext_resource type="Resource" path="res://content/mvp/regimes/gilded_crown.tres" id="16_mvp"]
+[ext_resource type="Resource" path="res://content/mvp/regimes/iron_rotunda.tres" id="17_mvp"]
+[ext_resource type="Resource" path="res://content/mvp/regimes/velvet_fist.tres" id="18_mvp"]
+[ext_resource type="Resource" path="res://content/mvp/regimes/paper_crown.tres" id="19_mvp"]
+[ext_resource type="Script" path="res://content/schema/content_pack.gd" id="20_mvp"]
+[ext_resource type="Resource" path="res://content/mvp/economy_tunables.tres" id="21_mvp"]
+[ext_resource type="Script" path="res://content/schema/unit_def.gd" id="22_mvp"]
+[ext_resource type="Resource" path="res://content/mvp/units/peasant.tres" id="23_mvp"]
+[ext_resource type="Resource" path="res://content/mvp/units/worker.tres" id="24_mvp"]
+[ext_resource type="Resource" path="res://content/mvp/units/militia.tres" id="25_mvp"]
+[ext_resource type="Resource" path="res://content/mvp/units/trainee.tres" id="26_mvp"]
+[ext_resource type="Resource" path="res://content/mvp/units/knight.tres" id="27_mvp"]
+[ext_resource type="Resource" path="res://content/mvp/units/archer.tres" id="28_mvp"]
+
+[resource]
+script = ExtResource("20_mvp")
+pack_id = &"mvp"
+display_name = "Castle Storm — MVP Content Pack"
+resources = Array[StringName]([&"food", &"timber", &"iron"])
+gear_slots = Array[StringName]([&"weapon", &"armor"])
+units = Array[ExtResource("22_mvp")]([ExtResource("23_mvp"), ExtResource("24_mvp"), ExtResource("25_mvp"), ExtResource("26_mvp"), ExtResource("27_mvp"), ExtResource("28_mvp")])
+buildings = Array[ExtResource("2_mvp")]([ExtResource("3_mvp"), ExtResource("4_mvp"), ExtResource("5_mvp"), ExtResource("6_mvp")])
+gear = Array[ExtResource("7_mvp")]([ExtResource("8_mvp"), ExtResource("9_mvp"), ExtResource("10_mvp"), ExtResource("11_mvp"), ExtResource("12_mvp"), ExtResource("13_mvp")])
+regimes = Array[ExtResource("15_mvp")]([ExtResource("16_mvp"), ExtResource("17_mvp"), ExtResource("18_mvp"), ExtResource("19_mvp")])
+identity = ExtResource("14_mvp")
+tunables = ExtResource("21_mvp")
+art = ExtResource("1_mvp")
+starting_grants = Dictionary[StringName, int]({
+&"food": 50,
+&"timber": 80
+})

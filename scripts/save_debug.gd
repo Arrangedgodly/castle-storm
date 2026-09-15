@@ -4,7 +4,9 @@
 ##     CS_SAVE_HOURS=500 make save-debug    # a longer session
 ##     CS_SAVE_ROOT=res://saves make save-debug   # write into the repo's saves/ dir
 ##
-## Behavior models a real game process:
+## Behavior models a real game process (content: the T-DATA-02 MVP pack,
+## loaded through the loud gate; bootstrap through the grant_resources
+## command — the F1 verb, no set_resource):
 ##   - FIRST invocation: builds the full system stack, starts a run, plays
 ##     CS_SAVE_HOURS hours in 10h chunks (managed like the marathon suites),
 ##     saving BOTH domains after every chunk (the ring rotates live), then
@@ -20,6 +22,13 @@ extends SceneTree
 
 const CHUNK_HOURS := 10
 const SAVE_EVERY_CHUNK := true
+
+const PACK_PATH := "res://content/mvp/pack.tres"
+const MARATHON_STIPEND: Dictionary = {
+	&"food": 1_000_000_000,
+	&"timber": 1_000_000_000,
+	&"iron": 1_000_000_000,
+}
 
 
 func _initialize() -> void:
@@ -84,14 +93,15 @@ func _demo(root: String, run_seed: int, hours: int) -> int:
 	return 0 if reloaded else 1
 
 
-# --- Full-stack fixture (compact form of the marathon suite fixture) --------
+# --- Full-stack fixture (the MVP pack; compact form of the suites' helper) ---
 
 
 func _register_stack(engine: SimEngine) -> void:
+	var pack := ContentValidator.load_pack(PACK_PATH)
 	engine.register_system(HeartbeatSystem.new())
-	engine.register_system(RunLifecycleSystem.new(_regimes(), _identity()))
-	engine.register_system(UnitLifecycleSystem.new(_unit_defs(), _gear_defs(), EconomyTunables.new()))
-	engine.register_system(ProductionSystem.new(_building_defs(), EconomyTunables.new(), null))
+	engine.register_system(RunLifecycleSystem.new(pack.regimes, pack.identity, null, MARATHON_STIPEND))
+	engine.register_system(UnitLifecycleSystem.new(pack.units, pack.gear, pack.tunables))
+	engine.register_system(ProductionSystem.new(pack.buildings, pack.tunables, null))
 
 
 func _build(run_seed: int) -> SimEngine:
@@ -100,14 +110,19 @@ func _build(run_seed: int) -> SimEngine:
 	return engine
 
 
+func _producer_ids() -> Array[StringName]:
+	var ids: Array[StringName] = []
+	for building: BuildingDef in ContentValidator.load_pack(PACK_PATH).buildings:
+		if building.resource_produced != &"":
+			ids.append(building.id)
+	return ids
+
+
 func _seed_run(engine: SimEngine, crew := 4) -> void:
-	engine.set_resource(&"food", 1_000_000_000)
-	engine.set_resource(&"timber", 1_000_000_000)
-	engine.set_resource(&"iron", 1_000_000_000)
+	engine.submit_command(&"grant_resources", &"", 0)
 	engine.submit_command(&"add_worker", &"production", crew)
-	engine.submit_command(&"upgrade_building", &"farm", 1)
-	engine.submit_command(&"upgrade_building", &"camp", 1)
-	engine.submit_command(&"upgrade_building", &"mine", 1)
+	for id in _producer_ids():
+		engine.submit_command(&"upgrade_building", id, 1)
 
 
 func _manage(engine: SimEngine) -> void:
@@ -142,153 +157,10 @@ func _manage(engine: SimEngine) -> void:
 			if not options.is_empty():
 				engine.submit_command(&"equip_gear", options[0], uid)
 		engine.submit_command(&"promote", &"", uid)
-	for id in [&"farm", &"camp", &"mine"]:
+	for id in _producer_ids():
 		var free: int = production.worker_slots(id) - production.assigned_workers(id)
 		if free > 0 and production.idle_workers() > 0:
 			engine.submit_command(&"assign_worker", id, mini(free, production.idle_workers()))
-
-
-func _regimes() -> Array[RegimeDef]:
-	var make := func(
-		id: StringName, combat_kind: StringName, combat_value: float,
-		quirk_kind: StringName, quirk_target: StringName, quirk_value: float
-	) -> RegimeDef:
-		var regime := RegimeDef.new()
-		regime.id = id
-		regime.display_name = "Regime %s" % id
-		var combat := RegimeModifier.new()
-		combat.kind = combat_kind
-		combat.value = combat_value
-		regime.combat_modifier = combat
-		var quirk := RegimeModifier.new()
-		quirk.kind = quirk_kind
-		quirk.target = quirk_target
-		quirk.value = quirk_value
-		regime.economy_quirk = quirk
-		return regime
-	return [
-		make.call(&"gilded_crown", &"garrison_multiplier", 1.2, &"production_multiplier", &"timber", 0.85),
-		make.call(&"iron_rotunda", &"army_score_multiplier", 1.1, &"building_cost_multiplier", &"all", 1.2),
-		make.call(&"velvet_fist", &"garrison_multiplier", 0.9, &"production_multiplier", &"all", 1.15),
-		make.call(&"paper_crown", &"army_score_multiplier", 0.95, &"building_cost_multiplier", &"timber", 0.75),
-	]
-
-
-func _identity() -> IdentityPools:
-	var pools := IdentityPools.new()
-	pools.leader_first_names = ["Bran", "Ottilie", "Wick", "Mabel", "Godfrey", "Petronella", "Aldous", "Sybil"]
-	pools.leader_epithets = [
-		"the Unbearable", "the Almost Wise", "of the Leaky Barn", "the Twice-Fooled",
-		"the Modest Avalanche", "of Fine Debt", "the Whispering Shout", "the Patient Torch",
-	]
-	pools.personality_tags = [&"ambitious", &"pious", &"gluttonous", &"paranoid", &"romantic", &"vengeful"]
-	pools.recruit_names = ["Tom", "Hob", "Nell", "Kate", "Wat", "Dick", "Bess", "Gil", "Meg", "Ralph", "Joan", "Sim"]
-	return pools
-
-
-func _unit_defs() -> Array[UnitDef]:
-	var defs: Array[UnitDef] = []
-	var peasant := UnitDef.new()
-	peasant.id = &"peasant"
-	peasant.display_name = "Peasant"
-	peasant.promotion_paths.append(&"worker")
-	peasant.promotion_paths.append(&"militia")
-	defs.append(peasant)
-	var worker := UnitDef.new()
-	worker.id = &"worker"
-	worker.display_name = "Worker"
-	worker.can_work = true
-	worker.training_time_hours = 0.5
-	defs.append(worker)
-	var militia := UnitDef.new()
-	militia.id = &"militia"
-	militia.display_name = "Militia"
-	militia.training_time_hours = 2.0
-	militia.promotion_paths.append(&"trainee")
-	militia.combat_power = 1
-	defs.append(militia)
-	var trainee := UnitDef.new()
-	trainee.id = &"trainee"
-	trainee.display_name = "Trainee"
-	trainee.training_time_hours = 4.0
-	trainee.promotion_paths.append(&"knight")
-	trainee.promotion_paths.append(&"archer")
-	trainee.combat_power = 2
-	defs.append(trainee)
-	var knight := UnitDef.new()
-	knight.id = &"knight"
-	knight.display_name = "Knight"
-	knight.training_time_hours = 12.0
-	knight.required_gear_slots.append(&"weapon")
-	knight.required_gear_slots.append(&"armor")
-	knight.combat_power = 10
-	defs.append(knight)
-	var archer := UnitDef.new()
-	archer.id = &"archer"
-	archer.display_name = "Archer"
-	archer.training_time_hours = 6.0
-	archer.required_gear_slots.append(&"weapon")
-	archer.combat_power = 6
-	defs.append(archer)
-	return defs
-
-
-func _gear_defs() -> Array[GearDef]:
-	var defs: Array[GearDef] = []
-	var weapon_t1 := GearDef.new()
-	weapon_t1.id = &"gear_weapon_t1"
-	weapon_t1.display_name = "Borrowed Sword"
-	weapon_t1.slot = &"weapon"
-	weapon_t1.tier = 1
-	weapon_t1.combat_power = 2
-	weapon_t1.recipe[&"iron"] = 10
-	weapon_t1.recipe[&"timber"] = 5
-	defs.append(weapon_t1)
-	var armor_t1 := GearDef.new()
-	armor_t1.id = &"gear_armor_t1"
-	armor_t1.display_name = "Padded Jack"
-	armor_t1.slot = &"armor"
-	armor_t1.tier = 1
-	armor_t1.combat_power = 3
-	armor_t1.recipe[&"iron"] = 15
-	defs.append(armor_t1)
-	return defs
-
-
-func _building_defs() -> Array[BuildingDef]:
-	var milestones: Array[int] = [10, 20]
-	var farm := BuildingDef.new()
-	farm.id = &"farm"
-	farm.display_name = "Farm"
-	farm.resource_produced = &"food"
-	farm.base_production_per_worker_hour = 6.0
-	farm.worker_slots_base = 2
-	farm.base_cost[&"timber"] = 15
-	farm.cost_growth = 1.08
-	farm.milestone_levels = milestones
-	farm.max_level = 30
-	var camp := BuildingDef.new()
-	camp.id = &"camp"
-	camp.display_name = "Lumber Camp"
-	camp.resource_produced = &"timber"
-	camp.base_production_per_worker_hour = 6.0
-	camp.worker_slots_base = 2
-	camp.base_cost[&"food"] = 10
-	camp.cost_growth = 1.10
-	camp.milestone_levels = milestones
-	camp.max_level = 30
-	var mine := BuildingDef.new()
-	mine.id = &"mine"
-	mine.display_name = "Iron Mine"
-	mine.resource_produced = &"iron"
-	mine.base_production_per_worker_hour = 3.0
-	mine.worker_slots_base = 3
-	mine.base_cost[&"timber"] = 40
-	mine.base_cost[&"food"] = 20
-	mine.cost_growth = 1.12
-	mine.milestone_levels = milestones
-	mine.max_level = 30
-	return [farm, camp, mine]
 
 
 func _parse(path: String) -> Dictionary:

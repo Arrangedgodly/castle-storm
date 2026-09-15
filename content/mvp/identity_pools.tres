@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="IdentityPools" format=3]
+
+[ext_resource type="Script" path="res://content/schema/identity_pools.gd" id="1_e"]
+
+[resource]
+script = ExtResource("1_e")
+leader_first_names = Array[String](["Bran", "Ottilie", "Wick", "Mabel", "Godfrey", "Petronella", "Aldous", "Sybil", "Humphrey", "Dagmar", "Percival", "Griselda", "Emeric", "Tabitha", "Cornelius", "Beatrix", "Osric", "Winifred", "Bartholomew", "Hilda", "Reginald", "Millicent", "Fenn", "Isolde", "Gaw", "Ursula"])
+leader_epithets = Array[String](["the Unbearable", "the Almost Wise", "of the Leaky Barn", "the Twice-Fooled", "the Modest Avalanche", "of Fine Debt", "the Whispering Shout", "the Patient Torch", "the Overly Fond", "of the Damp Dungeon", "the Slightly Late", "of the Wrong Field", "the Quietly Furious", "of Borrowed Heraldry", "the Marginally Brave", "of the Overturned Cart", "the Undersung", "of the Miscounted Army", "the Stubbornly Cheerful", "of the Leaking Coffers", "the Extremely Pious", "of the Unwashed Feast", "the Mildly Terrible", "of the Trundling Banner", "the Suddenly Devout", "of the Overstuffed Saddle"])
+personality_tags = Array[StringName]([&"ambitious", &"pious", &"gluttonous", &"paranoid", &"romantic", &"vengeful", &"boastful", &"thrifty", &"gregarious", &"melancholy", &"scheming", &"devout"])
+recruit_names = Array[String](["Tom", "Hob", "Nell", "Kate", "Wat", "Dick", "Bess", "Gil", "Meg", "Ralph", "Joan", "Sim", "Piers", "Aldwin", "Cissy", "Dob", "Edith", "Fulk", "Gert", "Ham", "Ida", "Jack", "Kemp", "Lark", "Maud", "Ned", "Odo", "Pip", "Quill", "Rob", "Sal", "Tib", "Win", "Art", "Bertha", "Colin", "Edda", "Fina", "Godwin", "Hodge"])

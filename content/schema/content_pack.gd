@@ -44,3 +44,13 @@ extends Resource
 
 ## Art key -> vendored source + license manifest (R6).
 @export var art: ArtManifest
+
+## Starting stipend for a run: resource id -> amount, paid in full by the
+## `grant_resources` command at run start (the F1 fix, T-DATA-02). Empty = the
+## pack declares no stipend and `grant_resources` is refused loudly — a
+## zero-grant bootstrap is impossible by design (the cheapest producer costs
+## resources while nothing flows until it is built AND staffed). This is pack
+## data, not an EconomyTunables knob, because the amounts must scale with THIS
+## pack's building costs and recipes (a balance decision of the content, like
+## base_cost — tunables carry rate/curve/policy vocabulary instead).
+@export var starting_grants: Dictionary[StringName, int] = {}

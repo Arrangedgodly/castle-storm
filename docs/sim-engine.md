@@ -479,6 +479,7 @@ quirk lands the moment the draw does — 6/h × 0.85 becomes exactly
 | Command | Effect |
 |---|---|
 | `run_start` | draw identity + regime, UNSTARTED → RUNNING, `run_started` (subject = regime id, value = run index) |
+| `grant_resources` | pay the run's starting stipend (boot-injected pack content, `ContentPack.starting_grants`) into the pool, ONCE per run — the F1 bootstrap verb; `resources_granted` per line (subject = resource, value = amount, value2 = new total; lines sorted by resource text). Denied 3 no running run / 4 pack has no stipend / 5 already paid this run; the PAID flag (`stipend_run`) is serialized + hashed so a restore cannot double-pay |
 | `run_abort` | explicit surrender — the THIN failure path (suspicion failure is T-SIM-05); banks + `run_aborted` |
 | `run_restart` | fold a new identity, reset run-scoped state (below), `run_restarted` |
 | `resolve_victory` | internal (queued by the entry point, below); subject `&"win"`/`&"loss"`, value = army power override |
@@ -580,15 +581,15 @@ T-UI-03..10 and any future CLI should treat as binding:
 
 - **Writes**: ONE entry point — `engine.submit_command(kind, subject,
   value)`. The assault is the raw `resolve_victory` command (what
-  T-SIM-06 will submit). No system write methods, no internals.
-  Exception (finding F1, docs/ultron/m1-findings.md): the STARTING
-  GRANT must currently use `engine.set_resource` at boot — the command
-  vocabulary has no grant verb and a zero-grant bootstrap is impossible
-  (cheapest producer costs timber+food while no resource flows until a
-  producer is built AND staffed; every restart zeroes the pool). The
-  gate proves the refusal (`upgrade_denied` reason 4) before granting,
-  and counts its grants (2 resources × 2 runs). A data-driven grant
-  should replace this (T-DATA-02).
+  T-SIM-06 will submit). No system write methods, no internals. The
+  starting grant is a real command since T-DATA-02 (finding F1 resolved):
+  `grant_resources` pays the pack's stipend — the amounts live in
+  content (`ContentPack.starting_grants`), never in the command, so the
+  verb cannot carry arbitrary amounts. The gate still proves the
+  zero-grant bootstrap impossible (`upgrade_denied` reason 4 precedes
+  the first `building_built`), then boots through the verb; restart
+  zeroes the pool and the verb pays the new run's stipend.
+  `engine.set_resource` is a documented TEST/construction seam only.
 - **Reads**: the systems' documented UI-query surfaces only
   (`offer_ids`, `idle_units`, `missing_gear_slots`, `upgrade_cost`,
   `army_power`, `leader_name`, ...). A host-side affordability mirror
@@ -606,10 +607,11 @@ T-UI-03..10 and any future CLI should treat as binding:
   and event count — the live drive and the catch-up drive see the
   same world.
 
-Measured (seed 20260916, honest 60t+40f grants, example-pack
-content): thin knight floor (1 knight + 1 archer, power 23) at ~26.1
-sim-hours; run 2 produced +584 food / +114 timber / +17 iron in 18h
-from a restarted economy; 319 events over 45 sim-hours (~7/h — a
-UI-friendly chronicle volume); wall 0.018s; replay hash 1285341300.
+Measured (seed 20260916, the T-DATA-02 MVP pack with its honest
+`starting_grants` stipend of 80 timber + 50 food, paid through the
+grant verb): thin knight floor (1 knight + 1 archer, army power 23) at
+~27.0 sim-hours; run 2 produced +543 food / +80 timber / +17 iron in 18h
+from a restarted economy; 324 events over 45 sim-hours (~7/h — a
+UI-friendly chronicle volume); wall time 0.027s; replay hash 3372344018.
 Full findings (pacing, gear cost vs production, UI coverage gaps,
 watchlist for T-SIM-05..08): docs/ultron/m1-findings.md.

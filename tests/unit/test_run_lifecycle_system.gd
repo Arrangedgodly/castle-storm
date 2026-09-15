@@ -193,11 +193,12 @@ func _engine_with(
 	p_regimes: Array[RegimeDef],
 	p_identity: IdentityPools,
 	p_run_seed: int,
-	p_meta: RunMeta = null
+	p_meta: RunMeta = null,
+	p_starting_grants: Dictionary = {}
 ) -> SimEngine:
 	var engine := SimEngine.new(p_run_seed)
 	engine.register_system(HeartbeatSystem.new())
-	engine.register_system(RunLifecycleSystem.new(p_regimes, p_identity, p_meta))
+	engine.register_system(RunLifecycleSystem.new(p_regimes, p_identity, p_meta, p_starting_grants))
 	engine.register_system(UnitLifecycleSystem.new(_unit_defs(), _gear_defs(), _tunables()))
 	engine.register_system(ProductionSystem.new([_farm(), _camp()], _tunables(), null))
 	return engine
@@ -778,3 +779,129 @@ func test_full_run_script_is_deterministic() -> void:
 	assert_dict(first[1]).is_equal(second[1])
 	assert_int(int(first[2]["hash"])).is_equal(int(second[2]["hash"]))
 	assert_int(int(first[2]["points"])).is_equal(int(second[2]["points"]))
+
+
+# --- Starting stipend: the grant_resources command (F1, T-DATA-02) ------------
+#
+# The host bootstrap verb: pays the boot-injected stipend ONCE per run, at a
+# command drain, from CONTENT — never backdoor set_resource. Denial codes:
+# 3 no running run, 4 no stipend in content, 5 already paid this run.
+
+
+func test_grant_resources_pays_the_stipend_once_per_run() -> void:
+	var grants := {&"timber": 60, &"food": 40}
+	var engine := _engine_with(_regimes(), _identity(), RUN_SEED, null, grants)
+	var run := _start(engine)
+	# run_start does NOT auto-grant: the pool starts empty (the verb is the
+	# host's explicit bootstrap decision).
+	assert_int(engine.get_resource(&"food")).is_equal(0)
+	assert_int(engine.get_resource(&"timber")).is_equal(0)
+	engine.submit_command(&"grant_resources", &"", 0)
+	engine.tick()
+	assert_int(engine.get_resource(&"food")).is_equal(40)
+	assert_int(engine.get_resource(&"timber")).is_equal(60)
+	assert_int(run.stipend_paid_run()).is_equal(1)
+	# One event per resource line, sorted resource order, value2 = new total.
+	var events := _events_of_type(engine, &"resources_granted")
+	assert_int(events.size()).is_equal(2)
+	assert_str(String(events[0]["subject"])).is_equal("food")
+	assert_int(int(events[0]["value"])).is_equal(40)
+	assert_int(int(events[0]["value2"])).is_equal(40)
+	assert_str(String(events[1]["subject"])).is_equal("timber")
+	assert_int(int(events[1]["value"])).is_equal(60)
+	assert_int(int(events[1]["value2"])).is_equal(60)
+	# A second grant in the SAME run is refused and pays nothing.
+	engine.submit_command(&"grant_resources", &"", 0)
+	engine.tick()
+	var denials := _events_of_type(engine, &"run_denied")
+	assert_int(denials.size()).is_equal(1)
+	assert_int(int(denials[0]["value"])).is_equal(RunLifecycleSystem.REASON_STIPEND_PAID)
+	assert_int(engine.get_resource(&"food")).is_equal(40)
+	assert_int(engine.get_resource(&"timber")).is_equal(60)
+	# Read API mirrors the injected content.
+	var read_back: Dictionary = run.starting_grants()
+	assert_int(int(read_back[&"food"])).is_equal(40)
+	assert_int(int(read_back[&"timber"])).is_equal(60)
+
+
+func test_grant_resources_denied_without_a_running_run() -> void:
+	var engine := _engine_with(_regimes(), _identity(), RUN_SEED, null, {&"food": 40})
+	engine.submit_command(&"grant_resources", &"", 0)
+	engine.tick()
+	var denials := _events_of_type(engine, &"run_denied")
+	assert_int(denials.size()).is_equal(1)
+	assert_int(int(denials[0]["value"])).is_equal(RunLifecycleSystem.REASON_NOT_RUNNING)
+	assert_int(engine.get_resource(&"food")).is_equal(0)
+
+
+func test_grant_resources_denied_without_stipend_content() -> void:
+	var engine := _engine()  # default: no stipend injected
+	var run := _start(engine)
+	engine.submit_command(&"grant_resources", &"", 0)
+	engine.tick()
+	var denials := _events_of_type(engine, &"run_denied")
+	assert_int(denials.size()).is_equal(1)
+	assert_int(int(denials[0]["value"])).is_equal(RunLifecycleSystem.REASON_NO_CONTENT)
+	assert_int(run.stipend_paid_run()).is_equal(0)
+
+
+func test_grant_pays_again_after_restart_zeroed_the_pool() -> void:
+	# The restart hole F1 called out: every restart zeroes the pool, so the
+	# verb must pay the new run's stipend again (once per run index).
+	var engine := _engine_with(_regimes(), _identity(), RUN_SEED, null, {&"food": 40})
+	var run := _start(engine)
+	engine.submit_command(&"grant_resources", &"", 0)
+	engine.tick()
+	assert_int(engine.get_resource(&"food")).is_equal(40)
+	# Test-seam extra (set_resource is the documented construction seam):
+	# prove the restart zeroes EVERYTHING, granted or produced.
+	engine.set_resource(&"food", 500)
+	engine.submit_command(&"run_restart", &"", 0)
+	engine.tick()
+	assert_int(engine.get_resource(&"food")).is_equal(0)
+	assert_int(run.stipend_paid_run()).is_equal(1)  # run 1 paid; run 2 not yet
+	engine.submit_command(&"grant_resources", &"", 0)
+	engine.tick()
+	assert_int(engine.get_resource(&"food")).is_equal(40)
+	assert_int(run.stipend_paid_run()).is_equal(2)
+
+
+func test_stipend_paid_flag_survives_the_save_round_trip() -> void:
+	# Without the serialized flag, a restore would re-grant and silently
+	# double the boot pool — the exact class of gap the oracle check below
+	# exists to catch.
+	var grants := {&"food": 40}
+	var engine := _engine_with(_regimes(), _identity(), RUN_SEED, null, grants)
+	var run := _start(engine)
+	engine.submit_command(&"grant_resources", &"", 0)
+	engine.tick()
+	var captured := engine.to_dict()
+	var restored_engine := _engine_with(_regimes(), _identity(), RUN_SEED, null, grants)
+	assert_bool(restored_engine.apply_state_dict(captured)).is_true()
+	var restored := _run(restored_engine)
+	assert_int(restored.stipend_paid_run()).is_equal(1)
+	assert_int(restored_engine.state_hash()).is_equal(engine.state_hash())
+	# The restored engine refuses to double-pay.
+	restored_engine.submit_command(&"grant_resources", &"", 0)
+	restored_engine.tick()
+	var denials := _events_of_type(restored_engine, &"run_denied")
+	assert_int(denials.size()).is_equal(1)
+	assert_int(int(denials[0]["value"])).is_equal(RunLifecycleSystem.REASON_STIPEND_PAID)
+	assert_int(restored_engine.get_resource(&"food")).is_equal(40)
+
+
+func test_state_hash_sees_the_stipend_paid_flag() -> void:
+	# Two engines identical in every observable except the paid flag (the
+	# second's pool is constructed via the test seam to the same values):
+	# the oracle must distinguish them.
+	var grants := {&"food": 40}
+	var paid := _engine_with(_regimes(), _identity(), RUN_SEED, null, grants)
+	_start(paid)
+	paid.submit_command(&"grant_resources", &"", 0)
+	paid.tick()
+	var unpaid := _engine_with(_regimes(), _identity(), RUN_SEED, null, grants)
+	_start(unpaid)
+	unpaid.set_resource(&"food", 40)  # same pool values, no paid flag
+	unpaid.tick()
+	assert_int(paid.get_resource(&"food")).is_equal(unpaid.get_resource(&"food"))
+	assert_int(paid.state_hash()).is_not_equal(unpaid.state_hash())

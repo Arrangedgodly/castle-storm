@@ -59,6 +59,7 @@ through `ContentValidator.load_pack(path)`.
 | `identity` | `IdentityPools` | set, valid | Leader/recruit name pools | T-SIM-04, T-COPY-01 |
 | `tunables` | `EconomyTunables` | set, valid | R4 vocabulary as data (§4) | T-SIM-05/07/08 |
 | `art` | `ArtManifest` | set, valid; covers every referenced key | Asset keys → vendored sources + licenses (§3) | T-ARCH-04, T-UI-01 |
+| `starting_grants` | `Dictionary[StringName, int]` | keys ⊆ `resources`; values > 0 (additive, T-DATA-02) | Run-start stipend paid by the `grant_resources` command (M1 finding F1); empty = no stipend, the verb is refused | T-DATA-02, T-SIM-04, T-UI-05 |
 
 Cross-refs between defs use **`StringName` ids, never file paths or
 ExtResource chains**: `peasant.promotion_paths = [&"worker", &"militia"]`,
@@ -223,6 +224,11 @@ to start, never silently default"):
 - Wired into `make test`:
   - *Green path*: `content/examples/pack_example.tres` + all its files
     validate with zero errors.
+  - *Green path 2 (T-DATA-02)*: `content/mvp/pack.tres` — the shipped MVP
+    pack — loads through `load_pack` and validates with zero errors
+    (`tests/unit/test_mvp_pack.gd` also pins its id contract, economy
+    self-consistency, regime quirk-shape coverage, no-orphan art, no
+    duplicate display names, and a zero-backdoor grant-verb boot).
   - *Red path*: `tests/unit/fixtures/pack_invalid.tres` (a real broken
     pack on disk) — `load_pack` must return `null`; plus 11 in-code
     mutation tests asserting exact messages (empty id, unknown promotion
@@ -293,6 +299,42 @@ costs, training hours) are placeholders for T-SIM-08 to tune — the
 schema's job is that they are *data*, swappable without code changes.
 `tests/unit/fixtures/pack_invalid.tres` is the permanent red-path
 fixture (a pack whose first unit has an empty id, among other faults).
+
+## 9. The MVP pack (T-DATA-02) — the game's shipped content
+
+`content/mvp/pack.tres` is the full MVP content set; every acceptance
+suite and `scripts/save_debug.gd` loads it through the loud gate via the
+shared fixture `tests/acceptance/suites/_mvp_pack.gd` (one source of
+truth — no suite carries its own content copy):
+
+- **Resources**: food, timber, iron. **Gear slots**: weapon, armor × 3 tiers.
+- **Units**: the 6-unit chain peasant→worker/militia→trainee→knight|archer
+  at the M1-measured numbers (worker 0.5h, militia 2h, trainee 4h,
+  knight 12h combat 10, archer 6h combat 6; t1 knight kit = 25 iron +
+  5 timber ≈ 2.8h of fully-staffed L1 smithy — M1 finding F3's healthy
+  parity, pinned by test).
+- **Buildings** (the M1 watch-item reconciliation): farm (food 6/h, 2
+  slots, timber 15, r=1.08), lumber_camp (timber 6/h, 2 slots, food 10,
+  r=1.10), smithy (iron 3/h, 3 slots, timber 40 + food 20, r=1.12) and
+  training_grounds (non-producing flavor card — training needs no
+  building per T-SIM-03; the smithy doubles as the bog-iron smelter so
+  gear crafting has its flavor home). Producer numbers are byte-identical
+  to the M1-measured trio.
+- **Regimes**: gilded_crown (garrison ×1.2 + timber prod ×0.85),
+  iron_rotunda (army score ×1.1 + all costs ×1.2), velvet_fist
+  (garrison ×0.9 + all production ×1.15), paper_crown (army score ×0.95 +
+  timber costs ×0.75) — distinct combat modifiers and all four economy
+  quirk shapes (per-resource prod, prod-all, cost-all, per-resource
+  cost), with inks, crests and satirical flavor text.
+- **Identity pools** (the breadth substrate for T-COPY-01): 26 leader
+  first names × 26 epithets (676 full-name permutations), 12 personality
+  tags, 40 recruit names — medieval-farce voice, no modern anachronisms.
+- **starting_grants**: `{food 50, timber 80}` — affords building all four
+  buildings at identity costs with a thin spare buffer; paid once per run
+  by the `grant_resources` command (docs/sim-engine.md §12, F1).
+- **Art manifest**: 20 assets — every unit face, building icon, gear icon
+  and regime crest keyed; ids only, paths are forward declarations of the
+  vendored layout until T-ARCH-04.
 
 Editing workflow: open the project in the Godot editor
 (`tools/godot/godot -e`), select a `.tres`, edit fields in the inspector

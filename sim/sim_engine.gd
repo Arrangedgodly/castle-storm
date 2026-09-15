@@ -162,6 +162,11 @@ func get_resource(id: StringName) -> int:
 	return int(resources.get(id, 0))
 
 
+## Direct pool write. TEST/HOST CONSTRUCTION SEAM ONLY (documented T-DATA-02,
+## M1 finding F1): gameplay never calls this — production settles into the
+## pool via add_resource, and a run's starting stipend arrives through the
+## `grant_resources` command (RunLifecycleSystem, paid from pack content).
+## Tests use it to construct exact pool states; nothing else may.
 func set_resource(id: StringName, amount: int) -> void:
 	assert(amount >= 0, "SimEngine.set_resource: amount must be >= 0 (id '%s')" % id)
 	resources[id] = amount

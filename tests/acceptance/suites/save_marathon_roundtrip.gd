@@ -235,12 +235,12 @@ func _regime_round_trip(harness, fixture, root: String, regime: RegimeDef) -> vo
 	engine.submit_command(&"run_start", &"", 0)  # forced draw: the quirk applies at the drain
 	fixture._seed_run(engine)
 	engine.submit_command(&"assign_worker", &"farm", 2)
-	engine.submit_command(&"assign_worker", &"camp", 2)
+	engine.submit_command(&"assign_worker", &"lumber_camp", 2)
 	engine.fast_forward(CHUNK_TICKS)  # 10h of real production under the quirk
 
 	var production := engine.get_system(&"production") as ProductionSystem
 	var rate_farm: int = production.production_rate_milli_per_worker(&"farm")
-	var rate_camp: int = production.production_rate_milli_per_worker(&"camp")
+	var rate_camp: int = production.production_rate_milli_per_worker(&"lumber_camp")
 	var cost_timber: int = production.upgrade_cost(&"farm")[&"timber"]
 	var hash_at_save: int = engine.state_hash()
 	_sweep_camp_rates.append(rate_camp)
@@ -253,7 +253,7 @@ func _regime_round_trip(harness, fixture, root: String, regime: RegimeDef) -> vo
 	var loaded: bool = SaveManager.new(root).load_run(restarted)
 	var restarted_production := restarted.get_system(&"production") as ProductionSystem
 	var restored_rate_farm: int = restarted_production.production_rate_milli_per_worker(&"farm")
-	var restored_rate_camp: int = restarted_production.production_rate_milli_per_worker(&"camp")
+	var restored_rate_camp: int = restarted_production.production_rate_milli_per_worker(&"lumber_camp")
 	var restored_cost_timber: int = restarted_production.upgrade_cost(&"farm")[&"timber"]
 	var hash_at_load: int = restarted.state_hash()
 
@@ -282,15 +282,17 @@ func _regime_round_trip(harness, fixture, root: String, regime: RegimeDef) -> vo
 
 
 ## The fixture's stack with ONE regime in the pack: run_start's uniform draw
-## is forced, so each sweep iteration deterministically exercises its flavor.
+## is forced, so each sweep iteration deterministically exercises its flavor
+## (the pack's 4 flavors cover every quirk shape: production-target
+## gilded_crown, cost-all iron_rotunda, production-all velvet_fist,
+## cost-target paper_crown). Marathon funds through the grant verb (F1).
 func _build_under(fixture, regime: RegimeDef) -> SimEngine:
 	var single: Array[RegimeDef] = [regime]
-	var engine := SimEngine.new(20260915)
-	engine.register_system(HeartbeatSystem.new())
-	engine.register_system(RunLifecycleSystem.new(single, fixture._identity()))
-	engine.register_system(UnitLifecycleSystem.new(fixture._unit_defs(), fixture._gear_defs(), EconomyTunables.new()))
-	engine.register_system(ProductionSystem.new(fixture._building_defs(), EconomyTunables.new(), null))
-	return engine
+	var mvp = load("res://tests/acceptance/suites/_mvp_pack.gd")
+	return mvp.stack_with_regimes(
+		20260915, single, fixture._unit_defs(), fixture._building_defs(),
+		mvp.MARATHON_STIPEND
+	)
 
 
 # --- File helpers (the suite runs under user:// and cleans up after itself)

@@ -107,6 +107,11 @@ static func _check_pack_header(pack: ContentPack, errors: Array[String]) -> void
 		_err(errors, "pack: tunables must be set")
 	if pack.art == null:
 		_err(errors, "pack: art manifest must be set")
+	for resource in pack.starting_grants:
+		if not pack.resources.has(resource):
+			_err(errors, "pack: starting_grants references undeclared resource '%s'" % resource)
+		if int(pack.starting_grants[resource]) <= 0:
+			_err(errors, "pack: starting_grants['%s'] must be > 0 (got %d)" % [resource, int(pack.starting_grants[resource])])
 
 
 static func _check_unique(errors: Array[String], message_format: String, names: Array) -> void:

@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="BuildingDef" format=3]
+
+[ext_resource type="Script" path="res://content/schema/building_def.gd" id="1_b"]
+
+[resource]
+script = ExtResource("1_b")
+id = &"farm"
+display_name = "Farm"
+resource_produced = &"food"
+base_production_per_worker_hour = 6.0
+worker_slots_base = 2
+base_cost = Dictionary[StringName, int]({
+&"timber": 15
+})
+cost_growth = 1.08
+milestone_levels = Array[int]([10, 20])
+max_level = 30
+icon_id = &"icon_farm"

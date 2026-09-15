@@ -1,5 +1,6 @@
 ## M1 milestone gate — the thin end-to-end loop through the UI seam
-## (T-SCOPE-01; findings: docs/ultron/m1-findings.md).
+## (T-SCOPE-01; findings: docs/ultron/m1-findings.md; content since T-DATA-02:
+## the FULL MVP pack, content/mvp/pack.tres).
 ##
 ## THE GATE: the whole loop — recruit -> assign -> train/gear -> assault ->
 ## restart, twice (victory path, then defeat path) — driven exactly the way a
@@ -9,16 +10,13 @@
 ##   - WRITES go through ONE entry point: `engine.submit_command(...)`. The
 ##     assault is the raw `resolve_victory` command (what T-SIM-06 will
 ##     submit), never the system method. No system write/internals are
-##     touched; no test backdoors.
-##   - ONE sanctioned exception, measured then flagged (finding F1): the
-##     STARTING GRANT. The command vocabulary has no grant/boot verb, and a
-##     zero-grant bootstrap is impossible (the cheapest producer costs
-##     timber+food, but no resource flows until a producer is built AND
-##     staffed). The gate PROVES the gap — an honest build attempt is
-##     refused first (`upgrade_denied` reason 4) — then grants through
-##     `engine.set_resource` (the host boot seam). Every restart zeroes the
-##     pool, so each of the two runs needs its own grant; the grant count is
-##     asserted (4) so the exception stays visible.
+##     touched; no test backdoors. The STARTING GRANT is now a real verb
+##     (finding F1, resolved by T-DATA-02): `grant_resources` pays the pack's
+##     stipend from content, once per run — the gate still PROVES the
+##     zero-grant bootstrap impossible (an honest build attempt is refused
+##     first, `upgrade_denied` reason 4), then boots through the verb. ZERO
+##     set_resource calls remain (that method is a documented test
+##     construction seam only).
 ##   - READS use the systems' documented UI-query surfaces (offer_ids,
 ##     idle_units, upgrade_cost, army_power, leader_name, ...) only.
 ##   - EVENTS arrive by BOTH documented UI paths: run 1 is driven by live
@@ -38,13 +36,13 @@
 ## drive and the catch-up drive see the same deterministic world.
 extends RefCounted
 
+const MVP := preload("res://tests/acceptance/suites/_mvp_pack.gd")
+
 const GATE_SEED := 20260916
 const BUDGET_SECONDS := 10.0
 const BATCH_TICKS := 60  # management cadence: one batch per sim-hour
 const RUN1_CAP_TICKS := 60 * SimEngine.TICKS_PER_SIM_HOUR  # 60h to the floor
 const RUN2_BATCHES := 18  # 18h of honest production before the losing assault
-const GRANT_FOOD := 40
-const GRANT_TIMBER := 60
 const RUN_BEAT_TYPES: Array[StringName] = [
 	&"run_started", &"run_restarted", &"run_won", &"run_lost",
 	&"recruit_arrived", &"unit_promoted", &"gear_equipped", &"building_built",
@@ -144,6 +142,7 @@ func run(harness) -> void:
 	var session := SessionLog.new()
 	engine.event_logged.connect(session.capture_signal)
 	var report := _gate_script(engine, true, session)
+	report["grant_lines"] = session.count_type(&"resources_granted")
 	var wall := float(Time.get_ticks_msec() - clock_start) / 1000.0
 	report["wall"] = wall
 	_print_digest(report, session)
@@ -152,11 +151,13 @@ func run(harness) -> void:
 	harness.check(bool(report["floor_met"]), "run 1 reached the thin knight floor (1 knight + 1 archer) within %dh (army %d @ %.1fh)" % [RUN1_CAP_TICKS / 60, report["army1"], float(report["run1_ticks"]) / 60.0])
 	harness.check(wall < BUDGET_SECONDS, "gate loop (2 runs + 2 restarts) in < %.0fs (took %.3fs)" % [BUDGET_SECONDS, wall])
 
-	# --- F1, executable: the zero-grant bootstrap is impossible. The honest
-	# build attempt was refused BEFORE the host grant; every other write went
-	# through the one entry point (queue empty at the end, grants counted).
+	# --- F1, executable then resolved: the zero-grant bootstrap is still
+	# impossible. The honest build attempt was refused BEFORE the grant verb
+	# drained; every write — the stipend included — went through the one
+	# entry point (queue empty at the end, grants counted, zero backdoor).
 	harness.check(session.first_index(&"upgrade_denied") != -1 and session.first_index(&"upgrade_denied") < session.first_index(&"building_built"), "bootstrap gap proven: upgrade_denied (reason %d) precedes the first building_built" % ProductionSystem.REASON_UNAFFORDABLE)
-	harness.check(int(report["grants"]) == 4, "host grants: exactly 4 set_resource calls (2 resources x 2 runs — F1: no grant command exists)")
+	harness.check(int(report["grants"]) == 2, "starting grants: exactly 2 grant_resources commands (1 per run — F1 resolved by the verb; zero set_resource calls)")
+	harness.check(int(report["grant_lines"]) == 2 * int(MVP.starting_grants().size()), "stipend events in the log: %d lines for %d runs (pack stipend %s)" % [int(report["grant_lines"]), 2, str(MVP.starting_grants())])
 	harness.check(engine.pending_command_count() == 0, "every gameplay write went through submit_command (queue drained)")
 
 	# --- The session log reads coherently end to end.
@@ -229,16 +230,15 @@ func _gate_script(engine: SimEngine, live_run1: bool, session: SessionLog) -> Di
 	var run := engine.get_system(&"run") as RunLifecycleSystem
 	var report := {"grants": 0, "regime_ids": _regime_ids()}
 
-	# --- Run 1: start, honest bootstrap attempt (refused), grant, build.
+	# --- Run 1: start, honest bootstrap attempt (refused), grant verb, build.
 	engine.submit_command(&"run_start", &"", 0)
-	engine.submit_command(&"upgrade_building", &"farm", 1)  # zero-grant: refused (F1)
+	engine.submit_command(&"upgrade_building", &"farm", 1)  # zero-grant: refused (F1 proof)
 	_advance(engine, 1, live_run1, session)
-	engine.set_resource(&"food", GRANT_FOOD)
-	engine.set_resource(&"timber", GRANT_TIMBER)
-	report["grants"] = report["grants"] + 2
-	engine.submit_command(&"upgrade_building", &"farm", 1)
-	engine.submit_command(&"upgrade_building", &"camp", 1)
-	engine.submit_command(&"upgrade_building", &"mine", 1)
+	engine.submit_command(&"grant_resources", &"", 0)  # the stipend, from pack content
+	report["grants"] = report["grants"] + 1
+	_advance(engine, 1, live_run1, session)
+	for id in MVP.building_ids():
+		engine.submit_command(&"upgrade_building", id, 1)  # all 4 buildings
 	_advance(engine, 1, live_run1, session)
 	var boot := {
 		&"food": engine.get_resource(&"food"),
@@ -276,13 +276,11 @@ func _gate_script(engine: SimEngine, live_run1: bool, session: SessionLog) -> Di
 	if session != null:
 		session.mark_ring_consumed(engine.events)
 
-	# --- Run 2: honest production from a fresh grant, then a losing assault.
-	engine.set_resource(&"food", GRANT_FOOD)
-	engine.set_resource(&"timber", GRANT_TIMBER)
-	report["grants"] = report["grants"] + 2
-	engine.submit_command(&"upgrade_building", &"farm", 1)
-	engine.submit_command(&"upgrade_building", &"camp", 1)
-	engine.submit_command(&"upgrade_building", &"mine", 1)
+	# --- Run 2: honest production from a fresh stipend, then a losing assault.
+	engine.submit_command(&"grant_resources", &"", 0)
+	report["grants"] = report["grants"] + 1
+	for id in MVP.building_ids():
+		engine.submit_command(&"upgrade_building", id, 1)
 	_advance(engine, 1, false, session)  # from here on: the catch-up drive
 	var boot2 := {
 		&"food": engine.get_resource(&"food"),
@@ -396,14 +394,12 @@ func _manage(engine: SimEngine) -> void:
 	# Balance idle workers across producers: fewest-assigned first, one at a
 	# time (host-side idle/assigned mirrors so no assign can be denied).
 	var idle_local := production.idle_workers()
-	var assigned_local := {
-		&"farm": production.assigned_workers(&"farm"),
-		&"camp": production.assigned_workers(&"camp"),
-		&"mine": production.assigned_workers(&"mine"),
-	}
+	var assigned_local := {}
+	for id in MVP.producer_ids():
+		assigned_local[id] = production.assigned_workers(id)
 	while idle_local > 0:
 		var pick: StringName = &""
-		for id in [&"farm", &"camp", &"mine"]:
+		for id in MVP.producer_ids():
 			if production.worker_slots(id) - int(assigned_local[id]) > 0 \
 					and (pick == &"" or int(assigned_local[id]) < int(assigned_local[pick])):
 				pick = id
@@ -412,7 +408,23 @@ func _manage(engine: SimEngine) -> void:
 		engine.submit_command(&"assign_worker", pick, 1)
 		assigned_local[pick] = int(assigned_local[pick]) + 1
 		idle_local -= 1
-	for id in [&"farm", &"camp", &"mine"]:
+	# Construct any still-unbuilt building when affordable (the 4th card must
+	# exist even under a cost-quirk regime's tighter boot), then upgrade the
+	# first affordable built one.
+	for id in MVP.building_ids():
+		if production.building_level(id) > 0:
+			continue
+		var build_cost := production.upgrade_cost(id)
+		var buildable := not build_cost.is_empty()
+		for resource in build_cost:
+			if int(funds.get(resource, 0)) < int(build_cost[resource]):
+				buildable = false
+				break
+		if buildable:
+			for resource in build_cost:
+				funds[resource] = int(funds.get(resource, 0)) - int(build_cost[resource])
+			engine.submit_command(&"upgrade_building", id, 1)
+	for id in MVP.building_ids():
 		if production.building_level(id) < 1:
 			continue
 		var cost := production.upgrade_cost(id)
@@ -480,16 +492,16 @@ func _floor_met(engine: SimEngine) -> bool:
 func _run_state_empty(engine: SimEngine) -> bool:
 	var units := engine.get_system(&"units") as UnitLifecycleSystem
 	var production := engine.get_system(&"production") as ProductionSystem
-	return units.total_units() == 0 \
+	var all_empty := units.total_units() == 0 \
 		and units.pending_offers() == 0 \
 		and units.arrivals_total == 0 \
 		and production.idle_workers() == 0 \
-		and production.building_level(&"farm") == 0 \
-		and production.building_level(&"camp") == 0 \
-		and production.building_level(&"mine") == 0 \
 		and engine.get_resource(&"food") == 0 \
 		and engine.get_resource(&"timber") == 0 \
 		and engine.get_resource(&"iron") == 0
+	for id in MVP.building_ids():
+		all_empty = all_empty and production.building_level(id) == 0
+	return all_empty
 
 
 ## First-time markers for the pacing digest (m1-findings cites these).
@@ -508,17 +520,19 @@ func _measure_firsts(engine: SimEngine, report: Dictionary, boot: Dictionary) ->
 	if not report.has("upgrades_done") :
 		report["upgrades_done"] = 0
 	var production := engine.get_system(&"production") as ProductionSystem
-	var levels: int = production.building_level(&"farm") + production.building_level(&"camp") + production.building_level(&"mine")
-	report["upgrades_done"] = levels - 3  # 3 are the initial constructions
+	var levels := 0
+	for id in MVP.building_ids():
+		levels += production.building_level(id)
+	report["upgrades_done"] = levels - MVP.building_ids().size()  # the initial constructions
 
 
 func _print_digest(report: Dictionary, session: SessionLog) -> void:
 	print(
-		"[gate_m1_thin_loop] M1 thin loop via the UI seam: run 1 '%s' (%s) hit the floor 1K+1A @ %.1fh (army %d); run 2 '%s' produced F%d/T%d/I%d in %dh then lost; banked %d lp (win %d + loss %d); grants %d (F1); %d events (%d signal / %d ring); firsts: worker %.1fh food %.1fh iron %.1fh knight %.1fh archer %.1fh; %d upgrades; wall %.3fs; hash %d"
+		"[gate_m1_thin_loop] M1 thin loop via the UI seam: run 1 '%s' (%s) hit the floor 1K+1A @ %.1fh (army %d); run 2 '%s' produced F%d/T%d/I%d in %dh then lost; banked %d lp (win %d + loss %d); grants %d via grant_resources (stipend %s); %d events (%d signal / %d ring); firsts: worker %.1fh food %.1fh iron %.1fh knight %.1fh archer %.1fh; %d upgrades; wall %.3fs; hash %d"
 		% [
 			report["leader1"], report["regime1"], float(report["run1_ticks"]) / 60.0, report["army1"],
 			report["leader2"], report["run2_food"], report["run2_timber"], report["run2_iron"], RUN2_BATCHES,
-			report["points"], report["score1"], report["score2"], report["grants"],
+			report["points"], report["score1"], report["score2"], report["grants"], str(MVP.starting_grants()),
 			session.entries.size(), session.count_source("signal"), session.count_source("ring"),
 			report.get("first_worker_h", -1.0), report.get("first_food_h", -1.0), report.get("first_iron_h", -1.0),
 			report.get("first_knight_h", -1.0), report.get("first_archer_h", -1.0),
@@ -545,7 +559,7 @@ func _print_digest(report: Dictionary, session: SessionLog) -> void:
 			print("  %s" % line)
 
 
-# --- Fixtures (the content-schema example values; the host holds content) ------
+# --- Fixtures (the T-DATA-02 MVP pack; the host holds content) -----------------
 
 
 func _regime_ids() -> Array[String]:
@@ -556,175 +570,30 @@ func _regime_ids() -> Array[String]:
 
 
 func _regimes() -> Array[RegimeDef]:
-	var make := func(
-		id: StringName,
-		combat_kind: StringName,
-		combat_value: float,
-		quirk_kind: StringName,
-		quirk_target: StringName,
-		quirk_value: float
-	) -> RegimeDef:
-		var regime := RegimeDef.new()
-		regime.id = id
-		regime.display_name = "Regime %s" % id
-		var combat := RegimeModifier.new()
-		combat.kind = combat_kind
-		combat.value = combat_value
-		regime.combat_modifier = combat
-		var quirk := RegimeModifier.new()
-		quirk.kind = quirk_kind
-		quirk.target = quirk_target
-		quirk.value = quirk_value
-		regime.economy_quirk = quirk
-		return regime
-
-	var regimes: Array[RegimeDef] = [
-		make.call(&"gilded_crown", &"garrison_multiplier", 1.2, &"production_multiplier", &"timber", 0.85),
-		make.call(&"iron_rotunda", &"army_score_multiplier", 1.1, &"building_cost_multiplier", &"all", 1.2),
-		make.call(&"velvet_fist", &"garrison_multiplier", 0.9, &"production_multiplier", &"all", 1.15),
-		make.call(&"paper_crown", &"army_score_multiplier", 0.95, &"building_cost_multiplier", &"timber", 0.75),
-	]
-	return regimes
+	return MVP.load_mvp().regimes
 
 
 func _identity() -> IdentityPools:
-	var pools := IdentityPools.new()
-	pools.leader_first_names = [
-		"Bran", "Ottilie", "Wick", "Mabel", "Godfrey", "Petronella", "Aldous", "Sybil",
-	]
-	pools.leader_epithets = [
-		"the Unbearable", "the Almost Wise", "of the Leaky Barn", "the Twice-Fooled",
-		"the Modest Avalanche", "of Fine Debt", "the Whispering Shout", "the Patient Torch",
-	]
-	pools.personality_tags = [&"ambitious", &"pious", &"gluttonous", &"paranoid", &"romantic", &"vengeful"]
-	pools.recruit_names = ["Tom", "Hob", "Nell", "Kate", "Wat", "Dick", "Bess", "Gil", "Meg", "Ralph", "Joan", "Sim"]
-	return pools
-
-
-func _build() -> SimEngine:
-	# Host boot composition (registration order mirrors causality).
-	var engine := SimEngine.new(GATE_SEED)
-	engine.register_system(HeartbeatSystem.new())
-	engine.register_system(RunLifecycleSystem.new(_regimes(), _identity()))
-	engine.register_system(UnitLifecycleSystem.new(_unit_defs(), _gear_defs(), EconomyTunables.new()))
-	engine.register_system(ProductionSystem.new(_building_defs(), EconomyTunables.new(), null))
-	return engine
+	return MVP.load_mvp().identity
 
 
 func _unit_defs() -> Array[UnitDef]:
-	# The content-schema example chain (6 units, full promotion graph).
-	var defs: Array[UnitDef] = []
-	var peasant := UnitDef.new()
-	peasant.id = &"peasant"
-	peasant.display_name = "Peasant"
-	peasant.promotion_paths.append(&"worker")
-	peasant.promotion_paths.append(&"militia")
-	defs.append(peasant)
-
-	var worker := UnitDef.new()
-	worker.id = &"worker"
-	worker.display_name = "Worker"
-	worker.can_work = true
-	worker.training_time_hours = 0.5
-	defs.append(worker)
-
-	var militia := UnitDef.new()
-	militia.id = &"militia"
-	militia.display_name = "Militia"
-	militia.training_time_hours = 2.0
-	militia.promotion_paths.append(&"trainee")
-	militia.combat_power = 1
-	defs.append(militia)
-
-	var trainee := UnitDef.new()
-	trainee.id = &"trainee"
-	trainee.display_name = "Trainee"
-	trainee.training_time_hours = 4.0
-	trainee.promotion_paths.append(&"knight")
-	trainee.promotion_paths.append(&"archer")
-	trainee.combat_power = 2
-	defs.append(trainee)
-
-	var knight := UnitDef.new()
-	knight.id = &"knight"
-	knight.display_name = "Knight"
-	knight.training_time_hours = 12.0
-	knight.required_gear_slots.append(&"weapon")
-	knight.required_gear_slots.append(&"armor")
-	knight.combat_power = 10
-	defs.append(knight)
-
-	var archer := UnitDef.new()
-	archer.id = &"archer"
-	archer.display_name = "Archer"
-	archer.training_time_hours = 6.0
-	archer.required_gear_slots.append(&"weapon")
-	archer.combat_power = 6
-	defs.append(archer)
-	return defs
+	return MVP.load_mvp().units
 
 
 func _gear_defs() -> Array[GearDef]:
-	var defs: Array[GearDef] = []
-	var weapon_t1 := GearDef.new()
-	weapon_t1.id = &"gear_weapon_t1"
-	weapon_t1.display_name = "Borrowed Sword"
-	weapon_t1.slot = &"weapon"
-	weapon_t1.tier = 1
-	weapon_t1.combat_power = 2
-	weapon_t1.recipe[&"iron"] = 10
-	weapon_t1.recipe[&"timber"] = 5
-	defs.append(weapon_t1)
-
-	var armor_t1 := GearDef.new()
-	armor_t1.id = &"gear_armor_t1"
-	armor_t1.display_name = "Padded Jack"
-	armor_t1.slot = &"armor"
-	armor_t1.tier = 1
-	armor_t1.combat_power = 3
-	armor_t1.recipe[&"iron"] = 15
-	defs.append(armor_t1)
-	return defs
+	return MVP.load_mvp().gear
 
 
 func _building_defs() -> Array[BuildingDef]:
-	var milestones: Array[int] = [10, 20]
-	var farm := BuildingDef.new()
-	farm.id = &"farm"
-	farm.display_name = "Farm"
-	farm.resource_produced = &"food"
-	farm.base_production_per_worker_hour = 6.0
-	farm.worker_slots_base = 2
-	farm.base_cost[&"timber"] = 15
-	farm.cost_growth = 1.08
-	farm.milestone_levels = milestones
-	farm.max_level = 30
+	return MVP.load_mvp().buildings
 
-	var camp := BuildingDef.new()
-	camp.id = &"camp"
-	camp.display_name = "Lumber Camp"
-	camp.resource_produced = &"timber"
-	camp.base_production_per_worker_hour = 6.0
-	camp.worker_slots_base = 2
-	camp.base_cost[&"food"] = 10
-	camp.cost_growth = 1.10
-	camp.milestone_levels = milestones
-	camp.max_level = 30
 
-	var mine := BuildingDef.new()
-	mine.id = &"mine"
-	mine.display_name = "Iron Mine"
-	mine.resource_produced = &"iron"
-	mine.base_production_per_worker_hour = 3.0
-	mine.worker_slots_base = 3
-	mine.base_cost[&"timber"] = 40
-	mine.base_cost[&"food"] = 20
-	mine.cost_growth = 1.12
-	mine.milestone_levels = milestones
-	mine.max_level = 30
-
-	var defs: Array[BuildingDef] = [farm, camp, mine]
-	return defs
+func _build() -> SimEngine:
+	# Host boot composition (registration order mirrors causality); the
+	# stipend is the pack's own starting grant — the honest boot, paid
+	# through the grant verb.
+	return MVP.full_stack(GATE_SEED)
 
 
 # --- Host-side affordability (content is host-held; no engine quote for gear)

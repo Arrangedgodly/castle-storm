@@ -1,23 +1,37 @@
-## Acceptance marathon — 1000 sim-hours of units flowing (T-SIM-03).
+## Acceptance marathon — 1000 sim-hours of units flowing (T-SIM-03; content:
+## the T-DATA-02 MVP pack).
 ##
-## Full stack (heartbeat + units + production): peasants arrive on the
-## seeded-jitter cadence, get accepted, branch worker/military, train,
-## gear up and promote across 60,000 one-minute ticks while the farm/
-## camp/mine economy runs underneath. Proves: the arrival band is sane and
-## REPRODUCIBLE (same seed -> same arrival count and hash), the worker
-## handoff feeds production's pool exactly (assigned + idle == bootstrap +
-## worker promotions), army ranks emerge on both branches, the
-## arrivals == offers + units conservation law holds, and a mid-run
-## (500h) save round-trip resumes in lockstep with in-flight training and
-## partial gear. Measures and reports the marathon rate so T-SIM-03's
-## weight on the engine stays visible in CI output.
+## Full stack (heartbeat + run + units + production): a run starts, the
+## stipend arrives through the grant_resources command (F1), peasants arrive
+## on the seeded-jitter cadence, get accepted, branch worker/military, train,
+## gear up (cheapest tier first) and promote across 60,000 one-minute ticks
+## while the farm/lumber_camp/smithy economy runs underneath — then fielded
+## ranks refit to the next gear tier each batch, so every tier's recipe
+## crosses the economy. Proves: the arrival band is sane and REPRODUCIBLE
+## (same seed -> same arrival count and hash), the worker handoff feeds
+## production's pool exactly (assigned + idle == bootstrap + worker
+## promotions), army ranks emerge on both branches at every gear tier, the
+## arrivals == offers + units conservation law holds, and a mid-run (500h)
+## save round-trip resumes in lockstep with in-flight training and partial
+## gear. Measures and reports the marathon rate so T-SIM-03's weight on the
+## engine stays visible in CI output.
 extends RefCounted
+
+const MVP := preload("res://tests/acceptance/suites/_mvp_pack.gd")
 
 const SIM_HOURS := 1000
 const RUN_SEED := 20260915
 const BUDGET_SECONDS := 60.0
 const CHUNK_TICKS := 600  # one management batch per 10h
 const BOOTSTRAP_WORKERS := 4  # pre-arrival starting crew via add_worker
+const MAX_TIER := 3
+
+## Gear tiers fielded during the MAIN run (observed host-side across the
+## management batches + the final roster): proves every tier's recipe was
+## actually PAID, not merely present in content. A t3 holder also proves its
+## t2 refit happened (re-equips require a strictly higher tier), so the set
+## is evidence even when no unit happens to rest at t2 at the snapshot.
+var _tiers_fielded := {}
 
 
 func suite_name() -> String:
@@ -36,6 +50,13 @@ func run(harness) -> void:
 	var rate := float(total_ticks) / wall
 	var units := first.get_system(&"units") as UnitLifecycleSystem
 	var production := first.get_system(&"production") as ProductionSystem
+	# The final roster completes the tier observation (the last cohort was
+	# equipped after the final management batch).
+	for uid in units.unit_ids():
+		for slot in MVP.load_mvp().gear_slots:
+			var tier: int = units.gear_tier(uid, slot)
+			if tier > 0:
+				_tiers_fielded[tier] = true
 
 	print(
 		"[marathon_units_1000h] %d ticks (%d sim-hours, %d arrivals, %d workers, %d knights, %d archers, army power %d) in %.3fs — %.0f ticks/s; state_hash=%d"
@@ -59,7 +80,7 @@ func run(harness) -> void:
 		units.arrivals_total == second_units.arrivals_total,
 		"arrival count reproducible: %d" % units.arrivals_total
 	)
-	harness.check(first.rng.state == second.rng.state, "rng stream identical (arrival jitters only)")
+	harness.check(first.rng.state == second.rng.state, "rng stream identical (arrival jitters + run draws only)")
 
 	# --- Arrival band: 2h +/- 0.25h cadence over 1000h -> [440, 575].
 	harness.check(
@@ -85,8 +106,8 @@ func run(harness) -> void:
 	# (no leaks, no double-counting; nothing removed at this stage).
 	var employed: int = production.idle_workers() \
 		+ production.assigned_workers(&"farm") \
-		+ production.assigned_workers(&"camp") \
-		+ production.assigned_workers(&"mine")
+		+ production.assigned_workers(&"lumber_camp") \
+		+ production.assigned_workers(&"smithy")
 	harness.check(
 		employed == BOOTSTRAP_WORKERS + units.unit_count(&"worker"),
 		"production pool == bootstrap %d + worker promotions %d (got %d)"
@@ -94,7 +115,9 @@ func run(harness) -> void:
 	)
 
 	# --- Economy actually ran under the unit flow: every promoted rank is
-	# walking around in paid-for gear (recipes were charged at equip time).
+	# walking around in paid-for gear (recipes were charged at equip time),
+	# and every TIER 1..3 was equipped at least once (the full pack's gear
+	# ladder is exercised end to end).
 	var geared := 0
 	for uid in units.unit_ids():
 		if units.gear_tier(uid, &"weapon") > 0 or units.gear_tier(uid, &"armor") > 0:
@@ -103,7 +126,9 @@ func run(harness) -> void:
 		geared >= units.unit_count(&"knight") + units.unit_count(&"archer"),
 		"every knight/archer holds paid gear: %d geared vs %d promoted" % [geared, units.unit_count(&"knight") + units.unit_count(&"archer")]
 	)
-	for id in [&"food", &"timber", &"iron"]:
+	for tier in range(1, MAX_TIER + 1):
+		harness.check(_tiers_fielded.has(tier), "gear tier %d fielded during the run (tiers seen: %s — all tiers' recipes exercised)" % [tier, str(_tiers_fielded.keys())])
+	for id: StringName in MVP.load_mvp().resources:
 		harness.check(first.get_resource(id) > 0, "%s pool positive: %d" % [id, first.get_resource(id)])
 
 	# --- Mid-run save round-trip at 500h: in-flight training + partial
@@ -126,23 +151,21 @@ func run(harness) -> void:
 # --- Run scripting ----------------------------------------------------------
 
 
-## Grants the pool and queues the boot commands (drained at tick 1):
-## bootstrap crew, build all three producers.
+## Queues the boot commands (drained at tick 1): run_start, stipend via the
+## grant verb (F1), bootstrap crew, build the producers.
 func _seed_run(engine: SimEngine) -> void:
-	engine.set_resource(&"food", 1_000_000_000)
-	engine.set_resource(&"timber", 1_000_000_000)
-	engine.set_resource(&"iron", 1_000_000_000)
+	engine.submit_command(&"run_start", &"", 0)
+	engine.submit_command(&"grant_resources", &"", 0)
 	engine.submit_command(&"add_worker", &"production", BOOTSTRAP_WORKERS)
-	engine.submit_command(&"upgrade_building", &"farm", 1)
-	engine.submit_command(&"upgrade_building", &"camp", 1)
-	engine.submit_command(&"upgrade_building", &"mine", 1)
+	for id in MVP.producer_ids():
+		engine.submit_command(&"upgrade_building", id, 1)
 
 
 ## One deterministic management batch: accept the gate, branch the idle
 ## peasants (every third takes the military path), advance the military
-## path, gear + promote the held ranks (cheapest option per missing slot;
-## unaffordable attempts deny loudly and retry next batch), and keep the
-## growing worker pool employed. Pure reads -> commands; no RNG.
+## path, gear + promote the held ranks (cheapest option per missing slot),
+## refit fielded ranks to the next gear tier (every tier's recipe paid),
+## and keep the growing worker pool employed. Pure reads -> commands; no RNG.
 func _manage(engine: SimEngine) -> void:
 	var units := engine.get_system(&"units") as UnitLifecycleSystem
 	var production := engine.get_system(&"production") as ProductionSystem
@@ -178,7 +201,18 @@ func _manage(engine: SimEngine) -> void:
 			if not options.is_empty():
 				engine.submit_command(&"equip_gear", options[0], uid)
 		engine.submit_command(&"promote", &"", uid)
-	for id in [&"farm", &"camp", &"mine"]:
+	# Tier refits: fielded ranks step up to the next tier when one exists
+	# (options are tier-sorted, index = tier-1; marathon funds cover it).
+	for rank in [&"knight", &"archer"]:
+		for uid in units.idle_units(rank):
+			for slot in MVP.load_mvp().gear_slots:
+				var tier: int = units.gear_tier(uid, slot)
+				if tier > 0:
+					_tiers_fielded[tier] = true
+				var options := units.gear_ids_for_slot(slot)
+				if tier > 0 and tier < options.size():
+					engine.submit_command(&"equip_gear", options[tier], uid)
+	for id in MVP.producer_ids():
 		var free: int = production.worker_slots(id) - production.assigned_workers(id)
 		if free > 0 and production.idle_workers() > 0:
 			engine.submit_command(&"assign_worker", id, mini(free, production.idle_workers()))
@@ -201,150 +235,7 @@ func _run_script(engine: SimEngine, total_ticks: int) -> int:
 
 
 func _build() -> SimEngine:
-	# Registration order mirrors causality: recruits flow units ->
-	# production. Heartbeat first (engine marathon convention).
-	var engine := SimEngine.new(RUN_SEED)
-	engine.register_system(HeartbeatSystem.new())
-	engine.register_system(UnitLifecycleSystem.new(_unit_defs(), _gear_defs(), EconomyTunables.new()))
-	engine.register_system(ProductionSystem.new(_building_defs(), EconomyTunables.new(), null))
-	return engine
-
-
-func _unit_defs() -> Array[UnitDef]:
-	# The content-schema example chain (6 units, full promotion graph).
-	var defs: Array[UnitDef] = []
-	var peasant := UnitDef.new()
-	peasant.id = &"peasant"
-	peasant.display_name = "Peasant"
-	peasant.promotion_paths.append(&"worker")
-	peasant.promotion_paths.append(&"militia")
-	defs.append(peasant)
-
-	var worker := UnitDef.new()
-	worker.id = &"worker"
-	worker.display_name = "Worker"
-	worker.can_work = true
-	worker.training_time_hours = 0.5
-	defs.append(worker)
-
-	var militia := UnitDef.new()
-	militia.id = &"militia"
-	militia.display_name = "Militia"
-	militia.training_time_hours = 2.0
-	militia.promotion_paths.append(&"trainee")
-	militia.combat_power = 1
-	militia.suspicion_on_train = 8
-	defs.append(militia)
-
-	var trainee := UnitDef.new()
-	trainee.id = &"trainee"
-	trainee.display_name = "Trainee"
-	trainee.training_time_hours = 4.0
-	trainee.promotion_paths.append(&"knight")
-	trainee.promotion_paths.append(&"archer")
-	trainee.combat_power = 2
-	defs.append(trainee)
-
-	var knight := UnitDef.new()
-	knight.id = &"knight"
-	knight.display_name = "Knight"
-	knight.training_time_hours = 12.0
-	knight.required_gear_slots.append(&"weapon")
-	knight.required_gear_slots.append(&"armor")
-	knight.combat_power = 10
-	knight.suspicion_on_train = 8
-	defs.append(knight)
-
-	var archer := UnitDef.new()
-	archer.id = &"archer"
-	archer.display_name = "Archer"
-	archer.training_time_hours = 6.0
-	archer.required_gear_slots.append(&"weapon")
-	archer.combat_power = 6
-	archer.suspicion_on_train = 4
-	defs.append(archer)
-	return defs
-
-
-func _gear_defs() -> Array[GearDef]:
-	# Both slots x two tiers: t1 = the example pack recipes, t2 stronger.
-	var defs: Array[GearDef] = []
-	var weapon_t1 := GearDef.new()
-	weapon_t1.id = &"gear_weapon_t1"
-	weapon_t1.display_name = "Borrowed Sword"
-	weapon_t1.slot = &"weapon"
-	weapon_t1.tier = 1
-	weapon_t1.combat_power = 2
-	weapon_t1.recipe[&"iron"] = 10
-	weapon_t1.recipe[&"timber"] = 5
-	defs.append(weapon_t1)
-
-	var weapon_t2 := GearDef.new()
-	weapon_t2.id = &"gear_weapon_t2"
-	weapon_t2.display_name = "Ground Sword"
-	weapon_t2.slot = &"weapon"
-	weapon_t2.tier = 2
-	weapon_t2.combat_power = 4
-	weapon_t2.recipe[&"iron"] = 20
-	weapon_t2.recipe[&"timber"] = 10
-	defs.append(weapon_t2)
-
-	var armor_t1 := GearDef.new()
-	armor_t1.id = &"gear_armor_t1"
-	armor_t1.display_name = "Padded Jack"
-	armor_t1.slot = &"armor"
-	armor_t1.tier = 1
-	armor_t1.combat_power = 3
-	armor_t1.recipe[&"iron"] = 15
-	defs.append(armor_t1)
-
-	var armor_t2 := GearDef.new()
-	armor_t2.id = &"gear_armor_t2"
-	armor_t2.display_name = "Riveted Jack"
-	armor_t2.slot = &"armor"
-	armor_t2.tier = 2
-	armor_t2.combat_power = 6
-	armor_t2.recipe[&"iron"] = 30
-	defs.append(armor_t2)
-	return defs
-
-
-func _building_defs() -> Array[BuildingDef]:
-	# The production marathon trio (farm/camp/mine at the R4 band spread).
-	var milestones: Array[int] = [10, 20]
-	var farm := BuildingDef.new()
-	farm.id = &"farm"
-	farm.display_name = "Farm"
-	farm.resource_produced = &"food"
-	farm.base_production_per_worker_hour = 6.0
-	farm.worker_slots_base = 2
-	farm.base_cost[&"timber"] = 15
-	farm.cost_growth = 1.08
-	farm.milestone_levels = milestones
-	farm.max_level = 30
-
-	var camp := BuildingDef.new()
-	camp.id = &"camp"
-	camp.display_name = "Lumber Camp"
-	camp.resource_produced = &"timber"
-	camp.base_production_per_worker_hour = 6.0
-	camp.worker_slots_base = 2
-	camp.base_cost[&"food"] = 10
-	camp.cost_growth = 1.10
-	camp.milestone_levels = milestones
-	camp.max_level = 30
-
-	var mine := BuildingDef.new()
-	mine.id = &"mine"
-	mine.display_name = "Iron Mine"
-	mine.resource_produced = &"iron"
-	mine.base_production_per_worker_hour = 3.0
-	mine.worker_slots_base = 3
-	mine.base_cost[&"timber"] = 40
-	mine.base_cost[&"food"] = 20
-	mine.cost_growth = 1.12
-	mine.milestone_levels = milestones
-	mine.max_level = 30
-
-	var defs: Array[BuildingDef] = [farm, camp, mine]
-	return defs
+	# Registration order mirrors causality: the run frame exists before the
+	# recruits/economy it governs. Heartbeat first (engine marathon
+	# convention). Marathon funds flow through the grant verb (F1).
+	return MVP.full_stack(RUN_SEED, MVP.MARATHON_STIPEND)

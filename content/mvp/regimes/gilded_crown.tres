@@ -1,0 +1,26 @@
+[gd_resource type="Resource" script_class="RegimeDef" format=3]
+
+[ext_resource type="Script" path="res://content/schema/regime_modifier.gd" id="1_d"]
+[ext_resource type="Script" path="res://content/schema/regime_def.gd" id="2_d"]
+
+[sub_resource type="Resource" id="RegimeModifier_1"]
+script = ExtResource("1_d")
+kind = &"garrison_multiplier"
+value = 1.2
+
+[sub_resource type="Resource" id="RegimeModifier_2"]
+script = ExtResource("1_d")
+kind = &"production_multiplier"
+target = &"timber"
+value = 0.85
+
+[resource]
+script = ExtResource("2_d")
+id = &"gilded_crown"
+display_name = "The Gilded Crown"
+combat_modifier = SubResource("RegimeModifier_1")
+economy_quirk = SubResource("RegimeModifier_2")
+crest_id = &"crest_gilded_crown"
+ink_ground = Color(0.23, 0.18, 0.12, 1)
+ink_secondary = Color(0.8, 0.64, 0.3, 1)
+flavor_text = "Taxes your timber, stations archers on every wall, and calls the arrangement prosperity."

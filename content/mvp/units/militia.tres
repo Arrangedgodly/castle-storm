@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="UnitDef" format=3]
+
+[ext_resource type="Script" path="res://content/schema/unit_def.gd" id="1_a"]
+
+[resource]
+script = ExtResource("1_a")
+id = &"militia"
+display_name = "Militia"
+training_time_hours = 2.0
+promotion_paths = Array[StringName]([&"trainee"])
+combat_power = 1
+suspicion_on_train = 8
+face_id = &"face_militia"

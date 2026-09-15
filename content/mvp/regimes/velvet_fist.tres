@@ -1,0 +1,26 @@
+[gd_resource type="Resource" script_class="RegimeDef" format=3]
+
+[ext_resource type="Script" path="res://content/schema/regime_modifier.gd" id="1_d"]
+[ext_resource type="Script" path="res://content/schema/regime_def.gd" id="2_d"]
+
+[sub_resource type="Resource" id="RegimeModifier_1"]
+script = ExtResource("1_d")
+kind = &"garrison_multiplier"
+value = 0.9
+
+[sub_resource type="Resource" id="RegimeModifier_2"]
+script = ExtResource("1_d")
+kind = &"production_multiplier"
+target = &"all"
+value = 1.15
+
+[resource]
+script = ExtResource("2_d")
+id = &"velvet_fist"
+display_name = "The Velvet Fist"
+combat_modifier = SubResource("RegimeModifier_1")
+economy_quirk = SubResource("RegimeModifier_2")
+crest_id = &"crest_velvet_fist"
+ink_ground = Color(0.23, 0.12, 0.18, 1)
+ink_secondary = Color(0.72, 0.42, 0.6, 1)
+flavor_text = "Governed with kindness, generously applied. The fields flourish; the walls doze."

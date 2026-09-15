@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="GearDef" format=3]
+
+[ext_resource type="Script" path="res://content/schema/gear_def.gd" id="1_c"]
+
+[resource]
+script = ExtResource("1_c")
+id = &"gear_weapon_t3"
+display_name = "Ancestral Grudge"
+slot = &"weapon"
+tier = 3
+recipe = Dictionary[StringName, int]({
+&"iron": 45,
+&"timber": 20
+})
+combat_power = 7
+craft_time_hours = 4.0
+icon_id = &"icon_greatsword"

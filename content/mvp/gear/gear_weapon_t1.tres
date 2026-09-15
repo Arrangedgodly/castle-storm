@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="GearDef" format=3]
+
+[ext_resource type="Script" path="res://content/schema/gear_def.gd" id="1_c"]
+
+[resource]
+script = ExtResource("1_c")
+id = &"gear_weapon_t1"
+display_name = "Borrowed Sword"
+slot = &"weapon"
+tier = 1
+recipe = Dictionary[StringName, int]({
+&"iron": 10,
+&"timber": 5
+})
+combat_power = 2
+craft_time_hours = 1.0
+icon_id = &"icon_sword"
