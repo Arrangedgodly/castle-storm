@@ -137,7 +137,7 @@ returns 0, `tick_count` — and therefore the state hash modulo the paused
 bit — stands still. `resume()` restores advancement. Both idempotent;
 `pause_changed` fires only on transitions.
 
-## 7. Serialization hooks (reserved for T-ARCH-03)
+## 7. Serialization hooks (persisted by T-ARCH-03)
 
 `to_dict()` captures the whole engine — core scalars, RNG state, command
 queue, resources, one sub-dict per system (keyed by `system_name`).
@@ -146,6 +146,16 @@ registered; `STATE_FORMAT_VERSION` gates it loudly (refuse, never
 half-apply). The event ring is not serialized (presentation). Proven by
 the round-trip unit test: capture at t=130, restore, resume — lockstep
 hashes from there on.
+
+T-ARCH-03 composes these hooks into the on-disk save format:
+`sim/save_manager.gd` (SaveManager) wraps the dict in a versioned,
+checksummed envelope, writes atomically (temp + rename), rotates 3 run
+slots, and keeps the meta domain (RunMeta) in its own file. The full
+contract — 64-bit-exact RNG encoding, canonical checksum, quarantine and
+migration registry — is documented in `docs/save-format.md`; the 500h
+disk round-trip (including `rng_state` bit-exactness and continuation
+lockstep across the restart seam) is proven by
+`tests/acceptance/suites/save_marathon_roundtrip.gd`.
 
 ## 8. Fast-forward + measured performance
 

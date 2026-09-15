@@ -10,6 +10,14 @@
 # runs unit + property suites; a custom SceneTree runner handles marathon
 # acceptance suites. scripts/ci.sh orchestrates both and fails non-zero.
 #
+# Save debug (T-ARCH-03): a manual save/load probe — plays a full-stack
+# session, saves both domains every 10h (ring rotates), and CONTINUES from
+# disk when run again (cross-process persistence by hand; corruption probes
+# in docs/save-format.md §9):
+#     make save-debug
+#     CS_SAVE_HOURS=500 make save-debug
+#     CS_SAVE_ROOT=res://saves make save-debug
+#
 # Boundary validation (T-ARCH-01 acceptance):
 #     make version   # expect 4.7.2.stable.official.ed1daf0bf
 #     make import    # godot --headless --path . --import
@@ -19,10 +27,10 @@
 GODOT_BIN ?= tools/godot/godot
 
 .DEFAULT_GOAL := help
-.PHONY: help version import check run test export
+.PHONY: help version import check run test save-debug export
 
 help:
-	@echo "Targets: version | import | check | run | test | export  (GODOT_BIN defaults to tools/godot/godot)"
+	@echo "Targets: version | import | check | run | test | save-debug | export  (GODOT_BIN defaults to tools/godot/godot)"
 
 version:
 	@$(GODOT_BIN) --version
@@ -38,6 +46,9 @@ run:
 
 test:
 	GODOT_BIN="$(GODOT_BIN)" scripts/ci.sh
+
+save-debug:
+	$(GODOT_BIN) --headless --path . -s res://scripts/save_debug.gd
 
 export:
 	@echo "export: presets land in T-ARCH-02 (Windows x86_64 / macOS Universal / Linux-X11 x86_64)"
