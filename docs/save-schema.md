@@ -188,7 +188,14 @@ stack does not, yet) carries a fifth `suspicion` sub-dict, whose field-level
 reference lives in sim-engine.md §14 ("Serialization + determinism") until
 it joins this doc's generated stack — the same additive-optional-keys,
 tolerant-reader policy as §8's `regime_quirks` precedent applies (absent
-key = the system was not registered; present = restored verbatim).
+key = the system was not registered; present = restored verbatim). NOTE
+(T-SIM-06): the assault resolver (opt-in per sim-engine.md §15) registers
+the same way but is STATELESS BY DESIGN — its sub-dict is always `{}`
+(`to_dict()` empty, constant `state_hash`, no `reset_run`): nothing
+assault-shaped exists between commands, so nothing assault-shaped is ever
+saved, restored, or survives a restart; the roster/meter/run state it
+touches is already carried by the `units`/`suspicion`/`run` sub-dicts
+above. A sixth+ key follows the identical policy.
 
 ### 4.3 `systems.heartbeat` — `HeartbeatSystem`
 

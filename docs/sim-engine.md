@@ -184,7 +184,7 @@ Measured (vendored 4.7.2 binary, Apple silicon, this repo's CI command):
 | T-SIM-02 production | `sim/systems/production_system.gd` (§10) — the seam + `SimFixed` + `resources` pool + `EconomyTunables` band, live since T-SIM-02 |
 | T-SIM-03 units | `sim/systems/unit_lifecycle_system.gd` (§11) — arrivals draw `rng` in `on_tick`, worker handoff rides the command queue, training/gear state in the save hooks |
 | T-SIM-05 suspicion | `sim/systems/suspicion_system.gd` (§14) — the pressure curve: act bumps (`training_complete` subjects resolve `UnitDef.suspicion_on_train`; building level gains) + presence drip vs tiered decay, cancellable ≥4h telegraphs, crackdowns that seize floor-40% + scatter unassigned recruits, run death at 100 via `resolve_victory(engine, false)` (§12); joins the restart reset list |
-| T-SIM-06 assault | reads `army_power()`/`gear_tier()` and the regime combat modifier, resolves through `RunLifecycleSystem.resolve_victory` (§12) |
+| T-SIM-06 assault | `sim/systems/assault_resolver.gd` (§15) — a RESOLVER, not a ticker: `assault_odds` pure query (per-unit breakdown vs garrison), `commit_assault` command resolving at the drain into replayable `assault_beat` events + `resolve_victory` on win / set-back rules on loss |
 | T-SIM-04 run lifecycle | `sim/systems/run_lifecycle_system.gd` (§12) — `run_seed` → `rng` for randomized leaders/regimes drawn at the run_start/restart drains; events for chronicle; meta bank in `sim/run_meta.gd` |
 | T-SIM-07 catch-up | `fast_forward` (480 ticks = 8h cap) or linear accrual at the boundary; wall clock stays OUTSIDE sim |
 | T-ARCH-03 save | `to_dict()/apply_state_dict()` + system save hooks |
@@ -765,3 +765,159 @@ their recorded hashes byte-identically (engine 3567881493, production
 3517250863, units 4081412319, run_thin 2708794948, gate 3372344018) —
 suspicion is strictly opt-in per engine until the game host composes the
 full stack.
+
+## 15. Assault resolver (T-SIM-06)
+
+`sim/systems/assault_resolver.gd` (`AssaultResolver`, system_name
+`&"assault"`) — army score vs castle garrison: the odds query, the
+player-chosen commit, the deterministic resolution, and the replayable beat
+stream the assault vignette (T-UI-07) renders from events alone.
+
+**A RESOLVER, not a system that ticks.** `on_tick` is a hard no-op (the
+RunLifecycleSystem precedent, §12) and the resolver holds ZERO state between
+commands — every persistent effect lives in the siblings it hands its result
+to (units roster, suspicion meter, run frame). It sits on the SimSystem seam
+anyway because the commit must be a COMMAND (the tick-aligned write
+contract, §5): `commit_assault` queues exactly like every other player verb
+and resolves at the next tick's drain, inside the engine's determinism
+rules. Consequences of statelessness, all deliberate: `to_dict()` is `{}`
+and `state_hash()` constant (nothing to save — nothing survives a restart
+by construction; the units system's roster reset IS the whole assault
+reset), and no `reset_run` (the §12 `has_method` guard skips it). Placement
+justification: a per-tick system would carry armed-assault state between
+ticks (a new save/restore/fork surface for zero gameplay value); the
+resolver pattern keeps the whole battle inside ONE command drain — the
+same-tick property the vignette replay relies on.
+
+```gdscript
+var assault := AssaultResolver.new(pack.tunables)
+engine.register_system(assault)  # anywhere after run; suites: 5th, before suspicion
+```
+
+Opt-in per engine like suspicion (§14): the shared `_mvp_pack.full_stack`
+fixture does NOT register it, so every sibling suite's recorded hash stays
+byte-identical; the assault marathon registers it on top
+(`tests/acceptance/suites/marathon_assault_storm.gd`).
+
+### The odds (pure query — the odds screen's data contract)
+
+`assault_odds(engine)` — no RNG draws, no writes, callable every frame:
+
+```
+army_score   = army_power() (def + gear tiers, incl. archer support values)
+               x army_score_multiplier    [regime combat kind -> army side]
+garrison     = assault_garrison_base_power
+               x garrison_multiplier      [regime combat kind -> castle side]
+win_permille = army_milli * 1000 / (army_milli + garrison_milli)
+```
+
+The regime's ONE combat modifier lands on exactly one side (the schema
+allots one per flavor: gilded_crown garrison x1.2, velvet_fist x0.9,
+iron_rotunda army x1.1, paper_crown x0.95); a regime-less run (restore
+edge, §12 warns loudly) is neutral x1.000 both sides. Monotone by
+construction — more power NEVER lowers the odds (unit-tested across the
+growth curve and all four flavors); at parity 500; the floor assault
+(power 23 vs garrison 60) opens at **277**, 2x floor ≈ 434, the M1
+100-power line 625. The breakdown dict carries per-unit contributions
+(`{uid, def, def_power, gear_power, total}` in roster order), the army
+sums + multiplier, the garrison composition (base, modifier kind,
+multiplier, strength), `floor_power`, `floor_met`, and `win_permille` —
+and the parts SUM to the displayed probability exactly (unit-tested:
+per-unit totals = army power; power x multiplier = score_milli; the two
+sides reproduce the permille to the digit).
+
+### The knight floor: a floor, never a trigger
+
+`assault_knight_floor_power` (23 = the M1-measured 1K+1A t1 line, m1-findings)
+gates the COMMIT only: below it `commit_assault` is refused loudly
+(`assault_denied` reason 3, value2 = live army power for the "you need X
+more" line); meeting it merely UNLOCKS the commit button. The odds query
+itself always answers — the screen shows the odds you are climbing toward
+while locked. Surplus power and gear quality (t1 → t3 refits) keep raising
+the displayed odds; nothing auto-triggers.
+
+### The commit (`commit_assault`, resolved AT the drain)
+
+Guards → `assault_denied` (1 no running run, 2 no units system, 3 below
+floor). Then **one decisive draw**: `rng.randi_range(0, 999) <
+win_permille` wins — the odds shown before the commit are exactly the
+odds rolled. Then the beat stream, then the outcome:
+
+- **Win**: `assault_won` (value = the win_permille that was shown, value2 =
+  army power at commit) and `run.resolve_victory(engine, true, power)` —
+  queued from INSIDE this drain, so `run_won` lands in the SAME tick
+  (the queue drains until empty; unit- and marathon-tested). Victory
+  applies no roster losses: the roster is terminal at victory (restart
+  clears it; the future L2 snapshot reads whatever stands). The beats
+  still narrate attrition for the vignette.
+- **Loss — set-back, NEVER instant run death** (R4 philosophy): (a)
+  `ceil(assault_loss_fraction x army units)` ARMY units fall — newest
+  first (reverse roster order: the vanguard holds), gear and all — via
+  the units system's `apply_army_losses` seam, `assault_casualties`
+  (value = count, value2 = surviving power); (b) `+
+  assault_failure_suspicion` (20) through the suspicion system's
+  `apply_external_bump` seam — the same damped/clamped path as every
+  rise (relief x0.5 inside the window), loud (pauses decay above warn),
+  `suspicion_rose` with subject `assault`. The run KEEPS RUNNING; the
+  floor re-arms below 23 and the assault can be re-attempted after
+  rebuilding. The ONE bend in the rule: a spike that reaches the meter
+  max (100) crushes at that tick's suspicion on_tick (§14) — an assault
+  thrown away with the meter already at the edge is fatal, mirroring the
+  crackdown design.
+
+### The beat stream (the T-UI-07 vignette contract)
+
+Four `assault_beat` events per resolved commit — replayable from events
+alone, data-light, int payloads only: `subject` = phase, `value` = army
+score remaining (milli), `value2` = garrison strength remaining (milli).
+
+| Path | Phases in order |
+|---|---|
+| win | `advance` → `skirmish` → `gate` → `throne` (garrison ends at 0) |
+| loss | `advance` → `skirmish` → `gate` → `rout` (army ends at the TRUE survivors) |
+
+Army remaining is non-increasing across every chain and ends at the true
+post-battle state: on the loss path the TOTAL applied loss is split
+across skirmish/gate by one drawn share so the gate beat lands exactly on
+the survivors the roster holds. Event order per commit — win: 4 beats,
+`assault_won`, `run_won` (same tick); loss: 4 beats, `assault_casualties`,
+`suspicion_rose`, `assault_lost`.
+
+**RNG draw count per commit** (documented for stream reasoning): 1 roll +
+4 attrition draws on the win path, 1 + 3 on the loss path. Content floats
+cross the single `SimFixed.milli_from_float` boundary (regime modifier
+values at use; the loss fraction once at construction); after that
+everything is integer milli.
+
+### Events, read API, serialization
+
+Events: `assault_denied`, `assault_beat`, `assault_won`, `assault_lost`,
+`assault_casualties` (+ the sibling `suspicion_rose` on loss). Read API:
+`assault_odds(engine)` (the full breakdown), `floor_met(engine)`,
+`knight_floor_power()`, `garrison_base_power()`. Serialization: the
+resolver is stateless — `to_dict()` `{}`, constant `state_hash()`, no
+`reset_run` (§12's guard skips it); a save carries `"assault": {}`
+(additive-optional, the §save-schema 4.2 policy) and a restored engine
+commits identically. Sibling seams added for T-SIM-06:
+`UnitLifecycleSystem.army_contributions()` (per-unit def/gear power,
+roster order — also the odds screen's panel) and `apply_army_losses(count)`
+(newest-first army-only removal, gear included), and
+`SuspicionSystem.apply_external_bump(engine, source, points, loud)` (the
+shared damped/clamped act-bump path — internal act bumps and external
+spikes ride the same rules).
+
+### Measured
+
+`marathon_assault_storm` — the full arc on the MVP pack (seed searched
+deterministically for loss-then-win): floor assault at power 23 (2 units)
+under paper_crown → 266 permille → **lost**: 1 casualty (ceil(0.5 x 2)),
+suspicion +20 exactly, army 15, run still RUNNING, re-commit refused
+below the floor; rebuilt 28h to power 77 → 549 permille → **won**:
+`run_won` in the same tick as `assault_won`, 233 lp banked, exactly one
+chronicle entry. A mid-recovery fork (engine state saved, twin restored,
+phase 2 replayed) reproduces the final hash bit-identically; the full
+fast-forward replay reproduces hash + event count (578 events). Wall
+0.98s including the seed search. All sibling marathons held their
+recorded hashes byte-identically (engine 3567881493, production
+3517250863, units 4081412319, run_thin 2708794948) — the resolver adds
+zero per-tick cost (it does not tick).

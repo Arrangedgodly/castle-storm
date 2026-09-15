@@ -313,6 +313,53 @@ func army_power() -> int:
 	return power
 
 
+## Per-unit combat contribution breakdown (the T-SIM-06 odds-screen seam):
+## roster order, one {uid, def, def_power, gear_power} per ARMY unit. Pure
+## read; the odds screen sums these for its "where does my power come from"
+## panel and the resolver re-reads them to narrate attrition. gear_power is
+## the sum of the unit's equipped GearDef combat values (tiers included).
+func army_contributions() -> Array[Dictionary]:
+	var contributions: Array[Dictionary] = []
+	for unit in _units:
+		if not _army_defs.has(unit.def_id):
+			continue
+		var def := _units_by_id[unit.def_id] as UnitDef
+		var gear_power := 0
+		for slot in unit.gear.keys():
+			var gear := _gear_by_id.get(unit.gear[slot]) as GearDef
+			if gear != null:
+				gear_power += gear.combat_power
+		contributions.append({
+			"uid": unit.uid,
+			"def": unit.def_id,
+			"def_power": def.combat_power,
+			"gear_power": gear_power,
+		})
+	return contributions
+
+
+## Army-loss seam (T-SIM-06 failed assault): remove up to `count` ARMY units —
+## gear and all (the kit is lost with its wearer) — newest-commissioned first
+## (reverse roster order: the vanguard holds, the newest ranks break), never
+## touching workers, pipeline, offers or any non-army unit. Returns the removed
+## uids in removal order; the caller records the events. Pure roster mutation,
+## the same direct-synchronous-call shape as scatter_recruits (T-SIM-05).
+func apply_army_losses(count: int) -> Array[int]:
+	var removed: Array[int] = []
+	if count <= 0:
+		return removed
+	var index := _units.size() - 1
+	while removed.size() < count and index >= 0:
+		var unit := _units[index]
+		if _army_defs.has(unit.def_id):
+			_units.remove_at(index)
+			_by_uid.erase(unit.uid)
+			_counts[unit.def_id] = int(_counts.get(unit.def_id, 1)) - 1
+			removed.append(unit.uid)
+		index -= 1
+	return removed
+
+
 ## Gear ids occupying a slot, lowest tier first (deterministic order).
 func gear_ids_for_slot(slot: StringName) -> Array[StringName]:
 	var ids: Array[StringName] = []

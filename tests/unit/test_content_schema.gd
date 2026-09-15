@@ -154,6 +154,29 @@ func test_telegraph_below_r4_floor_fails() -> void:
 	assert_int(_count(errors, "crackdown_telegraph_hours must be >= 4.0")).is_equal(1)
 
 
+func test_assault_loss_fraction_one_plus_fails() -> void:
+	# A failed assault is a set-back, NEVER annihilation (T-SIM-06 rule the
+	# validator pins): fraction must stay within (0, 1].
+	var pack := _scratch_pack()
+	pack.tunables.assault_loss_fraction = 1.5
+	var errors := ContentValidator.validate_pack(pack)
+	assert_int(_count(errors, "assault_loss_fraction must be within (0, 1]")).is_equal(1)
+
+
+func test_assault_tunables_bounds_fail() -> void:
+	# Floor and garrison must be positive; the failure spike cannot exceed
+	# the meter max (a failed assault bends the set-back rule only at the
+	# edge, never past it).
+	var pack := _scratch_pack()
+	pack.tunables.assault_knight_floor_power = 0
+	pack.tunables.assault_garrison_base_power = 0
+	pack.tunables.assault_failure_suspicion = 101
+	var errors := ContentValidator.validate_pack(pack)
+	assert_int(_count(errors, "assault_knight_floor_power must be > 0")).is_equal(1)
+	assert_int(_count(errors, "assault_garrison_base_power must be > 0")).is_equal(1)
+	assert_int(_count(errors, "assault_failure_suspicion must be within")).is_equal(1)
+
+
 func test_missing_art_key_fails() -> void:
 	var pack := _scratch_pack()
 	(pack.units[1] as UnitDef).face_id = &"face_ghost"

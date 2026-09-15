@@ -173,8 +173,9 @@ garrison ×1.2 (archers on the walls) + timber ×0.85 (timber tax).
 ### EconomyTunables (`content/schema/economy_tunables.gd`) — the R4 vocabulary
 
 Defaults = R4 seeds. Consumed by T-SIM-07 (offline), T-SIM-02 (band),
-T-SIM-03 (recruit arrival cadence), T-SIM-05 (suspicion), T-SIM-08 (all;
-tuned in the simulator), T-SEC-01 (cap/clamp policy).
+T-SIM-03 (recruit arrival cadence), T-SIM-05 (suspicion), T-SIM-06
+(assault block), T-SIM-08 (all; tuned in the simulator), T-SEC-01
+(cap/clamp policy).
 
 | Field (default) | R4 row | Validator constraint |
 |---|---|---|
@@ -204,6 +205,10 @@ tuned in the simulator), T-SEC-01 (cap/clamp policy).
 | `suspicion_decay_pause_hours` (1.0) | T-SIM-05: a loud act above warn freezes decay this long (R4 decay_reset_rule) | ≥ 0 |
 | `crackdown_scatter_fraction` (0.5) | T-SIM-05: fraction of the unassigned pool (offers + idle peasants) a crackdown scatters; rounds UP; never touches army/workers/buildings | within (0, 1] |
 | `crackdown_rearm_hours` (4.0) | T-SIM-05: minimum hours after a crackdown before the next telegraph may arm (recur gate) | ≥ 0 |
+| `assault_knight_floor_power` (23) | T-SIM-06: minimum army POWER to commit an assault — the knight FLOOR (a floor, not a trigger; 23 = the M1-measured 1 knight t1 + 1 archer t1 line, m1-findings) | > 0 |
+| `assault_garrison_base_power` (60) | T-SIM-06: base castle garrison strength before the regime combat modifier (floor assault ≈ 277 permille, 2x floor ≈ 434, 100 power ≈ 625) | > 0 |
+| `assault_loss_fraction` (0.5) | T-SIM-06: fraction of ARMY UNITS that fall when an assault FAILS; rounds UP; newest first, gear and all; the run continues (set-back, not death) | within (0, 1] — never annihilation |
+| `assault_failure_suspicion` (20) | T-SIM-06: suspicion spike on a failed assault (the Crown watched the whole army break); relief-damped, clamped; CAN crush at the meter's edge | within [0, `suspicion_max`] |
 
 R4 rows not carried as fields (`first_session_budget`,
 `per_session_visible_delta`, `run_arc_shape`) are acceptance targets for

@@ -3,7 +3,7 @@
 ## an R4 seed value; T-SIM-08 tunes them in the simulator). Consumed by:
 ## T-SIM-07 (offline block), T-SIM-02 (cost band), T-SIM-08 (all),
 ## T-SIM-05 (suspicion block), T-SIM-03 (recruit arrival cadence),
-## T-SEC-01 (cap/clamp policy).
+## T-SIM-06 (assault block), T-SEC-01 (cap/clamp policy).
 class_name EconomyTunables
 extends Resource
 
@@ -139,3 +139,32 @@ extends Resource
 ## this). Default 4.0 — the fastest possible recur cycle is telegraph (4h) +
 ## re-arm (4h).
 @export var crackdown_rearm_hours: float = 4.0
+
+## --- Assault resolution (T-SIM-06; derived defaults, same derivation status
+## as R4's own hour-scale numbers — T-SIM-08 tunes them in the simulator) ---
+
+## Minimum ARMY POWER to commit an assault — the knight FLOOR (a floor, not a
+## trigger: meeting it only unlocks the commit; surplus power and gear quality
+## keep raising the displayed odds). Default 23 = the M1-measured thin line of
+## one knight (10 + t1 weapon 2 + t1 armor 3) + one archer (6 + t1 weapon 2),
+## docs/ultron/m1-findings.md.
+@export var assault_knight_floor_power: int = 23
+
+## Base castle garrison strength before the regime combat modifier (a
+## garrison_multiplier regime scales it; an army_score_multiplier regime
+## scales the army instead). With the default 60: the floor assault (23)
+## opens at ~27.7% odds, 2x floor at ~43%, the M1 100-power line at ~62.5%.
+@export var assault_garrison_base_power: int = 60
+
+## Fraction of ARMY UNITS (knights/archers, gear and all) that fall when an
+## assault FAILS. Rounds UP (the rout is thorough). Survivors keep their
+## places; the run continues — set-back, not death (R4 philosophy). Only the
+## trained army is touched: workers, pipeline, offers, buildings never are.
+@export var assault_loss_fraction: float = 0.5
+
+## Suspicion added when an assault FAILS — the Crown watched your whole army
+## march, break, and run home (louder than any single training act). Applied
+## through the suspicion system's external-bump seam: relief-damped, clamped
+## at the meter max, and CAN crush the run if the meter was already at the
+## edge. Default 20 = just above half a warn threshold.
+@export var assault_failure_suspicion: int = 20

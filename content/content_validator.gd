@@ -437,3 +437,12 @@ static func _check_tunables(t: EconomyTunables, errors: Array[String]) -> void:
 		_err(errors, "tunables: crackdown_scatter_fraction must be within (0, 1] (got %s)" % t.crackdown_scatter_fraction)
 	if t.crackdown_rearm_hours < 0.0:
 		_err(errors, "tunables: crackdown_rearm_hours must be >= 0 (got %s)" % t.crackdown_rearm_hours)
+	# --- Assault resolution (T-SIM-06 additive fields) ---
+	if t.assault_knight_floor_power <= 0:
+		_err(errors, "tunables: assault_knight_floor_power must be > 0 (got %d)" % t.assault_knight_floor_power)
+	if t.assault_garrison_base_power <= 0:
+		_err(errors, "tunables: assault_garrison_base_power must be > 0 (got %d)" % t.assault_garrison_base_power)
+	if t.assault_loss_fraction <= 0.0 or t.assault_loss_fraction > 1.0:
+		_err(errors, "tunables: assault_loss_fraction must be within (0, 1] — a failed assault is a set-back, never annihilation (got %s)" % t.assault_loss_fraction)
+	if t.assault_failure_suspicion < 0 or t.assault_failure_suspicion > t.suspicion_max:
+		_err(errors, "tunables: assault_failure_suspicion must be within [0, suspicion_max %d] (got %d)" % [t.suspicion_max, t.assault_failure_suspicion])

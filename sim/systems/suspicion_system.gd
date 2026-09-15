@@ -214,6 +214,30 @@ func set_suspicion(points: int) -> void:
 	accum = 0
 
 
+## External act-bump seam (T-SIM-06): a sibling system applies a LOUD act the
+## tick-boundary scan cannot see (the failed assault — the Crown watched the
+## whole army march). Same path as internal act bumps, same order: decay-pause
+## check on the PRE-bump meter (R4 decay_reset_rule), relief damping, clamp at
+## the max, `suspicion_rose` event. Returns the points actually applied (0
+## when damped to nothing / nothing to apply). The spike CAN reach the max —
+## the crush check at this tick's on_tick then ends the run (documented
+## T-SIM-06 rule: a failed assault at the meter's edge is fatal, elsewhere a
+## set-back).
+func apply_external_bump(engine: SimEngine, source: StringName, points: int, loud := false) -> int:
+	if points <= 0:
+		return 0
+	if loud and suspicion * SimFixed.MILLI > _warn_milli:
+		decay_paused_until_tick = engine.tick_count + _decay_pause_ticks
+	var applied := points
+	if engine.tick_count < relief_until_tick:
+		applied = applied * _relief_rise_milli / SimFixed.MILLI
+	if applied <= 0:
+		return 0
+	suspicion = mini(_max_points, suspicion + applied)
+	engine.events.record(engine.tick_count, &"suspicion_rose", source, applied, suspicion)
+	return applied
+
+
 # --- Tick -----------------------------------------------------------------
 
 
