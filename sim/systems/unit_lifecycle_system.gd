@@ -622,6 +622,22 @@ func _slot_required(unit: UnitState, slot: StringName) -> bool:
 	return false
 
 
+## Run-reset seam (T-SIM-04 reset contract, docs/sim-engine.md §12): the
+## roster, the gate and the arrival cadence back to boot state. The next
+## tick re-schedules the first arrival with a fresh RNG draw — the new
+## run's stream, identical in shape to a freshly constructed engine.
+## Called synchronously by the run system at the run_restart drain.
+func reset_run(_p_regime: RegimeDef = null) -> void:
+	_units.clear()
+	_by_uid.clear()
+	_offers.clear()
+	_training.clear()
+	_counts.clear()
+	next_uid = 1
+	arrivals_total = 0
+	_arrival_countdown_milli = -1
+
+
 func _deny(engine: SimEngine, command: SimCommand, reason: int) -> void:
 	var subject := command.subject if command.subject != &"" else &"units"
 	engine.events.record(engine.tick_count, &"lifecycle_denied", subject, reason, command.value)

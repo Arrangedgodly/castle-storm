@@ -7,15 +7,19 @@ saving, and wall-clock drive are consumers.
 - Code: `sim/sim_engine.gd` (core), `sim/sim_system.gd` (system base),
   `sim/sim_event_log.gd` + `sim/sim_event.gd` (event stream),
   `sim/sim_command.gd` (command), `sim/sim_fixed.gd` (fixed-point math),
+  `sim/run_meta.gd` (T-SIM-04 meta bank, §12),
   `sim/systems/heartbeat_system.gd` (placeholder system),
   `sim/systems/production_system.gd` (T-SIM-02 production, §10),
-  `sim/systems/unit_lifecycle_system.gd` (T-SIM-03 units, §11)
+  `sim/systems/unit_lifecycle_system.gd` (T-SIM-03 units, §11),
+  `sim/systems/run_lifecycle_system.gd` (T-SIM-04 run lifecycle, §12)
 - Tests: `tests/unit/test_sim_engine.gd`, `tests/unit/test_sim_event_log.gd`,
   `tests/unit/test_sim_fixed.gd`, `tests/unit/test_production_system.gd`,
   `tests/unit/test_unit_lifecycle_system.gd`,
+  `tests/unit/test_run_lifecycle_system.gd`,
   acceptance marathons `tests/acceptance/suites/marathon_sim_1000h.gd`,
   `tests/acceptance/suites/marathon_production_1000h.gd`,
-  `tests/acceptance/suites/marathon_units_1000h.gd`
+  `tests/acceptance/suites/marathon_units_1000h.gd`,
+  `tests/acceptance/suites/marathon_run_thin_loop.gd`
 - Conventions: `docs/gdscript-conventions.md` (sim/ determinism rules)
 
 ## 1. Tick size: 1 tick = 1 sim-minute
@@ -166,8 +170,8 @@ Measured (vendored 4.7.2 binary, Apple silicon, this repo's CI command):
 |---|---|
 | T-SIM-02 production | `sim/systems/production_system.gd` (§10) — the seam + `SimFixed` + `resources` pool + `EconomyTunables` band, live since T-SIM-02 |
 | T-SIM-03 units | `sim/systems/unit_lifecycle_system.gd` (§11) — arrivals draw `rng` in `on_tick`, worker handoff rides the command queue, training/gear state in the save hooks |
-| T-SIM-05 suspicion / T-SIM-06 assault | systems + commands + events + per-tick timers in tick units; suspicion keys off `training_complete` subjects (UnitDef.suspicion_on_train) and `building_upgraded` |
-| T-SIM-04 run lifecycle | `run_seed` → `rng` for randomized leaders/regimes; events for chronicle |
+| T-SIM-05 suspicion / T-SIM-06 assault | systems + commands + events + per-tick timers in tick units; suspicion keys off `training_complete` subjects (UnitDef.suspicion_on_train) and `building_upgraded`; assault reads `army_power()`/`gear_tier()` and resolves through `RunLifecycleSystem.resolve_victory` (§12) |
+| T-SIM-04 run lifecycle | `sim/systems/run_lifecycle_system.gd` (§12) — `run_seed` → `rng` for randomized leaders/regimes drawn at the run_start/restart drains; events for chronicle; meta bank in `sim/run_meta.gd` |
 | T-SIM-07 catch-up | `fast_forward` (480 ticks = 8h cap) or linear accrual at the boundary; wall clock stays OUTSIDE sim |
 | T-ARCH-03 save | `to_dict()/apply_state_dict()` + system save hooks |
 | T-UI-03/06 The Spread | `event_logged` (live), `events` ring (post-ffwd tail), `pause_changed` |
@@ -414,3 +418,132 @@ processes). The engine-only marathon still holds ~1.67M ticks/s
 (hash 3567881493) and the production marathon ~143k ticks/s
 (hash 2971927959) — both byte-identical to their T-SIM-01/02 records:
 T-SIM-03 added zero core drag.
+
+## 12. Run lifecycle system (T-SIM-04)
+
+`sim/systems/run_lifecycle_system.gd` (`RunLifecycleSystem`, system_name
+`&"run"`) — randomized leader/regime generation at run start,
+victory/failure resolution, restart with a new identity, chronicle
+entries and the meta bank reserve. Constructed from content at boot and
+registered with the stack (order used by the marathons: heartbeat, run,
+units, production — the run frame exists before the recruits/economy it
+governs; only ordering consistency is contractual):
+
+```gdscript
+var meta := RunMeta.new()                  # or one restored from the meta save
+var run := RunLifecycleSystem.new(pack.regimes, pack.identity, meta)
+engine.register_system(run)
+```
+
+### Generation (engine RNG, drawn at the command drains)
+
+`run_start` draws, in this fixed order, from `engine.rng` inside
+on_command (the only sanctioned draw site): leader first name
+(IdentityPools), epithet, personality tag, a second DISTINCT tag (draw
+over the n−1 others — uniform, no redraw loop, constant draw count),
+a trait-stub index (4 code-side placeholder labels pending T-COPY-01),
+and finally the regime (uniform over the pack's flavors). Identical seed
++ identical command timing ⟹ identical identities and identical
+`rng.state` (unit-tested at 100-leader scale and in the thin-loop
+replay). The regime is exposed whole (`current_regime()`) for later
+systems — T-SIM-06 reads its `combat_modifier`; production's economy
+quirk is applied at the SAME drain through `set_regime` (the T-SIM-02
+handoff: production is constructed before the regime exists, so the
+quirk lands the moment the draw does — 6/h × 0.85 becomes exactly
+5,100 milli/h at the drain tick).
+
+### Run frame, victory and failure
+
+| Command | Effect |
+|---|---|
+| `run_start` | draw identity + regime, UNSTARTED → RUNNING, `run_started` (subject = regime id, value = run index) |
+| `run_abort` | explicit surrender — the THIN failure path (suspicion failure is T-SIM-05); banks + `run_aborted` |
+| `run_restart` | fold a new identity, reset run-scoped state (below), `run_restarted` |
+| `resolve_victory` | internal (queued by the entry point, below); subject `&"win"`/`&"loss"`, value = army power override |
+
+`resolve_victory(engine, win, army_power = -1)` is the assault-outcome
+entry point: T-SIM-06 (which owns the odds) calls it with its result; -1
+reads the units system's live `army_power()` at drain. It is
+tick-aligned like every write: it pre-checks (loud `false` when no run
+is active) and queues the resolution command, which drains at the next
+tick. Resolution banks the run into RunMeta and emits `run_won` /
+`run_lost` (value = banked score, value2 = run index).
+
+**Failure banks FULL progress** (town-hall decision): every ended run
+accrues — victory, assault loss, abort, and a still-running run that
+gets restarted (auto-resolved as abandoned). Thin score stub, T-SIM-08
+owns the real curve: `score = duration_hours + army_power + 100
+(victory only)`.
+
+### The reset contract (documented choice)
+
+Restart is **in-engine, command-driven, orchestrated by the run system**
+— not an engine re-init. At the `run_restart` drain it: (1) auto-banks a
+running run as abandoned; (2) zeroes the engine resource pool
+(run-scoped); (3) resets sibling systems SYNCHRONOUSLY via the
+`reset_run(regime)` seam — systems that own run-scoped state implement
+it (production: buildings unbuilt, no workers, no remainders, new
+regime quirk applied; units: roster/gate/counters cleared, next tick
+re-schedules the first arrival like boot). Direct synchronous calls, no
+queued reset commands, because a restart must be atomic within one tick
+(no half-reset overlap) — the same reasoning as T-SIM-03's queue
+handoff, which HAD to queue because it fires mid-tick. Absent siblings
+are skipped (`has_method` guard — an engine without production is
+legitimate); T-SIM-05's suspicion system joins the reset list when it
+lands. The alternative (host-side engine re-init) remains available and
+is the same contract one level up: build a fresh engine and hand it the
+SAME RunMeta instance — the unit tests prove both forms.
+
+### Regime rule across restarts (town-hall journeys 4/5)
+
+Defeat/abort restarts under the SAME regime (the regime survived you);
+victory redraws it (you became the new regime — flavor-only at MVP, the
+L2 escalation snapshot is the post-MVP deepening). The identity is
+always freshly drawn; the regime draw happens only on start and
+victory-restarts, so the RNG stream shape is fixed per transition.
+
+### Meta domain separation (RunMeta)
+
+`sim/run_meta.gd` (`RunMeta`) holds `legacy_points`, `runs_recorded`
+(the chronicle's monotonic run number — engine-local run indexes reset
+with a re-init) and the append-only `chronicle` (one JSON-safe entry
+per ended run: `{run, leader, tags, trait, regime, outcome,
+duration_ticks, army_power, army, score}`). It lives in the META save
+domain: the run system's engine-side `to_dict()`/`state_hash()`
+deliberately EXCLUDE it — a run-save restore can neither fork nor
+rewind the bank, and two engines with the same seed hash identically
+regardless of carried-over meta (unit-tested both ways). RunMeta has its
+own `to_dict()/apply_dict()` with a version refusal mirroring the
+engine's; T-ARCH-03 persists it in the separate meta slot and hands the
+same instance to every engine. No spending exists yet — the L1 unlock
+tree is post-MVP by the layer gate.
+
+### Events and read API
+
+Events: `run_started`, `run_restarted` (value2 = previous outcome),
+`run_won`, `run_lost`, `run_aborted` (value = banked score, value2 =
+run index), `run_denied` (reasons 1 already started, 2 not started,
+3 not running, 4 no content). Read API: `is_running()`, `run_status()`,
+`current_run_index()`, `run_outcome()`, `last_run_score()`,
+`run_start_tick()`, `run_end_tick()`, `leader_name()`,
+`leader_first_name()`, `leader_epithet()`, `leader_tags()`,
+`leader_trait_stub()`, `leader_trait_label()`, `current_regime()`,
+`regime_id()`, `meta`. Serialization: ids + ints only (leader strings,
+trait index, regime id resolved from the pack at boot — unknown id
+warns and runs regime-less); round-trip is lockstep-hash-equal mid-run
+and across a restart (unit- and marathon-tested).
+
+Measured: `marathon_run_thin_loop` — three full runs in 16,204 ticks
+(270h) in ~0.06s (~250–280k ticks/s across runs; hash 1951872722).
+Run 1 recruits/produces/trains/gears/promotes to the 100-power line in
+exactly 9,000 ticks (150h), wins, and banks 365 lp (150h + 115 power +
+100 bonus; chronicle snapshots 5 knights + 5 archers); run 2 restarts
+under a fresh identity (the redrawn regime slot happened to hold the
+same flavor) with emptied state, rebuilds, produces +1,200 food over
+100h under the restarted economy, loses, banks 100 lp; run 3 folds a
+third identity and save-round-trips both domains mid-run (engine
+lockstep hash + meta dict). The replay is deterministic — identical
+identities, bank, and hash. This pre-stages the T-SCOPE-01 thin-loop
+gate. The engine/production/units marathons all held their
+T-SIM-01/02/03 hashes byte-identically — the run frame adds no per-tick
+cost (on_tick is empty; all work is at command drains).

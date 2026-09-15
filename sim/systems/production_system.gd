@@ -394,6 +394,28 @@ func _apply_regime(regime: RegimeDef) -> void:
 				_cost_quirk_milli[quirk.target] = value_milli
 
 
+## Public regime seam (T-SIM-04, docs/sim-engine.md §12): (re)apply a
+## regime's economy quirk mid-engine-lifetime — the exact code path the
+## constructor argument takes. RunLifecycleSystem calls this synchronously
+## at the run_start/run_restart command drains, because production is
+## constructed before the run's regime has been drawn.
+func set_regime(p_regime: RegimeDef) -> void:
+	_apply_regime(p_regime)
+
+
+## Run-reset seam (T-SIM-04 reset contract, docs/sim-engine.md §12): every
+## run-scoped field back to constructed-boot values — buildings unbuilt, no
+## workers, no carried remainders — then apply the new run's regime quirk.
+## Called synchronously by the run system at the run_restart drain.
+func reset_run(p_regime: RegimeDef = null) -> void:
+	workers_idle = 0
+	for state in _states:
+		state.level = 0
+		state.assigned = 0
+		state.accum = 0
+	_apply_regime(p_regime)
+
+
 ## Per-worker milli-units/hour at the state's current level. Called on the
 ## tick path: pure int math, no allocation, no float anywhere.
 func _rate_milli_per_worker(state: BuildingState) -> int:
