@@ -5,8 +5,13 @@ plain `RefCounted` — **not** an autoload: headless tests construct isolated
 instances with their own roots, and the game host creates exactly one per
 session and hands it the live engine + meta; no global state, no autoload
 ordering, no scene tree). This document is the source of truth for the
-format; the class header is the map. Storage is JSON on disk — diffable in
-a text editor, migration-friendly, corruption-diagnosable with any tool.
+format; the class header is the map. The field-level PAYLOAD schema — every
+persisted field per domain, the `__i64__` encoding rules, the L2 escalation
+reserve, a worked v1→v2 migration, and the save-compatibility policy — is
+`docs/save-schema.md` (T-DATA-03), which is machine-checked against real
+saves by `tests/unit/test_save_schema_doc.gd`. Storage is JSON on disk —
+diffable in a text editor, migration-friendly, corruption-diagnosable with
+any tool.
 
 ## 1. File layout
 
