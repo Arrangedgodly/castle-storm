@@ -203,8 +203,12 @@ engine.register_system(production)  # registration order is part of the contract
 `economy_quirk` is read (`production_multiplier`, `building_cost_multiplier`
 — target resource or `all`, e.g. timber ×0.85). All content floats cross
 `SimFixed.milli_from_float` ONCE, in the constructor; everything after is
-integer math (§2). The regime and defs are NOT serialized — same pack +
-same regime at boot reproduces them; saves carry ids only.
+integer math (§2). The defs are NOT serialized — same pack at boot
+reproduces them, saves carry ids only. The APPLIED quirk multipliers ARE
+serialized + hashed state (T-ARCH-03 verifier fix): `from_dict` runs with no
+`run_start` drain to re-apply a regime, so a save made under a quirked regime
+must carry the quirk itself or the restored economy silently resumes under
+identity multipliers and diverges on the first tick.
 
 ### State model
 
@@ -270,12 +274,19 @@ value2=idle after), and denials `upgrade_denied`/`assignment_denied`/
 ### Serialization + determinism
 
 `to_dict()`/`from_dict()` are fully overridden (never the `{}` default):
-`workers_idle` + one `{id, level, assigned, accum}` entry per building.
-Round-trip is lockstep-hash-equal including carried remainders
-(unit-tested; marathon re-proves at 1000h). `state_hash()` mixes only
-the ints. Upgrades apply instantly at command drain (no build timer at
-this stage — a timer would be a future system's per-tick countdown, not
-a core change).
+`workers_idle` + one `{id, level, assigned, accum}` entry per building + the
+applied `regime_quirks` multipliers (`prod_all_milli`, per-resource
+`prod_milli`, `cost_all_milli`, per-resource `cost_milli` — the effective
+economy config, restored verbatim by `from_dict`; a dict WITHOUT the key is
+a pre-fix save and keeps the constructed regime). Round-trip is
+lockstep-hash-equal including carried remainders (unit-tested for all four
+quirk flavors with an upgrade issued during continuation; the save marathon
+re-proves it across the disk boundary per regime). `state_hash()` mixes only
+ints — workers, buildings, AND the applied quirk multipliers: an oracle
+blind to the economy config called a quirk-losing restore "identical" (the
+T-ARCH-03 verifier FAIL), so the multipliers are hashed state now. Upgrades
+apply instantly at command drain (no build timer at this stage — a timer
+would be a future system's per-tick countdown, not a core change).
 
 ### Read API (for the UI; pure queries)
 

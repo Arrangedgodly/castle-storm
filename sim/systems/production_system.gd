@@ -28,9 +28,11 @@
 ## Worker identity is COUNT-level on purpose: T-SIM-03 owns units and feeds
 ## this system `add_worker`/`remove_worker` commands as recruits promote or
 ## scatter. The regime economy quirk (production_multiplier /
-## building_cost_multiplier, e.g. timber x0.85) is applied at construction
-## from content and is NOT serialized — same pack + same regime at boot
-## reproduces it, exactly like the defs themselves.
+## building_cost_multiplier, e.g. timber x0.85) is derived from content when
+## the regime is known (constructor / set_regime) AND the APPLIED multipliers
+## are serialized + hashed state (T-ARCH-03 verifier fix): a save made under
+## a quirked regime resumes under the same quirk even though no run_start
+## drain re-applies it, and the determinism oracle can see the difference.
 class_name ProductionSystem
 extends SimSystem
 
@@ -310,6 +312,19 @@ func _deny_assignment(engine: SimEngine, command: SimCommand, reason: int) -> vo
 func state_hash() -> int:
 	var hash_value := 0x811C9DC5
 	hash_value = _mix(hash_value, workers_idle)
+	# The APPLIED economy config is state, not boot context: a hash blind to
+	# it called an engine that had lost its regime quirk on restore "identical"
+	# and diverged on the next tick (the T-ARCH-03 verifier FAIL). Mix the
+	# effective multipliers so a serialization gap of this class can never
+	# hide from the oracle again.
+	hash_value = _mix(hash_value, _prod_quirk_all_milli)
+	hash_value = _mix(hash_value, _cost_quirk_all_milli)
+	for resource in _prod_quirk_milli:
+		hash_value = _mix(hash_value, String(resource).hash())
+		hash_value = _mix(hash_value, int(_prod_quirk_milli[resource]))
+	for resource in _cost_quirk_milli:
+		hash_value = _mix(hash_value, String(resource).hash())
+		hash_value = _mix(hash_value, int(_cost_quirk_milli[resource]))
 	for state in _states:
 		hash_value = _mix(hash_value, String(state.def.id).hash())
 		hash_value = _mix(hash_value, state.level)
@@ -327,11 +342,39 @@ func to_dict() -> Dictionary:
 			"assigned": state.assigned,
 			"accum": state.accum,
 		})
-	return {"workers_idle": workers_idle, "buildings": buildings}
+	var prod_milli := {}
+	for resource in _prod_quirk_milli:
+		prod_milli[String(resource)] = int(_prod_quirk_milli[resource])
+	var cost_milli := {}
+	for resource in _cost_quirk_milli:
+		cost_milli[String(resource)] = int(_cost_quirk_milli[resource])
+	return {
+		"workers_idle": workers_idle,
+		"buildings": buildings,
+		# Applied regime economy multipliers (T-ARCH-03 verifier fix): a
+		# restore must resume under the quirk the save was made under — the
+		# quirks are run state, not boot-time reconstruction (from_dict runs
+		# with no run_start drain to re-apply them).
+		"regime_quirks": {
+			"prod_all_milli": _prod_quirk_all_milli,
+			"prod_milli": prod_milli,
+			"cost_all_milli": _cost_quirk_all_milli,
+			"cost_milli": cost_milli,
+		},
+	}
 
 
 func from_dict(state: Dictionary) -> void:
 	workers_idle = int(state.get("workers_idle", 0))
+	if state.has("regime_quirks"):
+		# Restore the exact applied multipliers (serialized since the
+		# T-ARCH-03 verifier fix). A dict WITHOUT the key is a pre-fix save:
+		# keep the constructed quirks (the old boot-reconstruction contract).
+		var quirks: Dictionary = state["regime_quirks"]
+		_prod_quirk_all_milli = int(quirks.get("prod_all_milli", SimFixed.MILLI))
+		_prod_quirk_milli = _quirk_milli_from_json(quirks.get("prod_milli", {}))
+		_cost_quirk_all_milli = int(quirks.get("cost_all_milli", SimFixed.MILLI))
+		_cost_quirk_milli = _quirk_milli_from_json(quirks.get("cost_milli", {}))
 	for entry in state.get("buildings", []):
 		var restored := _by_id.get(StringName(entry["id"])) as BuildingState
 		if restored == null:
@@ -340,6 +383,15 @@ func from_dict(state: Dictionary) -> void:
 		restored.level = int(entry.get("level", 0))
 		restored.assigned = int(entry.get("assigned", 0))
 		restored.accum = int(entry.get("accum", 0))
+
+
+## JSON-safe String-keyed quirk dict -> the system's StringName-keyed form
+## (insertion order preserved by both the writer and the parser).
+static func _quirk_milli_from_json(encoded: Dictionary) -> Dictionary:
+	var decoded := {}
+	for resource in encoded:
+		decoded[StringName(String(resource))] = int(encoded[resource])
+	return decoded
 
 
 # --- Curve construction (integer milli-space; the single float boundary) ---

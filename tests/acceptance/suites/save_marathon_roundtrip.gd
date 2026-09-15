@@ -16,6 +16,15 @@
 ##   4. a second save rotates the ring; the newest slot is then deliberately
 ##      corrupted on disk (truncation) and the next "process" falls back to
 ##      the older good slot — the marathon-scale corruption recovery path
+##   5. REGIME SWEEP (the T-ARCH-03 verifier re-dispatch): every pack regime
+##      flavor — production-target, production-all, cost-all AND cost-target
+##      quirks — drives its own save -> "process restart" -> restore, with
+##      the restored economy's rates AND costs asserted equal to the pre-save
+##      quirked values and a +10h continuation (upgrade command included)
+##      locked against the never-saved twin. Parameterized over regimes, NOT
+##      seed-dependent: the first verifier FAIL was masked because the seed
+##      happened to draw the one identity-production regime — a sweep over
+##      forced single-regime draws cannot luck out.
 ##
 ## The 500h state is the "all systems, deep history" case: full roster with
 ## in-flight training timers, built-up buildings, remainder-carrying
@@ -31,6 +40,7 @@ const RUN_HOURS := 500
 const CONTINUE_HOURS := 50
 const BUDGET_SECONDS := 60.0
 const CHUNK_TICKS := 600  # one management batch per 10h
+const SWEEP_CONTINUE_HOURS := 10
 
 
 func suite_name() -> String:
@@ -146,6 +156,27 @@ func run(harness) -> void:
 	var replay := _replay(fixture)
 	harness.check(replay == hash_after_continuation, "replay: hash identical through save/load/restart (hash %d)" % hash_after_continuation)
 
+	# --- Act 5: the regime sweep (verifier re-dispatch) — every flavor.
+	var sweep_root := SCRATCH_ROOT + "_regimes"
+	_erase_dir(sweep_root)
+	for regime: RegimeDef in fixture._regimes():
+		_regime_round_trip(harness, fixture, sweep_root, regime)
+	# De-mask guards: the sweep must have actually run NON-identity production
+	# AND cost multipliers (the original suite passed because its seed drew
+	# the identity-production regime — distinct-value checks make that class
+	# of luck impossible to repeat silently).
+	var distinct_rates := {}
+	for rate in _sweep_camp_rates:
+		distinct_rates[rate] = true
+	var distinct_costs := {}
+	for cost in _sweep_farm_costs:
+		distinct_costs[cost] = true
+	harness.check(distinct_rates.size() >= 2,
+		"sweep covered non-identity production quirks (distinct camp rates %s)" % str(_sweep_camp_rates))
+	harness.check(distinct_costs.size() >= 2,
+		"sweep covered non-identity cost quirks (distinct farm costs %s)" % str(_sweep_farm_costs))
+	_erase_dir(sweep_root)
+
 	_erase_dir(SCRATCH_ROOT)
 
 
@@ -180,6 +211,86 @@ func _replay(fixture) -> int:
 	engine.fast_forward(CONTINUE_HOURS * SimEngine.TICKS_PER_SIM_HOUR)
 	_erase_dir(replay_root)
 	return restarted.state_hash() if restarted.state_hash() == engine.state_hash() else -1
+
+
+# --- Act 5: the regime sweep (T-ARCH-03 verifier re-dispatch) ---------------
+#
+# One forced single-regime flavor per iteration: run_start draws uniformly
+# over a ONE-regime pack, so the quirk lands through the REAL set_regime
+# handoff with zero seed luck. Covers every pack flavor: production-target
+# (gilded_crown), cost-all (iron_rotunda), production-all (velvet_fist),
+# cost-target (paper_crown). Per flavor: develop a real economy, snapshot the
+# QUIRKED rate + cost + hash, cross the disk boundary through SaveManager,
+# and demand the restored economy reproduce them exactly, then +10h
+# continuation lockstep (an upgrade command included — the cost quirk's only
+# query path) against the never-saved twin.
+
+var _sweep_camp_rates: Array[int] = []
+var _sweep_farm_costs: Array[int] = []
+
+
+func _regime_round_trip(harness, fixture, root: String, regime: RegimeDef) -> void:
+	var label := String(regime.id)
+	var engine := _build_under(fixture, regime)
+	engine.submit_command(&"run_start", &"", 0)  # forced draw: the quirk applies at the drain
+	fixture._seed_run(engine)
+	engine.submit_command(&"assign_worker", &"farm", 2)
+	engine.submit_command(&"assign_worker", &"camp", 2)
+	engine.fast_forward(CHUNK_TICKS)  # 10h of real production under the quirk
+
+	var production := engine.get_system(&"production") as ProductionSystem
+	var rate_farm: int = production.production_rate_milli_per_worker(&"farm")
+	var rate_camp: int = production.production_rate_milli_per_worker(&"camp")
+	var cost_timber: int = production.upgrade_cost(&"farm")[&"timber"]
+	var hash_at_save: int = engine.state_hash()
+	_sweep_camp_rates.append(rate_camp)
+	_sweep_farm_costs.append(cost_timber)
+
+	# Disk boundary: save, then a fresh engine + fresh manager ("process").
+	var saver := SaveManager.new(root)
+	var saved: bool = saver.save_run(engine)
+	var restarted := _build_under(fixture, regime)
+	var loaded: bool = SaveManager.new(root).load_run(restarted)
+	var restarted_production := restarted.get_system(&"production") as ProductionSystem
+	var restored_rate_farm: int = restarted_production.production_rate_milli_per_worker(&"farm")
+	var restored_rate_camp: int = restarted_production.production_rate_milli_per_worker(&"camp")
+	var restored_cost_timber: int = restarted_production.upgrade_cost(&"farm")[&"timber"]
+	var hash_at_load: int = restarted.state_hash()
+
+	# +10h continuation with an upgrade in flight on BOTH timelines.
+	var continue_ticks := SWEEP_CONTINUE_HOURS * SimEngine.TICKS_PER_SIM_HOUR
+	for e: SimEngine in [engine, restarted]:
+		e.submit_command(&"upgrade_building", &"farm", 1)
+	engine.fast_forward(continue_ticks)
+	restarted.fast_forward(continue_ticks)
+	var hash_twin: int = engine.state_hash()
+	var hash_restored: int = restarted.state_hash()
+
+	print(
+		"[save_marathon_roundtrip] regime sweep %s: rates %d/%d milli/h, cost %d timber -> restart %d/%d, %d -> lockstep %d"
+		% [label, rate_farm, rate_camp, cost_timber, restored_rate_farm,
+			restored_rate_camp, restored_cost_timber, hash_restored]
+	)
+	harness.check(saved and loaded, "%s: save -> \"process restart\" -> load" % label)
+	harness.check(restored_rate_farm == rate_farm and restored_rate_camp == rate_camp,
+		"%s: restored production rates match pre-save under quirk (farm %d, camp %d)" % [label, restored_rate_farm, restored_rate_camp])
+	harness.check(restored_cost_timber == cost_timber,
+		"%s: restored upgrade cost matches pre-save under quirk (%d timber)" % [label, restored_cost_timber])
+	harness.check(hash_at_load == hash_at_save, "%s: state_hash identical at restore (%d)" % [label, hash_at_save])
+	harness.check(hash_restored == hash_twin,
+		"%s: +%dh continuation lockstep incl. an upgrade (%d)" % [label, SWEEP_CONTINUE_HOURS, hash_twin])
+
+
+## The fixture's stack with ONE regime in the pack: run_start's uniform draw
+## is forced, so each sweep iteration deterministically exercises its flavor.
+func _build_under(fixture, regime: RegimeDef) -> SimEngine:
+	var single: Array[RegimeDef] = [regime]
+	var engine := SimEngine.new(20260915)
+	engine.register_system(HeartbeatSystem.new())
+	engine.register_system(RunLifecycleSystem.new(single, fixture._identity()))
+	engine.register_system(UnitLifecycleSystem.new(fixture._unit_defs(), fixture._gear_defs(), EconomyTunables.new()))
+	engine.register_system(ProductionSystem.new(fixture._building_defs(), EconomyTunables.new(), null))
+	return engine
 
 
 # --- File helpers (the suite runs under user:// and cleans up after itself)

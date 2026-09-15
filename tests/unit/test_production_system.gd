@@ -3,7 +3,9 @@
 ## seam coverage: exact rate math (incl. the x0.85 regime-quirk remainder
 ## carry), upgrade cost curve across the milestone boundaries 1/9/10/11/
 ## 19/20/21, worker assignment/reassignment determinism, denial codes,
-## events, and the to_dict/from_dict save round-trip (lockstep hash).
+## events, the to_dict/from_dict save round-trip (lockstep hash), and the
+## regime-quirk survival across that round-trip (T-ARCH-03 verifier fix:
+## applied multipliers are serialized + hashed state, all four flavors).
 extends GdUnitTestSuite
 
 
@@ -575,6 +577,101 @@ func test_from_dict_skips_unknown_buildings_loudly() -> void:
 	assert_bool(restored.apply_state_dict(captured)).is_true()
 	assert_int(_production(restored).building_level(&"camp")).is_equal(0)
 	assert_int(_production(restored).idle_workers()).is_equal(1)
+
+
+# --- Regime quirks across the save boundary (T-ARCH-03 verifier fix) -------
+#
+# The T-ARCH-03 verifier FAIL: quirk multipliers were neither serialized nor
+# re-applied on restore (set_regime only fired at run_start), and state_hash
+# was blind to them — every reloaded game resumed under identity economy
+# multipliers and diverged on the first tick under a quirked regime. The
+# masked acceptance drew a regime whose seed happened to be identity-quirk;
+# these tests PARAMETERIZE over the quirk flavors instead of trusting a draw.
+
+
+## All four pack quirk flavors survive to_dict -> from_dict. The restored
+## engine is constructed with NO regime, so any quirk present after the
+## restore came from the save dict. The continuation then issues an UPGRADE
+## (the cost quirk's only query path) and demands +10h lockstep against the
+## never-saved twin.
+func test_regime_quirk_survives_round_trip_all_four_flavors() -> void:
+	var flavors := [
+		[&"production_multiplier", &"timber", 0.85],    # gilded_crown shape
+		[&"production_multiplier", &"all", 1.15],       # velvet_fist shape
+		[&"building_cost_multiplier", &"all", 1.2],     # iron_rotunda shape
+		[&"building_cost_multiplier", &"timber", 0.75],  # paper_crown shape
+	]
+	for flavor in flavors:
+		var original := _engine([_farm(), _camp()], _regime(flavor[0], flavor[1], float(flavor[2])), 20260915)
+		_build(original, &"farm")
+		_build(original, &"camp")
+		_build(original, &"farm")  # farm to L2: the next cost is a curve step
+		original.submit_command(&"add_worker", &"production", 2)
+		original.submit_command(&"assign_worker", &"farm", 1)
+		original.submit_command(&"assign_worker", &"camp", 1)
+		original.fast_forward(90)  # carry a remainder across the boundary
+		var production := _production(original)
+		var rate_farm: int = production.production_rate_milli_per_worker(&"farm")
+		var rate_camp: int = production.production_rate_milli_per_worker(&"camp")
+		var cost_timber: int = production.upgrade_cost(&"farm")[&"timber"]
+		var hash_at_save: int = original.state_hash()
+
+		var restored := _engine([_farm(), _camp()], null, 20260915)  # NO regime at boot
+		assert_bool(restored.apply_state_dict(original.to_dict())).is_true()
+		var restored_production := _production(restored)
+		assert_int(restored_production.production_rate_milli_per_worker(&"farm")).is_equal(rate_farm)
+		assert_int(restored_production.production_rate_milli_per_worker(&"camp")).is_equal(rate_camp)
+		assert_int(restored_production.upgrade_cost(&"farm")[&"timber"]).is_equal(cost_timber)
+		assert_int(restored.state_hash()).is_equal(hash_at_save)
+
+		# +10h continuation with an upgrade in flight on BOTH timelines.
+		_grant(original, 1_000_000, 1_000_000, 1_000_000)
+		_grant(restored, 1_000_000, 1_000_000, 1_000_000)
+		for engine: SimEngine in [original, restored]:
+			engine.submit_command(&"upgrade_building", &"farm", 1)
+		original.fast_forward(600)
+		restored.fast_forward(600)
+		assert_int(_production(restored).building_level(&"farm")).is_equal(3)
+		assert_int(restored.state_hash()).is_equal(original.state_hash())
+
+
+## The determinism oracle sees the applied multipliers (the second half of
+## the verifier fix): identical buildings/workers under different quirks hash
+## differently, a restored engine hashes equal, and a dict that DROPPED the
+## quirks (the pre-fix save shape) hashes different — the exact blindness
+## that masked the original defect can no longer occur.
+func test_state_hash_sees_the_applied_regime_quirks() -> void:
+	var quirked := _engine([_camp()], _regime(&"production_multiplier", &"timber", 0.85))
+	var identity := _engine([_camp()], null)
+	for engine: SimEngine in [quirked, identity]:
+		_build(engine, &"camp")
+		engine.submit_command(&"add_worker", &"production", 1)
+		engine.submit_command(&"assign_worker", &"camp", 1)
+		engine.tick()
+	assert_int(_production(identity).state_hash()).is_not_equal(_production(quirked).state_hash())
+
+	var restored := _engine([_camp()], null)
+	assert_bool(restored.apply_state_dict(quirked.to_dict())).is_true()
+	assert_int(_production(restored).state_hash()).is_equal(_production(quirked).state_hash())
+
+	var stripped: Dictionary = quirked.to_dict()
+	(stripped["systems"]["production"] as Dictionary).erase("regime_quirks")
+	var legacy := _engine([_camp()], null)
+	assert_bool(legacy.apply_state_dict(stripped)).is_true()
+	assert_int(_production(legacy).state_hash()).is_not_equal(_production(quirked).state_hash())
+
+
+## A dict WITHOUT the regime_quirks key (a pre-fix save) restores under the
+## old contract: whatever regime the engine was constructed with stays
+## applied — from_dict never silently zeroes the boot-time quirk.
+func test_from_dict_without_quirk_key_keeps_constructed_regime() -> void:
+	var original := _engine([_camp()], _regime(&"production_multiplier", &"timber", 0.85))
+	_build(original, &"camp")
+	var captured: Dictionary = original.to_dict()
+	(captured["systems"]["production"] as Dictionary).erase("regime_quirks")
+	var same_regime := _engine([_camp()], _regime(&"production_multiplier", &"timber", 0.85))
+	assert_bool(same_regime.apply_state_dict(captured)).is_true()
+	assert_int(_production(same_regime).production_rate_milli_per_worker(&"camp")).is_equal(5_100)
 
 
 # --- Engine integration ------------------------------------------------------

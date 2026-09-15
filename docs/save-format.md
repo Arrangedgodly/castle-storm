@@ -225,13 +225,23 @@ load falls back, corrupt bytes are preserved in quarantine.**
 | 64-bit exactness (rng_state beyond 2^53, int64 max, negative) | `test_rng_state_survives_exact_beyond_float_precision`, `test_rng_state_max_int64_survives_exact`, `test_negative_big_int_survives_exact` |
 | Insertion-order preservation (stringify-sort regression) | `test_disk_json_preserves_dictionary_insertion_order` |
 
-Marathon scale (`tests/acceptance/suites/save_marathon_roundtrip.gd`, 19
+Marathon scale (`tests/acceptance/suites/save_marathon_roundtrip.gd`, 41
 checks): 500h full-stack state → save both domains → fresh engine + fresh
 manager (the "process restart" seam — no state shared but disk) → load →
 `state_hash()` and `rng_state` identical → both timelines fast-forward
 50h in lockstep → second save rotates the ring → newest slot truncated on
 disk → next "process" falls back to the prior generation. Replay of the
-whole script reproduces the final hash.
+whole script reproduces the final hash. A REGIME SWEEP then repeats
+save → restart → restore for EVERY pack regime flavor (production-target,
+production-all, cost-all, cost-target — each forced through a single-regime
+`run_start` draw, no seed luck): the restored economy's production rates and
+upgrade costs must equal the pre-save quirked values, and a +10h
+continuation (with an `upgrade_building` in flight, so the cost quirk is
+queried) locks against the never-saved twin; distinct-value guards prove
+the sweep ran non-identity production AND cost multipliers (the T-ARCH-03
+verifier re-dispatch: the production system's applied regime multipliers
+are serialized payload — `regime_quirks` in the production sub-dict — and
+hashed state, so a quirked regime can no longer silently drop on restore).
 
 Manual probes: `make save-debug` (see Makefile / `scripts/save_debug.gd`)
 — run it twice to watch a continuation from disk; truncate/empty/mangle a
