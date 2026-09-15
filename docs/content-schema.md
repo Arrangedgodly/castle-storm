@@ -172,8 +172,8 @@ garrison ×1.2 (archers on the walls) + timber ×0.85 (timber tax).
 ### EconomyTunables (`content/schema/economy_tunables.gd`) — the R4 vocabulary
 
 Defaults = R4 seeds. Consumed by T-SIM-07 (offline), T-SIM-02 (band),
-T-SIM-05 (suspicion), T-SIM-08 (all; tuned in the simulator),
-T-SEC-01 (cap/clamp policy).
+T-SIM-03 (recruit arrival cadence), T-SIM-05 (suspicion), T-SIM-08 (all;
+tuned in the simulator), T-SEC-01 (cap/clamp policy).
 
 | Field (default) | R4 row | Validator constraint |
 |---|---|---|
@@ -182,6 +182,8 @@ T-SEC-01 (cap/clamp policy).
 | `cost_growth_band_min/max` (1.08/1.12) | B: r per building | 1.0 < min ≤ max < 2.0; buildings checked against it |
 | `milestone_multiplier` (2.0) | B: ×2 at 10/20 | ≥ 1.0 |
 | `knight_cost_step` (1.6) | B: ~1.6× per knight | within (1.0, 3.0) |
+| `recruit_arrival_interval_hours` (2.0) | T-SIM-03: base interval between peasant arrivals (additive field, no format bump) | > 0 |
+| `recruit_arrival_jitter_hours` (0.25) | T-SIM-03: ± jitter per interval, drawn from the engine's seeded RNG (0 = metronome, no draws) | within [0, interval) |
 | `suspicion_max` (100) | C: range | ordering input |
 | `suspicion_warn_threshold` (35) | C: tier 1 | 0 < warn < crackdown < max |
 | `suspicion_crackdown_threshold` (70) | C: tier 2 | (same ordering) |

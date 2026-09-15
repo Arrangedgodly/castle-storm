@@ -8,11 +8,14 @@ saving, and wall-clock drive are consumers.
   `sim/sim_event_log.gd` + `sim/sim_event.gd` (event stream),
   `sim/sim_command.gd` (command), `sim/sim_fixed.gd` (fixed-point math),
   `sim/systems/heartbeat_system.gd` (placeholder system),
-  `sim/systems/production_system.gd` (T-SIM-02 production, §10)
+  `sim/systems/production_system.gd` (T-SIM-02 production, §10),
+  `sim/systems/unit_lifecycle_system.gd` (T-SIM-03 units, §11)
 - Tests: `tests/unit/test_sim_engine.gd`, `tests/unit/test_sim_event_log.gd`,
   `tests/unit/test_sim_fixed.gd`, `tests/unit/test_production_system.gd`,
+  `tests/unit/test_unit_lifecycle_system.gd`,
   acceptance marathons `tests/acceptance/suites/marathon_sim_1000h.gd`,
-  `tests/acceptance/suites/marathon_production_1000h.gd`
+  `tests/acceptance/suites/marathon_production_1000h.gd`,
+  `tests/acceptance/suites/marathon_units_1000h.gd`
 - Conventions: `docs/gdscript-conventions.md` (sim/ determinism rules)
 
 ## 1. Tick size: 1 tick = 1 sim-minute
@@ -162,7 +165,8 @@ Measured (vendored 4.7.2 binary, Apple silicon, this repo's CI command):
 | Consumer | What it uses |
 |---|---|
 | T-SIM-02 production | `sim/systems/production_system.gd` (§10) — the seam + `SimFixed` + `resources` pool + `EconomyTunables` band, live since T-SIM-02 |
-| T-SIM-03 training / T-SIM-05 suspicion / T-SIM-06 assault | systems + commands + events + per-tick timers in tick units |
+| T-SIM-03 units | `sim/systems/unit_lifecycle_system.gd` (§11) — arrivals draw `rng` in `on_tick`, worker handoff rides the command queue, training/gear state in the save hooks |
+| T-SIM-05 suspicion / T-SIM-06 assault | systems + commands + events + per-tick timers in tick units; suspicion keys off `training_complete` subjects (UnitDef.suspicion_on_train) and `building_upgraded` |
 | T-SIM-04 run lifecycle | `run_seed` → `rng` for randomized leaders/regimes; events for chronicle |
 | T-SIM-07 catch-up | `fast_forward` (480 ticks = 8h cap) or linear accrual at the boundary; wall clock stays OUTSIDE sim |
 | T-ARCH-03 save | `to_dict()/apply_state_dict()` + system save hooks |
@@ -269,3 +273,144 @@ Measured at 1000h: `marathon_production_1000h` — 60,000 ticks with 3
 producing buildings + a 10h upgrade cadence in ~0.42s
 (~144,000 ticks/s; the engine-only marathon holds ~1.67M ticks/s) —
 ~143× headroom under the 60s budget for the remaining T-SIM-03..08 weight.
+
+## 11. Unit lifecycle system (T-SIM-03)
+
+`sim/systems/unit_lifecycle_system.gd` (`UnitLifecycleSystem`, system_name
+`&"units"`) — recruit arrival, role assignment, training timers, gear
+requirements and promotion to the knight/archer branches, all data-driven
+from `UnitDef`/`GearDef`/`EconomyTunables`. Constructed from content at
+boot and registered alongside production (order: heartbeat, units,
+production — mirrors causality; only the ordering *consistency* is
+contractual):
+
+```gdscript
+var units := UnitLifecycleSystem.new(pack.units, pack.gear, pack.tunables)
+engine.register_system(units)
+```
+
+### Lifecycle
+
+```
+recruit_arrived (RNG cadence)      stable: offers wait at the gate, never expire
+  -> recruit_accept                peasant joins (the base unit)
+  -> assign_role worker|militia    starts that def's training timer
+       worker  (0.5h ex.)  -> unit_promoted + add_worker into production's pool
+       militia (2h)        -> unit_promoted (resting militia)
+  -> start_training trainee        militia -> trainee (4h)
+  -> start_training knight|archer  trainee -> branch (12h / 6h)
+       training_complete (held)    STABLE: trainee awaiting gear + promote
+  -> equip_gear (per required slot, any tier; pays the GearDef recipe)
+  -> promote                       knight / archer — counts on the army roster
+```
+
+- **Every hop is explicit** — no auto-advance: the player issues
+  `assign_role` for the peasant's branch, `start_training` for each later
+  hop (one command kind per semantic step; both funnel into the same
+  promotion-start path). Zero-hour targets complete within the same
+  command drain.
+- **Gear gating**: promotion into a def with `required_gear_slots`
+  (knight: weapon+armor; archer: weapon) REQUIRES training complete +
+  every required slot equipped, any tier (top tier NOT required — tiers
+  are recorded per unit as slot→gear-id and feed T-SIM-06 odds). An
+  unequipped trainee awaiting gear is a stable state, not an error;
+  `promote` without gear is refused LOUDLY (`lifecycle_denied`,
+  `REASON_GEAR_INCOMPLETE`). Gear-free ranks (worker, militia, trainee)
+  promote automatically when the timer runs out.
+- **Gear rules**: `equip_gear` pays the recipe from `resources`
+  (all-or-nothing); a slot may be filled only where the unit's current
+  def or training target requires it (choose the branch, then gear up);
+  re-equipping requires a strictly higher tier (tier refits). Craft
+  timers (GearDef.craft_time_hours) are a future smithy system's per-tick
+  countdown, not a core change — equip is instant at command drain.
+- **Army roster**: terminal combat units (combat_power > 0 and no
+  promotion_paths — knight/archer; militia/trainee excluded).
+  `army_power()` = Σ (def.combat_power + equipped gear combat_power).
+- **Worker handoff**: worker promotion submits `add_worker` to
+  production through the same command queue the UI uses — drained at the
+  next tick's start, one tick after the promotion. Identity mapping
+  lives here (worker units stay tracked); counts live in production.
+
+### Arrival cadence (interpretation choice, documented)
+
+Arrivals are a **tunable, not per-regime data**:
+`EconomyTunables.recruit_arrival_interval_hours` (default 2.0) +
+`recruit_arrival_jitter_hours` (default 0.25, ±). Each interval is drawn
+from `engine.rng` INSIDE `on_tick` (the only sanctioned draw site) —
+identical seeds produce identical arrival sequences (unit- and
+marathon-tested); jitter 0 is a metronome that draws nothing (rng.state
+frozen). The first tick schedules, so the first arrival lands at
+~interval+1 tick. Per-regime cadence can arrive later as an additive
+`RegimeModifier` kind (content-schema §4 registry is forward-compatible)
+if design wants flavor-differentiated gates; the tunable keeps T-SIM-08's
+simulator in control at MVP. Recruit tolerance pressure (too many
+recruits) is T-SIM-05's suspicion concern — the gate itself is uncapped.
+
+### Timers (integer, milli-ticks)
+
+`training_time_hours` crosses `SimFixed.milli_from_float` ONCE at
+construction, × 60 → duration in **milli-ticks**; each tick adds
+`SimFixed.MILLI` (1000) to the trainee's progress; completion when
+progress ≥ duration. 0.5h/2h/4h/6h/12h are exactly 30/120/240/360/720
+ticks — no truncation at the schema's hour granularity. Progress is
+visible two ways: the read API (`training_progress_milli` /
+`training_duration_milli` — exact, for meters) and
+`training_progress` events at each quarter crossing (250/500/750
+permille) — bounded per training, never per-tick spam.
+
+### Commands and events
+
+| Command | Subject | Value | Effect |
+|---|---|---|---|
+| `recruit_accept` | — | offer uid | offer → peasant |
+| `assign_role` | target def id | unit uid | peasant branch choice (worker/militia) |
+| `start_training` | target def id | unit uid | any later hop (trainee, knight/archer) |
+| `equip_gear` | gear id | unit uid | pay recipe, fill slot (tier-up replaces) |
+| `promote` | — | unit uid | held trainee → knight/archer |
+
+Events (subject = content id, value = unit uid unless noted):
+`recruit_arrived` (value2 = pending offers), `recruit_accepted`
+(value2 = base-def count), `training_started` (value2 = duration in
+milli-ticks), `training_progress` (value2 = permille), `training_complete`
+(value2 = 1 held-for-gear / 0 auto-promoted; subject resolves
+`UnitDef.suspicion_on_train` for T-SIM-05), `gear_equipped`
+(subject = gear id, value2 = tier), `unit_promoted` (value2 = new-def
+count), and `lifecycle_denied` (value = reason code 1–13, value2 = uid;
+constants on UnitLifecycleSystem — unknown unit/recruit/gear/target,
+invalid target, already training, awaiting promotion, slot not needed,
+slot occupied, unaffordable, not awaiting promotion, training
+incomplete, gear incomplete).
+
+### Serialization + determinism
+
+`to_dict()`/`from_dict()` fully overridden: uid counter, arrival
+countdown + arrivals_total, pending offers, one entry per unit
+(`{uid, def, target, progress, awaiting, gear}` — ids only, gear as
+slot→gear-id). Round-trip is lockstep-hash-equal with in-flight training
+timers and partial gear (unit-tested; the marathon re-proves at 500h
+scale). Unknown defs skip the unit loudly; an unknown training target
+drops the training (unit survives, resting); unknown gear ids are
+dropped — same pack at boot reproduces defs, exactly like production.
+`state_hash()` mixes the ints + `String.hash()` of def/gear ids. The
+engine serializes `rng.state`, so the jittered arrival stream continues
+identically after restore.
+
+### Read API (for the UI; pure queries)
+
+`pending_offers()`, `offer_ids()`, `unit_ids()`, `unit_count(id)`,
+`total_units()`, `unit_def(uid)`, `training_target(uid)`,
+`training_progress_milli(uid)`, `training_duration_milli(id)`,
+`is_awaiting_promotion(uid)`, `unit_gear(uid)`, `gear_tier(uid, slot)`,
+`missing_gear_slots(uid)`, `idle_units(id)`,
+`awaiting_promotion_ids()`, `army_roster()`, `army_power()`,
+`gear_ids_for_slot(slot)` (tier-sorted), `arrivals_total`.
+
+Measured at 1000h: `marathon_units_1000h` — 60,000 ticks of the full
+stack (heartbeat + units + production; 498 arrivals, 385 workers, 50
+knights + 50 archers promoted with paid gear, army power 1150, a 10h
+management cadence, and a 500h save round-trip) in ~0.31s
+(~190,000 ticks/s; hash 191601477, reproduced identically across
+processes). The engine-only marathon still holds ~1.67M ticks/s
+(hash 3567881493) and the production marathon ~143k ticks/s
+(hash 2971927959) — both byte-identical to their T-SIM-01/02 records:
+T-SIM-03 added zero core drag.

@@ -2,7 +2,8 @@
 ## (docs/ultron/research/r4-idle-balance-references.md; every default below is
 ## an R4 seed value; T-SIM-08 tunes them in the simulator). Consumed by:
 ## T-SIM-07 (offline block), T-SIM-02 (cost band), T-SIM-08 (all),
-## T-SIM-05 (suspicion block), T-SEC-01 (cap/clamp policy).
+## T-SIM-05 (suspicion block), T-SIM-03 (recruit arrival cadence),
+## T-SEC-01 (cap/clamp policy).
 class_name EconomyTunables
 extends Resource
 
@@ -31,6 +32,20 @@ extends Resource
 ## Effective-cost compounding factor per additional knight
 ## (R4: ~1.6x; first knight lands end of day 1 casual).
 @export var knight_cost_step: float = 1.6
+
+## --- Recruit arrival cadence (T-SIM-03) ---
+
+## Base interval between peasant arrivals at the gate, in sim-hours. The
+## actual interval is jittered +/- recruit_arrival_jitter_hours using the
+## engine's seeded RNG: identical run seeds produce identical arrival
+## sequences (docs/sim-engine.md §11). Tunable choice recorded in
+## docs/content-schema.md §4 — per-regime cadence can arrive later as an
+## additive RegimeModifier kind if design wants flavor-differentiated gates.
+@export var recruit_arrival_interval_hours: float = 2.0
+
+## +/- jitter on each arrival interval, in sim-hours (0 = metronome cadence
+## that draws no RNG at all). Must be < the base interval.
+@export var recruit_arrival_jitter_hours: float = 0.25
 
 ## --- Suspicion / pressure curve (R4 §C) ---
 
