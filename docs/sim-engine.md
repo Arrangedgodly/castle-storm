@@ -7,10 +7,12 @@ saving, and wall-clock drive are consumers.
 - Code: `sim/sim_engine.gd` (core), `sim/sim_system.gd` (system base),
   `sim/sim_event_log.gd` + `sim/sim_event.gd` (event stream),
   `sim/sim_command.gd` (command), `sim/sim_fixed.gd` (fixed-point math),
-  `sim/systems/heartbeat_system.gd` (placeholder system)
+  `sim/systems/heartbeat_system.gd` (placeholder system),
+  `sim/systems/production_system.gd` (T-SIM-02 production, §10)
 - Tests: `tests/unit/test_sim_engine.gd`, `tests/unit/test_sim_event_log.gd`,
-  `tests/unit/test_sim_fixed.gd`, acceptance marathon
-  `tests/acceptance/suites/marathon_sim_1000h.gd`
+  `tests/unit/test_sim_fixed.gd`, `tests/unit/test_production_system.gd`,
+  acceptance marathons `tests/acceptance/suites/marathon_sim_1000h.gd`,
+  `tests/acceptance/suites/marathon_production_1000h.gd`
 - Conventions: `docs/gdscript-conventions.md` (sim/ determinism rules)
 
 ## 1. Tick size: 1 tick = 1 sim-minute
@@ -96,9 +98,9 @@ gameplay-visible state), `to_dict()/from_dict()` (save hooks).
 
 `sim/systems/heartbeat_system.gd` is the placeholder proving every path
 end-to-end: hour-boundary `hour_struck` events from `on_tick`, `ping`
-command consumption, hash + save hooks. T-SIM-02 (production) registers
-its system alongside; when a real system covers the same test role,
-heartbeat retires.
+command consumption, hash + save hooks. T-SIM-02's production system
+(§10) registers alongside it as the first real system; heartbeat retires
+when a real system covers its test role.
 
 Typical system pattern (T-SIM-02 shape):
 
@@ -159,10 +161,111 @@ Measured (vendored 4.7.2 binary, Apple silicon, this repo's CI command):
 
 | Consumer | What it uses |
 |---|---|
-| T-SIM-02 production | systems + `SimFixed` + `resources` pool + `EconomyTunables` band |
+| T-SIM-02 production | `sim/systems/production_system.gd` (§10) — the seam + `SimFixed` + `resources` pool + `EconomyTunables` band, live since T-SIM-02 |
 | T-SIM-03 training / T-SIM-05 suspicion / T-SIM-06 assault | systems + commands + events + per-tick timers in tick units |
 | T-SIM-04 run lifecycle | `run_seed` → `rng` for randomized leaders/regimes; events for chronicle |
 | T-SIM-07 catch-up | `fast_forward` (480 ticks = 8h cap) or linear accrual at the boundary; wall clock stays OUTSIDE sim |
 | T-ARCH-03 save | `to_dict()/apply_state_dict()` + system save hooks |
 | T-UI-03/06 The Spread | `event_logged` (live), `events` ring (post-ffwd tail), `pause_changed` |
 | T-QA-02 economy CI | marathon pattern; asserts via `state_hash()` |
+
+## 10. Production system (T-SIM-02)
+
+`sim/systems/production_system.gd` (`ProductionSystem`, system_name
+`&"production"`) — worker assignment → building rates → upgrade
+multipliers for food/timber/iron. Constructed from content at boot:
+
+```gdscript
+var production := ProductionSystem.new(pack.buildings, pack.tunables, regime)
+engine.register_system(production)  # registration order is part of the contract
+```
+
+`regime` is the run's RegimeDef (null = no quirk); only its
+`economy_quirk` is read (`production_multiplier`, `building_cost_multiplier`
+— target resource or `all`, e.g. timber ×0.85). All content floats cross
+`SimFixed.milli_from_float` ONCE, in the constructor; everything after is
+integer math (§2). The regime and defs are NOT serialized — same pack +
+same regime at boot reproduces them; saves carry ids only.
+
+### State model
+
+- Buildings start at **level 0 = not yet built** (0 slots, 0 production).
+  Upgrading 0→1 CONSTRUCTS the building for exactly `base_cost` and emits
+  `building_built` — construction is the first upgrade.
+- Per building: `level`, `assigned` (worker count), `accum` (SimFixed
+  milli-unit-seconds remainder). Plus one global `workers_idle` pool.
+- Workers are COUNT-level by design: T-SIM-03 feeds the pool with
+  `add_worker`/`remove_worker` as recruits promote or scatter.
+
+### Curves (all integer, in milli-space)
+
+- **Upgrade cost** to reach level L (per resource line, ≥ 1, single
+  floored division):
+  `base_cost[res] × growth_milli[L] × milestone_milli[L] × cost_quirk / 10⁹`
+  where `growth_milli` compounds `cost_growth` r per level (rescaled to
+  milli each step — exact ints, never a float `pow`), and
+  `milestone_milli` compounds `tunables.milestone_multiplier` once per
+  milestone level ≤ L. The ×2 R4 milestone boosts therefore land AT
+  levels 10/20 and stay compounded beyond (10 ≤ L < 20 pays ×2, L ≥ 20
+  pays ×4) — per the T-SIM-02 contract and plan T-SIM-08's cost wording.
+  Worked example (farm: timber 15, r=1.08, milestones [10, 20] ×2),
+  locked verbatim by `test_upgrade_cost_curve_across_milestone_boundaries`:
+
+  | to-level | 1 | 9 | 10 | 11 | 19 | 20 | 21 |
+  |---|---|---|---|---|---|---|---|
+  | timber | 15 | 27 | 59 | 64 | 119 | 257 | 278 |
+
+- **Production** per worker per sim-hour at level L:
+  `base_rate_milli × L × milestone_milli[L] × production_quirk / 10⁶`
+  — linear in level and in workers (R4 §B production_shape), ×2 spike at
+  each milestone (6/h at L1, 54/h at L9, **120/h at L10**, 480/h at L20).
+  Per tick each producing building adds `rate × assigned × TICK_SECONDS`
+  to its accumulator; whole units settle into `engine.resources`,
+  remainders carry (never lost — the ×0.85 quirk at 5.1/h yields exactly
+  5 units + 0.1 carried per hour, 51 exact after 10h).
+- **Worker slots** at level L: `worker_slots_base + L − 1` for producing
+  buildings (the T-SIM-02 slot curve; an additive schema field can make
+  it data-driven later per content-schema §6). Non-producing buildings
+  and level 0 have 0 slots.
+
+### Commands (the only external writes; UI issues the same ones)
+
+| Kind | Subject | Value | Effect |
+|---|---|---|---|
+| `add_worker` | `&"production"` | count | idle pool += count |
+| `remove_worker` | `&"production"` | count | idle pool −= count (idle only) |
+| `assign_worker` | building id | count | pool → building (all-or-nothing) |
+| `unassign_worker` | building id | count | building → pool |
+| `upgrade_building` | building id | — | pay next-level cost, level += 1 |
+
+### Events (the UI's subscription surface)
+
+`building_built`, `building_upgraded`, `building_milestone` (value=level,
+value2=multiplier in milli), `worker_added`/`worker_removed` (value=new
+idle), `worker_assigned`/`worker_unassigned` (value=new assigned,
+value2=idle after), and denials `upgrade_denied`/`assignment_denied`/
+`worker_pool_denied` with reason codes 1 unknown building, 2 not built,
+3 max level, 4 unaffordable, 5 no idle workers, 6 no free slots,
+7 not enough assigned, 8 invalid count (constants on ProductionSystem).
+
+### Serialization + determinism
+
+`to_dict()`/`from_dict()` are fully overridden (never the `{}` default):
+`workers_idle` + one `{id, level, assigned, accum}` entry per building.
+Round-trip is lockstep-hash-equal including carried remainders
+(unit-tested; marathon re-proves at 1000h). `state_hash()` mixes only
+the ints. Upgrades apply instantly at command drain (no build timer at
+this stage — a timer would be a future system's per-tick countdown, not
+a core change).
+
+### Read API (for the UI; pure queries)
+
+`idle_workers()`, `building_level(id)`, `assigned_workers(id)`,
+`worker_slots(id)`, `production_rate_milli_per_worker(id)`,
+`production_rate_milli(id)`, `accumulated_milli_unit_seconds(id)`
+(progress-to-next-pip), `upgrade_cost(id)` (next level; empty at max).
+
+Measured at 1000h: `marathon_production_1000h` — 60,000 ticks with 3
+producing buildings + a 10h upgrade cadence in ~0.42s
+(~144,000 ticks/s; the engine-only marathon holds ~1.67M ticks/s) —
+~143× headroom under the 60s budget for the remaining T-SIM-03..08 weight.
