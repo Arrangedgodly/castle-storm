@@ -33,13 +33,30 @@ const DOT_SPACING := 26.0
 const DOT_RADIUS := 1.15
 const DOT_ALPHA := 0.055
 
+## The aftermath flash (T-UI-06): when a crackdown lands the ground
+## flashes cold aftermath ink for a beat — the morning-after wash paid as
+## an instant of light, then the phase tone returns. 0 = no flash (the
+## default; renders EXACTLY as before).
+@export var flash: float = 0.0:
+	set(value):
+		var clamped := clampf(value, 0.0, 1.0)
+		if flash != clamped:
+			flash = clamped
+			queue_redraw()
+
 
 func _get_minimum_size() -> Vector2:
 	return Vector2.ONE * Inks.TOUCH_GRIP_MIN
 
 
+## The flashed ground color: the base tone lerped toward cold ash. Pure —
+## tests pin the mapping; _draw only consumes it.
+static func flash_color(base: Color, flash: float) -> Color:
+	return base.lerp(Inks.ASH, clampf(flash, 0.0, 1.0) * 0.55)
+
+
 func _draw() -> void:
-	var ground := Inks.ground_for(regime_id, phase)
+	var ground := flash_color(Inks.ground_for(regime_id, phase), flash)
 	draw_rect(Rect2(Vector2.ZERO, size), ground)
 	# Halftone: the paper grain. A light paper-colored dot grid, offset
 	# deterministically per phase so each phase's grain is its own.

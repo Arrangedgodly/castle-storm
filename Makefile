@@ -69,6 +69,9 @@ run-responsive:
 #   CS_SPREAD_SHOT=/p.png CS_SPREAD_INTRO=2 make run-game    # reveal + mid-unfold (.mid.png)
 #   CS_SPREAD_SHOT=/p.png CS_SPREAD_RESTART=win make run-game   # full win-restart session captures
 #   CS_SPREAD_SHOT=/p.png CS_SPREAD_RESTART=loss make run-game  # the crush -> loss-restart captures
+#   CS_SPREAD_SHOT=/p.png CS_SPREAD_SUSPICION=1 make run-game  # the telegraph CHOICE CARD (T-UI-06)
+#   CS_SPREAD_SHOT=/p.png CS_SPREAD_SUSPICION=2 make run-game  # the landed-crackdown BLOCKQUOTE
+#   CS_SPREAD_SHOT=/p.png CS_SPREAD_SUSPICION=3 make run-game  # the CRUSHED beat over the swept table
 run-game:
 	$(GODOT_BIN) --path . res://ui/screens/spread/spread_screen.tscn
 

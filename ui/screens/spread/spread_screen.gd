@@ -39,19 +39,32 @@
 ## the signature moment — and cards that join a live table deal in with
 ## the slide-and-settle entrance (CardMotion).
 ##
+## SUSPICION EVENTS (T-UI-06) live on this table too: warn-zone entries
+## and telegraph armings slide a CHOICE CARD onto the table's edge
+## (print-styled, focusable, skippable — offering the real quieting
+## verbs, never invented ones), a landed crackdown prints as the
+## chronicle BLOCKQUOTE while the Eye strikes and the ground flashes, and
+## the crush plays the run-death beat (cards struck + swept, the crushing
+## quote, then T-UI-05's loss-restart reveal). All of it paper on the
+## table — the anti-goal is popup chrome.
+##
 ## Dev inspection hook (not a game path): CS_SPREAD_SHOT=/path.png renders
 ## for a settling window and saves one capture, then quits; pair with
 ## CS_SPREAD_LOUD=1 for the pressured state (see _capture_hook), with
 ## CS_SPREAD_PROMOTE=1 to capture THE PROMOTE MOMENT mid-flip (or =2 for
 ## the landed flip with its flourish), with CS_SPREAD_FAN=1 to capture
 ## an open action fan, with CS_SPREAD_INTRO=1/2 for the leader intro at
-## reveal / mid-unfold (T-UI-05), or with CS_SPREAD_RESTART=win/loss for
-## a full restart session's reveal captures.
+## reveal / mid-unfold (T-UI-05), with CS_SPREAD_RESTART=win/loss for
+## a full restart session's reveal captures, or with
+## CS_SPREAD_SUSPICION=1/2/3 for the suspicion moments (T-UI-06: the
+## telegraph choice card / the landed-crackdown blockquote / the crushed
+## beat's quote over the swept table).
 extends ResponsiveScreen
 
 const RUN_HEADER_SCRIPT := preload("res://ui/screens/spread/run_header.gd")
 const WATCHFUL_EYE_SCRIPT := preload("res://ui/screens/spread/watchful_eye.gd")
 const ACTION_FAN_SCRIPT := preload("res://ui/screens/spread/action_fan.gd")
+const SUSPICION_EVENTS_SCRIPT := preload("res://ui/screens/spread/suspicion_events.gd")
 const AssaultScreenScript := preload("res://ui/screens/assault/assault_screen.gd")
 const ASSAULT_SCENE := preload("res://ui/screens/assault/assault_screen.tscn")
 const IntroScreenScript := preload("res://ui/screens/intro/intro_screen.gd")
@@ -83,6 +96,8 @@ var stats := {
 	&"flips_played": 0, &"flip_replays": 0, &"entrances": 0,
 	&"assaults_opened": 0, &"assaults_finished": 0,
 	&"intros_opened": 0, &"intros_unfolded": 0,
+	&"choice_cards": 0, &"choices_made": 0, &"quotes_printed": 0,
+	&"crushes_played": 0, &"eye_strikes": 0, &"ground_flashes": 0,
 }
 
 ## The leader intro / restart reveal (T-UI-05): ON at boot, from the
@@ -94,12 +109,30 @@ var intro_enabled := true
 var _view := {}
 var _scale_chip: Label
 var _fan: ActionFan
+var _suspicion: SuspicionEvents
 var _assault: AssaultScreenScript
 var _intro: IntroScreenScript
 var _pre_assault_focus: Control
 ## A run ended WHILE the vignette was open (the edge crush): the intro
-## mounts after the vignette closes — paper never stacks on paper.
+## mounts after the vignette closes — paper never stacks on paper. When
+## the ending was a real CRUSH, the crush beat plays first (T-UI-06) and
+## the intro mounts when it resolves.
 var _intro_after_assault := false
+var _crush_after_assault := false
+## A crush landed while the intro itself was open (an away-window death
+## behind the reveal): the beat starts when the reveal folds away.
+var _crush_after_intro := false
+## A run_crushed event arrived in the drain that is ending the run — the
+## death goes through the CRUSHED BEAT (cards struck + swept, the crushing
+## blockquote), then T-UI-05's loss-restart reveal.
+var _crush_seen := false
+## True while the crush beat owns the table: card re-deals are FROZEN (the
+## table stays cleared for the story; the intro's restart re-deals).
+var _table_frozen := false
+## The pre-crackdown view's card list (captured at crackdown_struck — the
+## gate crowd's names for the scatter line; the sim mutates first, the
+## events arrive after).
+var _pre_crackdown_cards: Array = []
 var _flip_queue := CardMotion.PromotionFlipQueue.new()
 ## Entrance deals are armed only after the FIRST full bind — the boot deal
 ## is the packet unfold's business (T-UI-05); cards JOINING a live table
@@ -115,6 +148,7 @@ func _ready() -> void:
 	super._ready()
 	_compose_slot_chrome()
 	_build_action_fan()
+	_build_suspicion_layer()
 	_build_assault_screen()
 	_build_intro_screen()
 	host.event_observed.connect(_on_event)
@@ -222,20 +256,35 @@ static func _mix(hash_value: int, value: int) -> int:
 
 ## ONE event: map -> targeted rebinds. Never a whole-state pass here
 ## (only the "full" target — run boundaries, catch-up, unknown kinds).
+## The suspicion-event hooks (T-UI-06) run BEFORE the targets loop — a
+## "full" target RETURNS out of this function.
 func _on_event(event: Dictionary) -> void:
 	var row: Variant = presenter.chronicle_line_for(event, host)
 	if row != null:
 		presenter.push_row(row)
 		_bind_chronicle()
+	_on_suspicion_event(event)
 	# A run ENDED by failure (the suspicion crush; the thin abort): the
-	# leader intro mounts with the loss reveal — the new leader under the
-	# SAME regime + "the regime remembers". DEFERRED so the aftermath's
-	# full refresh (the "full" target below RETURNS) prints the crushing
-	# beat first — the chronicle keeps it, the reveal papers over after.
-	# Mid-vignette ends wait for the vignette's close (paper on paper).
+	# CRUSHED BEAT plays first when the death was a real crush (the table
+	# struck + swept, the crushing blockquote — T-UI-06), and the leader
+	# intro mounts with the loss reveal when it resolves — the new leader
+	# under the SAME regime + "the regime remembers". DEFERRED so the
+	# aftermath's full refresh (the "full" target below RETURNS) prints
+	# the beat first. Mid-vignette ends wait for the vignette's close
+	# (paper on paper).
 	if event["type"] == &"run_lost" or event["type"] == &"run_aborted":
+		var from_crush := _crush_seen
+		_crush_seen = false
 		if _assault != null and _assault.is_open():
 			_intro_after_assault = true
+			_crush_after_assault = from_crush
+		elif from_crush and _intro != null and _intro.is_open():
+			# The world crushed beneath an open reveal (an away window, or
+			# the dev drive): the beat waits for the paper to fold — the
+			# reveal's close starts the story, never stacks on it.
+			_crush_after_intro = true
+		elif from_crush:
+			_start_crush_beat.call_deferred()
 		elif intro_enabled:
 			_open_intro.call_deferred()
 	var targets := SpreadPresenter.refresh_targets_for(event["type"])
@@ -273,16 +322,56 @@ func _on_event(event: Dictionary) -> void:
 				pass  # printed above
 
 
+## The suspicion vocabulary's own hooks (T-UI-06): choice cards at the
+## warn/telegraph moments (live deliveries only — an away window's beats
+## printed in the strip already), the Eye's strike/retreat pulses, the
+## crackdown blockquote, the crush flag for the run-death beat, and the
+## choice card folding whenever its moment passes.
+func _on_suspicion_event(event: Dictionary) -> void:
+	if _suspicion == null:
+		return
+	var kind: StringName = event["type"]
+	var live := not host.delivering_catch_up
+	match kind:
+		&"suspicion_warn":
+			if live:
+				_open_suspicion_choice(event)
+		&"suspicion_telegraph":
+			if live:
+				_open_suspicion_choice(event)
+		&"crackdown_cancelled":
+			_on_telegraph_cancelled()
+		&"crackdown_struck":
+			if live:
+				_on_crackdown_struck(event)
+			else:
+				_suspicion.fold_choice()
+		&"crackdown_seized":
+			if live:
+				_on_crackdown_seized(event)
+		&"crackdown_scattered":
+			if live:
+				_on_crackdown_scattered(event)
+		&"run_crushed":
+			_crush_seen = true
+			_suspicion.fold_choice()
+		&"run_lost", &"run_aborted", &"run_won":
+			_suspicion.fold_choice()
+
+
 ## Per-batch periodic hook (the ONLY polling-adjacent path, one signal
 ## per processed batch — not per frame): pips (production settles
 ## silently), training countdown plates, the phase probe (army growth is
-## silent too), and the demo policy cadence.
+## silent too), the demo policy cadence, and the telegraph choice card's
+## live countdown (it rides the Eye's own per-batch channel).
 func _on_ticks(ticks: int) -> void:
 	stats[&"pip_refreshes"] += 1
 	# has(), not is_empty(): an event can partially fill the view (the cards
 	# section) before the deferred first bind — pips wait for the real thing.
 	if not _view.has("resources"):
 		return
+	if _suspicion != null and _suspicion.choice_is_open() and bool(_suspicion.choice_model().get("urgent", false)):
+		_suspicion.refresh_countdown(SpreadPresenter.eye_hours_left(host))
 	var view_resources: Array = _view["resources"]
 	for i in view_resources.size():
 		view_resources[i]["amount"] = host.engine.get_resource(view_resources[i]["id"])
@@ -344,6 +433,13 @@ func _on_assault_finished(outcome: StringName, _script: Dictionary) -> void:
 			return
 		if _intro_after_assault:
 			_intro_after_assault = false
+			if _crush_after_assault:
+				# The edge crush (the meter's assault spike ended the run
+				# mid-vignette): the beat tells the death first, the reveal
+				# is dealt when it resolves.
+				_crush_after_assault = false
+				_start_crush_beat()
+				return
 			_open_intro()
 			return
 	var restore := _pre_assault_focus
@@ -384,6 +480,8 @@ func _maybe_open_boot_intro() -> void:
 func _open_intro(p_variant: StringName = &"") -> void:
 	if _intro == null or _intro.is_open():
 		return
+	if _suspicion != null:
+		_suspicion.fold_quote()  # the reveal is the paper now
 	stats[&"intros_opened"] += 1
 	_intro.open(host, get_router(), p_variant)
 
@@ -393,6 +491,11 @@ func _open_intro(p_variant: StringName = &"") -> void:
 ## table has no cards yet; a screen must seed itself, the router's rule).
 func _on_intro_closed(_variant: StringName) -> void:
 	stats[&"intros_unfolded"] += 1
+	if _crush_after_intro:
+		# The run died behind the reveal: the table tells the story now.
+		_crush_after_intro = false
+		_start_crush_beat()
+		return
 	var active := get_active_slot() as OrientationSlot
 	if active == null:
 		return
@@ -484,6 +587,204 @@ func _build_action_fan() -> void:
 	add_child(_fan)
 	_fan.action_chosen.connect(_on_action_chosen)
 	_fan.action_refused.connect(_on_action_refused)
+
+
+# --- the suspicion event layer (T-UI-06) --------------------------------------------------
+
+
+## Build the suspicion layer ONCE (paper over the table, under the
+## assault vignette + intro: a mid-vignette crackdown prints beneath the
+## storm; the crush beat papers over everything when it plays).
+func _build_suspicion_layer() -> void:
+	_suspicion = SUSPICION_EVENTS_SCRIPT.new()
+	_suspicion.name = "SuspicionEvents"
+	add_child(_suspicion)
+	_suspicion.choice_made.connect(_on_suspicion_choice)
+	_suspicion.beat_finished.connect(_on_crush_beat_finished)
+
+
+## The live design bounds (the suspicion layer's paper places within it).
+func _design_bounds() -> Rect2:
+	var router := get_router()
+	if router == null:
+		return Rect2(Vector2.ZERO, size)
+	return Rect2(Vector2.ZERO, router.design_size())
+
+
+## The active slot's chronicle strip top (the blockquote clears it).
+func _chronicle_top() -> float:
+	var active := get_active_slot() as OrientationSlot
+	if active == null:
+		return _design_bounds().size.y
+	var line := active.get_chronicle_line(0)
+	if line == null:
+		return _design_bounds().size.y
+	return line.get_global_rect().position.y
+
+
+## Open a suspicion choice card (warn / telegraph) — live moments only:
+## an away window's beats printed in the chronicle strip already; sliding
+## a card for a warn eight hours stale would be noise, not news.
+func _open_suspicion_choice(event: Dictionary) -> void:
+	if _suspicion == null or not host.is_run_running():
+		return
+	stats[&"choice_cards"] += 1
+	_suspicion.open_choice(SuspicionEvents.choice_card_for(host, event), _design_bounds().size)
+	# Focus seeding is polite: never steal from an open fan or over paper
+	# (the vignette/intro own input while they are up).
+	if not _fan.is_open() and (_assault == null or not _assault.is_open()) \
+			and (_intro == null or not _intro.is_open()):
+		_suspicion.seed_choice_focus()
+
+
+## One chosen suspicion chip: the REAL commands down the host's one write
+## path (the thin-the-gate chip submits one dismiss_offer per offer), a
+## printed acknowledgment, and the card folds (focus returns to the table).
+func _on_suspicion_choice(action: Dictionary) -> void:
+	stats[&"choices_made"] += 1
+	var held_focus := _suspicion.choice_holds_focus()
+	if action.has("multi_command"):
+		var command: StringName = action["multi_command"]
+		for uid in action.get("subjects", []):
+			host.submit(command, &"", int(uid))
+		presenter.push_row({
+			"class": Inks.LineClass.WARN,
+			"text": "The gate thins: %d sent home with kind words and no bread." % (action.get("subjects", []) as Array).size(),
+		})
+	elif String(action["id"]) == "keep_close":
+		presenter.push_row({
+			"class": Inks.LineClass.WARN,
+			"text": "The conspirators keep the cards close and the lamps low.",
+		})
+	_bind_chronicle()
+	_suspicion.fold_choice()
+	if held_focus:
+		_focus_first_card()
+
+
+## Focus the table's first card (post-choice fallback — a screen must
+## never strand focus on folded paper).
+func _focus_first_card() -> void:
+	var active := get_active_slot() as OrientationSlot
+	if active == null:
+		return
+	for child in active.get_spread().get_children():
+		if child is Control and child.has_meta(&"spread_card_id"):
+			child.grab_focus()
+			return
+
+
+## THE CRACKDOWN LANDING: the Eye strikes (both slots), the ground flashes
+## aftermath ink, the choice card folds (the telegraph is no longer a
+## choice), and the blockquote begins from the struck headline. The
+## pre-crackdown view is captured HERE — the world's own record of the
+## gate crowd the riders are about to sweep.
+func _on_crackdown_struck(event: Dictionary) -> void:
+	_pre_crackdown_cards = (_view.get("cards", []) as Array).duplicate(true)
+	_suspicion.fold_choice()
+	stats[&"eye_strikes"] += 1
+	for slot: OrientationSlot in [get_portrait_slot(), get_landscape_slot()]:
+		var eye := eye_of(slot)
+		if eye != null:
+			eye.play_strike()
+	_flash_grounds()
+	stats[&"quotes_printed"] += 1
+	_suspicion.begin_quote(event, host, _design_bounds().size, _chronicle_top())
+
+
+## One seized-resource row into the open blockquote (the system's own
+## voice, the event's real payload).
+func _on_crackdown_seized(event: Dictionary) -> void:
+	if not _suspicion.quote_is_open():
+		return
+	var line: String = host.suspicion().chronicle_line(SuspicionEvents._as_sim_event(event))
+	if not line.is_empty():
+		_suspicion.append_quote_row({
+			"class": Inks.line_class_for_event(event["type"]), "text": line})
+
+
+## The scatter row with the NAMES of the swept gate crowd.
+func _on_crackdown_scattered(event: Dictionary) -> void:
+	if not _suspicion.quote_is_open():
+		return
+	_suspicion.append_scatter_row(_pre_crackdown_cards, event)
+
+
+## The ground's aftermath flash: cold ink pays across the table for a
+## beat, then the phase tone returns. Reduced motion skips it (the
+## blockquote carries the event).
+func _flash_grounds() -> void:
+	stats[&"ground_flashes"] += 1
+	var duration := MotionProfile.duration(0.75)
+	if duration <= 0.05:
+		return
+	for slot: OrientationSlot in [get_portrait_slot(), get_landscape_slot()]:
+		var ground := slot.get_ground()
+		if ground == null:
+			continue
+		var tween := ground.create_tween()
+		tween.tween_property(ground, "flash", 1.0, duration * 0.35) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		tween.tween_property(ground, "flash", 0.0, duration * 0.65) \
+			.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+
+
+## RELIEF: the telegraph cancelled (the meter dropped below the threshold
+## — laying low worked). A calmer line prints in the strip (the system's
+## own voice, via the chronicle path above) and the Eye retreats.
+func _on_telegraph_cancelled() -> void:
+	_suspicion.fold_choice()
+	for slot: OrientationSlot in [get_portrait_slot(), get_landscape_slot()]:
+		var eye := eye_of(slot)
+		if eye != null:
+			eye.play_retreat()
+
+
+# --- the crushed beat (the run-death story, T-UI-06) ---------------------------------------
+
+
+## A run ended through the crush: the beat plays BEFORE the loss-restart
+## reveal (deferred past this drain's full refresh — the aftermath binds
+## first, then the table tells the story).
+func _start_crush_beat() -> void:
+	if _suspicion == null or _suspicion.beat_active():
+		if intro_enabled:
+			_open_intro()
+		return
+	stats[&"crushes_played"] += 1
+	close_fan()
+	_table_frozen = true
+	var cards: Array[Control] = []
+	for slot: OrientationSlot in [get_portrait_slot(), get_landscape_slot()]:
+		var spread := slot.get_spread()
+		if spread == null:
+			continue
+		CardMotion.snap_all(spread)
+		for child in spread.get_children():
+			if child is Control and child.has_meta(&"spread_card_id"):
+				cards.append(child)
+	_suspicion.play_crush(cards, SuspicionEvents.crush_lines(host), _on_crush_strike_fx)
+
+
+## The beat's strike moment: the Eye strikes hard and the ground flashes.
+func _on_crush_strike_fx() -> void:
+	stats[&"eye_strikes"] += 1
+	for slot: OrientationSlot in [get_portrait_slot(), get_landscape_slot()]:
+		var eye := eye_of(slot)
+		if eye != null:
+			eye.play_strike()
+	_flash_grounds()
+
+
+## The beat resolved (pacing, dwell or skip): the table unfreezes and the
+## loss-restart reveal is dealt over the cleared table (the intro's own
+## restart re-deals the new hand beneath its paper). Without the intro
+## (sibling suites pinning the bare table), the cleared table STAYS
+## cleared — the hand is over; the next world event re-binds honestly.
+func _on_crush_beat_finished() -> void:
+	_table_frozen = false
+	if intro_enabled:
+		_open_intro()
 
 
 ## Fan a card's contextual actions out at its edge.
@@ -599,6 +900,10 @@ func _on_card_gui_input(event: InputEvent, card: Control) -> void:
 ## equivalence keys are part of the render). `count_render` bumps the
 ## instrumentation when called as a section render (not from full).
 func _bind_cards_list(count_render := true) -> void:
+	if _table_frozen:
+		return  # the crush beat owns the table (T-UI-06): the cleared paper
+			# stays cleared until the beat resolves; the intro's restart
+			# re-deals beneath its own full refresh
 	if count_render:
 		stats[&"card_list_renders"] += 1
 	var cards: Array = _view["cards"]
@@ -807,6 +1112,10 @@ func _on_layout_changed() -> void:
 		return
 	_apply_columns.call_deferred()
 	_bind_eye.call_deferred()
+	if _suspicion != null:
+		var bounds := _design_bounds().size
+		_suspicion.replace_choice.call_deferred(bounds)
+		_suspicion.replace_quote.call_deferred(bounds, _chronicle_top())
 
 
 ## The adaptive column ladder, re-derived from the CURRENT spread height
@@ -903,20 +1212,37 @@ func _refresh_chip() -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	## Project actions only (never ui_* — focus owns those): the demo's
-	## time-scale toggle, the world-freeze pause seam, and T-UI-04's card
+	## time-scale toggle, the world-freeze pause seam, T-UI-04's card
 	## interaction verbs (back folds the fan; primary on a focused card
 	## fans its actions — the pad/keyboard mirror of the touch tap.
 	## Positional presses are EXCLUDED: touch/mouse act through the card's
-	## own gui_input, so a tap on bare table never fans the focused card).
+	## own gui_input, so a tap on bare table never fans the focused card),
+	## and T-UI-06's suspicion paper: back folds a choice card, primary
+	## activates its focused chip, and ANY input skips the crush beat (a
+	## player who has read the beat deals the next hand — positional
+	## included, the beat's whole surface is its affordance).
+	if _suspicion != null and _suspicion.beat_active() \
+			and (event.is_action_pressed(&"back") or event.is_action_pressed(&"primary")):
+		_suspicion.skip_beat()
+		get_viewport().set_input_as_handled()
+		return
 	if event.is_action_pressed(&"back"):
 		if _fan != null and _fan.is_open():
 			close_fan()
+			get_viewport().set_input_as_handled()
+		elif _suspicion != null and _suspicion.choice_is_open():
+			_suspicion.fold_choice()
+			_focus_first_card()
 			get_viewport().set_input_as_handled()
 		return
 	if event.is_action_pressed(&"primary") and not (event is InputEventMouseButton) \
 			and not (event is InputEventScreenTouch):
 		if _fan != null and _fan.is_open():
 			_fan.activate_focused()
+			get_viewport().set_input_as_handled()
+			return
+		if _suspicion != null and _suspicion.choice_is_open():
+			_suspicion.activate_focused_choice()
 			get_viewport().set_input_as_handled()
 			return
 		var focus := get_viewport().gui_get_focus_owner()
@@ -971,10 +1297,100 @@ func _capture_hook() -> void:
 		_intro_then_capture(int(OS.get_environment("CS_SPREAD_INTRO")))
 	elif not OS.get_environment("CS_SPREAD_ASSAULT").is_empty():
 		_assault_then_capture(int(OS.get_environment("CS_SPREAD_ASSAULT")), settle)
+	elif not OS.get_environment("CS_SPREAD_SUSPICION").is_empty():
+		_suspicion_then_capture(int(OS.get_environment("CS_SPREAD_SUSPICION")), settle)
 	elif OS.get_environment("CS_SPREAD_LOUD") == "1":
 		_pressure_then_capture()
 	else:
 		_settle_then_capture(settle)
+
+
+## CS_SPREAD_SUSPICION=1: the telegraph CHOICE CARD as it slides onto the
+## table's edge (the loud drive until the telegraph arms, then settle).
+## =2: the CRACKDOWN LANDED — the drive continues past the land tick and
+## the capture waits for the blockquote (headline + seized + scattered).
+## =3: the CRUSHED BEAT — the drive continues to the run's death and the
+## capture waits for the crushing blockquote over the swept table, then
+## skips to the loss-restart reveal (state printed in the log).
+func _suspicion_then_capture(mode: int, settle: float) -> void:
+	# A player opens the game before they play it: the boot reveal mounts
+	# DEFERRED (a few frames after ready) — wait for it, then unfold the
+	# deal (the drive cannot show the table under paper).
+	for i in 90:
+		await get_tree().process_frame
+		if _intro != null and _intro.is_open():
+			break
+	if _intro != null and _intro.is_open():
+		_intro.unfold()
+		for i in 300:
+			await get_tree().process_frame
+			if not _intro.is_open():
+				break
+	demo_policy = DemoPolicy.new(40, 40, true)  # greed: gets watched
+	var suspicion := host.suspicion()
+	var waited_hours := 0.0
+	var done := func() -> bool:
+		if mode == 1:
+			return _suspicion.choice_is_open() and bool(_suspicion.choice_model().get("urgent", false))
+		if mode == 2:
+			return suspicion.crackdown_land_tick != -1
+		return not host.is_run_running()
+	while not done.call() and waited_hours < 160.0:
+		host.fast_forward(SimEngine.TICKS_PER_SIM_HOUR)
+		if demo_policy.on_ticks(SimEngine.TICKS_PER_SIM_HOUR):
+			demo_policy.apply(host)
+		waited_hours += 1.0
+	if mode == 2 and suspicion.crackdown_land_tick != -1:
+		# HOLD THE BAND so the riders actually arrive: raw greed's act
+		# bumps can outrun the 4h countdown to the crush WITHIN one hour
+		# step (measured twice: 100/100, zero crackdowns). The capture
+		# hook constructs the band through the documented meter seam,
+		# pinned per tick — the arming, the landing tick, the seizure
+		# payloads and the blockquote are all the real rules.
+		var held := 0.0
+		while suspicion.crackdowns_total == 0 and held < 10.0 and host.is_run_running():
+			for i in SimEngine.TICKS_PER_SIM_HOUR:
+				host.fast_forward(1)
+				suspicion.set_suspicion(75)
+			if demo_policy.on_ticks(SimEngine.TICKS_PER_SIM_HOUR):
+				demo_policy.apply(host)
+			held += 1.0
+			waited_hours += 1.0
+	refresh_from_state()
+	if mode == 3:
+		# The beat starts DEFERRED (after the aftermath's full refresh) and
+		# its quote opens after the authored strike+sweep — wait it out.
+		for i in 600:
+			await get_tree().process_frame
+			if _suspicion.beat_phase == SuspicionEvents.BeatPhase.QUOTE:
+				break
+	print("[spread] suspicion capture mode %d after %.0fh: suspicion %d/%d, telegraph %s, crackdowns %d, run %s, beat phase %d"
+		% [mode, waited_hours, suspicion.suspicion_points(), suspicion.max_points(),
+			"armed" if suspicion.crackdown_land_tick != -1 else "unarmed", suspicion.crackdowns_total,
+			"alive" if host.is_run_running() else "ended", _suspicion.beat_phase])
+	if mode == 1 and not _suspicion.choice_is_open():
+		print("[spread] suspicion capture: the choice card never opened — capturing the table as-is")
+		_settle_then_capture(0.3)
+		return
+	for row: Dictionary in _suspicion.quote_rows():
+		print("[spread]   quote: %s" % String(row["text"]))
+	if mode == 3:
+		# The crushed beat's quote over the swept table; then skip to the
+		# reveal (which mounts over it) and report the seam.
+		for i in maxi(2, int(0.4 * 60.0)):
+			await get_tree().process_frame
+		_capture_now("crushed")
+		_suspicion.skip_beat()
+		for i in 300:
+			await get_tree().process_frame
+			if _intro != null and _intro.is_open():
+				break
+		print("[spread] suspicion capture: after the beat the intro is %s (variant '%s')"
+			% ["open" if _intro != null and _intro.is_open() else "closed",
+				String(_intro.view()["variant"]) if _intro != null and _intro.is_open() else "-"])
+		get_tree().quit(0)
+		return
+	_settle_then_capture(settle if settle > 0.0 else 0.4)
 
 
 ## CS_SPREAD_ASSAULT=1: the odds table's honest capture — the demo is
@@ -1129,7 +1545,10 @@ func _restart_then_capture(kind: String) -> void:
 			greed_hours += 1.0
 		print("[spread] restart drive: after %.0fh the run is %s"
 			% [greed_hours, "alive (crush not reached)" if host.is_run_running() else "ended"])
-	for i in 240:
+	# The loss reveal mounts AFTER the crush beat (T-UI-06: cards struck +
+	# swept, the crushing blockquote, THEN the new hand) — the wait covers
+	# the beat's authored pacing plus the reveal's defer.
+	for i in 900:
 		await get_tree().process_frame
 		if _intro != null and _intro.is_open():
 			break
