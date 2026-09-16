@@ -223,7 +223,31 @@ func bind(view: Dictionary) -> void:
 	else:
 		_footer_label.text = "the bank holds %s legacy points" % Inks.abbreviate_amount(int(view["bank"]))
 		_footer_label.add_theme_color_override("font_color", Inks.INK_SOFT)
+	_wire_pad_column()
 	_relaid()
+
+
+## THE PAD COLUMN (T-PERF-02's Deck sweep find): entries then chips as one
+## cyclic vertical chain (the fan's own rule, vertical form). The engine's
+## geometric neighbor resolution races the chips' row against a tall
+## page's last entries — on the Deck profile the dpad skipped from the
+## second entry straight to the NEWER chip, leaving the third entry
+## unreachable by pad. Wired, every entry and chip walks by dpad
+## regardless of the page's geometry; left/right stay free.
+func _wire_pad_column() -> void:
+	var column: Array[Control] = []
+	column.append_array(_entries)
+	for chip in _chips:
+		column.append(chip)
+	var count := column.size()
+	if count == 0:
+		return
+	for i in count:
+		var node := column[i]
+		var prev: Control = column[wrapi(i - 1, 0, count)]
+		var next: Control = column[wrapi(i + 1, 0, count)]
+		node.focus_neighbor_top = node.get_path_to(prev)
+		node.focus_neighbor_bottom = node.get_path_to(next)
 
 
 func _regime_with_article(regime_name: String) -> String:

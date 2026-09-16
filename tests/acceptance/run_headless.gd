@@ -36,6 +36,7 @@ class Runner extends Node:
 	var _checks := 0
 	var _suite_checks := 0
 	var _current := "<none>"
+	var _busy := false
 
 	func _ready() -> void:
 		var env_seed := OS.get_environment("CS_ACCEPTANCE_SEED")
@@ -50,9 +51,20 @@ class Runner extends Node:
 
 
 	func _process(_delta: float) -> void:
+		# RE-ENTRY GUARD (T-PERF-02's async suites exposed the hole): a
+		# suspended `await _run(path)` leaves _process callable again next
+		# frame, which popped the NEXT suite while the first still ran
+		# (interleaved checks, and _finish() could quit the process under a
+		# live coroutine). One suite in flight at a time — synchronous
+		# suites (all of the originals) still complete within their frame,
+		# so the per-suite cadence is unchanged for them.
+		if _busy:
+			return
 		if not _suites.is_empty():
 			var path: String = _suites.pop_front()
+			_busy = true
 			await _run(path)
+			_busy = false
 			return
 		set_process(false)
 		_finish()

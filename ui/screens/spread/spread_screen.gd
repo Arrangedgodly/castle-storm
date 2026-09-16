@@ -1525,6 +1525,18 @@ func _unhandled_input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 			return
 		var focus := get_viewport().gui_get_focus_owner()
+		# PAD PARITY (T-PERF-02's Deck sweep find): the pad's A button is
+		# NOT ui_accept (the project's own primary action — the engine fact
+		# every screen's pad fallback exists for), so a focused BUTTON on
+		# the table itself (the header's chronicle chip) was pressable only
+		# from keyboard Enter and touch — the ledger was unreachable by
+		# pad. Activate any focused BaseButton here, exactly once (the
+		# natively-routed Enter never reaches unhandled input; positional
+		# presses were already excluded above).
+		if focus is BaseButton:
+			(focus as BaseButton).pressed.emit()
+			get_viewport().set_input_as_handled()
+			return
 		if focus != null and focus.has_meta(&"spread_card_id"):
 			open_fan_for_card(focus)
 			get_viewport().set_input_as_handled()

@@ -99,10 +99,10 @@ run-game:
 GODOT_BIN ?= tools/godot/godot
 
 .DEFAULT_GOAL := help
-.PHONY: help version import check run test save-debug perf-probe balance-sweep vendor-assets run-gallery run-responsive run-game export export-windows export-macos export-linux
+.PHONY: help version import check run test save-debug perf-probe deck-perf balance-sweep vendor-assets run-gallery run-responsive run-game export export-windows export-macos export-linux
 
 help:
-	@echo "Targets: version | import | check | run | run-game | run-gallery | run-responsive | test | save-debug | perf-probe | balance-sweep | vendor-assets | export | export-windows | export-macos | export-linux  (GODOT_BIN defaults to tools/godot/godot; exports need scripts/fetch_templates.sh once)"
+	@echo "Targets: version | import | check | run | run-game | run-gallery | run-responsive | test | save-debug | perf-probe | deck-perf | balance-sweep | vendor-assets | export | export-windows | export-macos | export-linux  (GODOT_BIN defaults to tools/godot/godot; exports need scripts/fetch_templates.sh once)"
 
 version:
 	@$(GODOT_BIN) --version
@@ -130,6 +130,17 @@ save-debug:
 # docs/ultron/production-log.md (T-PERF-01 entry).
 perf-probe:
 	$(GODOT_BIN) --headless --path . -s res://scripts/perf_probe.gd
+
+# Deck-profile performance measurement (T-PERF-02): WINDOWED (the real
+# Compatibility renderer) at the forced Deck window 1280x800 — frame
+# budget per representative state (idle / busy / assault vignette /
+# chronicle 50 scrolled) with vsync off for honest headroom, the idle
+# pixel-identity proof (zero animation on the quiet table), a vsync-
+# locked cadence sample, and per-state memory/draw-call reports.
+# NOT part of make test (it opens a real window and measures hardware).
+# The hardware-gated Deck remainder: docs/deck-validation.md.
+deck-perf:
+	$(GODOT_BIN) --path . -s res://scripts/deck_perf_suite.gd
 
 balance-sweep:
 	$(GODOT_BIN) --headless --path . -s res://scripts/balance_sweep.gd

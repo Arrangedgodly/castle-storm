@@ -37,6 +37,8 @@ extends Control
 ## Beat pacing (full motion): authored per phase, the 1.5–2.5s band the
 ## task contracts; rescaled by MotionProfile so reduced motion collapses
 ## each beat to near-instant while the printed summaries carry the story.
+const TABLE_GROUND := preload("res://ui/theme/table_ground.gd")
+
 const BEAT_SECONDS: Dictionary = {
 	&"advance": 2.2,
 	&"skirmish": 1.8,
@@ -478,15 +480,14 @@ func ground_color() -> Color:
 
 func _draw() -> void:
 	draw_rect(Rect2(Vector2.ZERO, size), ground_color())
-	# The paper grain, the same whisper TableGround prints.
-	var dot_color := Color(Inks.PAPER.r, Inks.PAPER.g, Inks.PAPER.b, 0.055)
-	var y := float((int(round(wash * 26.0)) % 26)) - 26.0
-	while y < size.y + 26.0:
-		var x := -26.0
-		while x < size.x + 26.0:
-			draw_circle(Vector2(x, y), 1.15, dot_color)
-			x += 26.0
-		y += 26.0
+	# The paper grain, the same whisper TableGround prints — ONE tiled
+	# draw off the shared baked tile (the T-PERF-02 find: this per-circle
+	# grid was ~1,250 draw calls per frame under the storm, measured as
+	# the vignette state's dominant cost). The wash drifts the grid's
+	# offset exactly as the integer-jitter form did.
+	var tile: Texture2D = TABLE_GROUND.dot_tile_for(int(round(wash * 26.0)) % 26)  # shared baked grain
+	var offset := Vector2.ONE * (float(int(round(wash * 26.0)) % 26) - 26.0)
+	draw_texture_rect(tile, Rect2(offset, size - 2.0 * offset), true, Color(1, 1, 1, 1))
 
 
 # --- internals --------------------------------------------------------------------------

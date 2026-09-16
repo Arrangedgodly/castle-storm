@@ -734,6 +734,33 @@ class ChoiceCard:
 			chip.pressed.connect(_on_chip.bind(chip))
 			_content.add_child(chip)
 			_chips.append(chip)
+		_wire_pad_column()
+
+
+	## THE PAD COLUMN (T-PERF-02's Deck sweep find): the card does NOT
+	## trap focus (left/right may leave it — the documented design), but
+	## its OWN vertical walk must resolve inside the paper. The engine's
+	## geometric neighbor resolution races the table beneath the edge card
+	## and the dpad skipped chips outright on the Deck profile, leaving
+	## verbs unreachable by pad. Wire the paper's column cyclically (the
+	## fan's own rule, vertical form): every row and chip is reachable
+	## from every other by dpad up/down; left/right stay free to leave.
+	func _wire_pad_column() -> void:
+		var column: Array[Control] = []
+		for line in _line_rows:
+			if line.visible:
+				column.append(line)
+		for chip in _chips:
+			column.append(chip)
+		var count := column.size()
+		if count == 0:
+			return
+		for i in count:
+			var node := column[i]
+			var prev: Control = column[wrapi(i - 1, 0, count)]
+			var next: Control = column[wrapi(i + 1, 0, count)]
+			node.focus_neighbor_top = node.get_path_to(prev)
+			node.focus_neighbor_bottom = node.get_path_to(next)
 
 
 	## The entrance slide: from off the table's left edge to the placed

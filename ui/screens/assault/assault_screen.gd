@@ -80,6 +80,12 @@ var _march_tweens: Array[Tween] = []
 func _ready() -> void:
 	visible = false
 	mouse_filter = Control.MOUSE_FILTER_STOP
+	# BATTERY SHAPE (T-PERF-02's idle counter find): _process exists ONLY
+	# for the commit drain retry (a paused world cannot drain the tick);
+	# a closed screen must not poll — it would process every frame for
+	# the whole session. Enabled at commit(), disabled at every exit from
+	# RESOLVING.
+	set_process(false)
 	_stage = STAGE_SCENE.instantiate() as AssaultStage
 	_stage.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(_stage)
@@ -139,6 +145,7 @@ func close() -> void:
 	_generation += 1
 	var outcome: StringName = _script.get("outcome", &"") as StringName
 	state = State.CLOSED
+	set_process(false)  # a closed screen never polls (the battery shape)
 	visible = false
 	finished.emit(outcome, _script)
 
@@ -252,6 +259,7 @@ func commit() -> void:
 	_battle_events.clear()
 	_script = {}
 	state = State.RESOLVING
+	set_process(true)  # the drain retry runs until the one tick lands
 	_stage.set_chips([])
 	_wire_chips()
 	_stage.print_line(Inks.LineClass.PLAIN, "The standard is raised. The storm is committed.")
@@ -297,6 +305,7 @@ func _on_event(event: Dictionary) -> void:
 			# The sim's own last-line defense (e.g. the run died between
 			# open and commit): print it and fall back to the odds.
 			state = State.ODDS
+			set_process(false)  # the drain ended in a refusal
 			_stage.print_line(Inks.LineClass.WARN,
 				"The assault is refused — the army is not yet an army (power %d)." % int(event["value2"]))
 			_bind_odds()
@@ -332,6 +341,7 @@ func _begin_vignette() -> void:
 		close()
 		return
 	state = State.VIGNETTE
+	set_process(false)  # the drain resolved — no more polling
 	_stage.begin_battle(_script, _roster_snapshot)
 	_play_beats()
 
@@ -471,6 +481,32 @@ func _unhandled_input(event: InputEvent) -> void:
 				or (event is InputEventScreenTouch and event.pressed):
 			skip()
 			get_viewport().set_input_as_handled()
+		return
+	# PAD PARITY (T-PERF-02's Deck sweep find): the pad's A button is NOT
+	# ui_accept (the project's own primary action — the same engine fact
+	# the ActionFan/Chronicle pad fallbacks exist for), so without this
+	# branch COMMIT and the outcome's close chip were reachable ONLY from
+	# keyboard Enter and touch — a pad player could open the odds table
+	# and then be unable to raise the standard. Activate the focused chip
+	# here, exactly once (the natively-routed Enter never reaches
+	# unhandled input).
+	if event.is_action_pressed(&"primary") and not (event is InputEventMouseButton) \
+			and not (event is InputEventScreenTouch):
+		if activate_focused():
+			get_viewport().set_input_as_handled()
+
+
+## The pad's A button on the focused chip (odds: COMMIT/RETREAT; outcome:
+## the close chip) — the ActionFan fallback mirrored. Returns true when a
+## chip was activated.
+func activate_focused() -> bool:
+	if state == State.CLOSED or state == State.VIGNETTE:
+		return false
+	var focus := get_viewport().gui_get_focus_owner()
+	if focus is BaseButton and focus in _stage.chips():
+		(focus as BaseButton).pressed.emit()
+		return true
+	return false
 
 
 func _focus_commit() -> void:
