@@ -24,6 +24,16 @@
 ##     the regime card is strictly larger than the leader card
 ##     (Major-Arcana scale), and the mounted reveal is unclipped at the
 ##     four common sizes with focus never stranded.
+##
+## WAITING STRATEGY (T-UI-05 fix round — the harness budget): the unfold
+## is a PURE function of t advanced by IntroPacket._process(delta), so
+## the full-motion test steps the packet's own clock directly with
+## synthesized authored-duration strides (never the wall clock); the
+## remaining frame waits are state-settle polls of a handful of frames
+## each (the orientation-dwell loop is frame-bound by the router's
+## hysteresis, not by timers), and the win-seam watch runs under reduced
+## motion by design (the paced vignette path is T-UI-07 suite's, under
+## ITS injected clock).
 extends GdUnitTestSuite
 
 const SPREAD_SCENE := "res://ui/screens/spread/spread_screen.tscn"
@@ -362,6 +372,10 @@ func test_enter_key_unfolds_in_one_interaction_reduced_synchronous() -> void:
 	assert_bool(intro.visible).is_false()
 	assert_int(intro.interactions).is_equal(1)
 	assert_int(intro.interactions).is_less_equal(IntroScreenScript.MAX_INTERACTIONS)
+	# The sync land reports COMPLETE (progress 1.0, nothing in flight) —
+	# the round-1 verifier's reporting nit, pinned.
+	assert_float(intro.unfold_progress()).is_equal(1.0)
+	assert_bool(intro.is_unfolding()).is_false()
 	# The table took focus back (a screen must seed itself).
 	assert_that(get_viewport().gui_get_focus_owner()).is_not_null()
 	screen.queue_free()
@@ -400,16 +414,30 @@ func test_full_motion_unfold_completes_inside_the_band() -> void:
 	intro.unfold()
 	assert_bool(intro.is_unfolding()).is_true()
 	assert_float(intro.last_unfold_seconds).is_equal(IntroPresenter.UNFOLD_SECONDS)
-	var closed := false
-	for i in 600:  # ~10s of frames — the 1.7s sweep must land well inside
-		await get_tree().process_frame
-		if not intro.is_open():
-			closed = true
-			break
-	assert_bool(closed).is_true()
+	# INJECTED DELTAS (T-UI-05 fix round): the sweep is a pure function
+	# of t advanced by the packet's own _process(delta) — the test steps
+	# the packet's clock directly in authored-duration eighths, never the
+	# wall clock. Eight strides = exactly UNFOLD_SECONDS of injected time
+	# (the in-band completion), with headroom in the guard for rounding.
+	var strides := 0
+	while intro.is_open() and strides < 32:
+		intro._packet._process(intro.last_unfold_seconds / 8.0)
+		strides += 1
+	# The authored duration is REACHED in exactly eight injected eighths
+	# (at most one extra stride from float rounding — never more).
+	assert_int(strides).is_greater_equal(8)
+	assert_int(strides).is_less_equal(9)
+	assert_bool(intro.is_open()).is_false()
+	assert_float(intro.unfold_progress()).is_equal(1.0)
+	assert_bool(intro.is_unfolding()).is_false()
 	# A DIRECT code call is not a player input — the counter stays 0 (the
 	# one-gesture count is pinned by the input-mode tests).
 	assert_int(intro.interactions).is_equal(0)
+	# The tree carries the deferred focus re-seed (the minimum real
+	# frames genuinely needed — batched here, not per stride).
+	for i in 2:
+		await get_tree().process_frame
+	assert_that(get_viewport().gui_get_focus_owner()).is_not_null()
 	screen.queue_free()
 
 

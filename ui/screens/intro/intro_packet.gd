@@ -352,6 +352,10 @@ func play_unfold(duration: float, on_done: Callable) -> void:
 	_unfold_t = 0.0
 	visible = true
 	if duration <= SYNC_SECONDS:
+		# The sync land is COMPLETE: progress reports 1.0 (never 0.00 after
+		# a synchronous completion — the round-1 verifier's reporting nit).
+		# Reporting only: _land() applies the same end state either way.
+		_unfold_t = 1.0
 		_apply(1.0)
 		_land()
 		return

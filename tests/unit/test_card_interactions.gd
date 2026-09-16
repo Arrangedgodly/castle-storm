@@ -17,15 +17,36 @@
 ##     chips are a >=48dp focus trap with no dead ends, disabled chips are
 ##     focusable-but-marked and refuse with a printed chronicle hint
 ##     (never popup chrome), and back closes the fan and returns focus.
+##
+## WAITING STRATEGY (T-UI-05 fix round — the harness budget): the flip,
+## flourish and entrance pacing are Tweens living in GAME code
+## (untouchable here), so this suite INJECTS TIME instead of waiting the
+## wall clock: `Engine.time_scale = MOTION_SCALE` advances every flip and
+## settle tween ~12x per frame (a watched 0.65s turn costs ~3 frames of
+## wall). The scale is deliberately BELOW every pinned in-flight window:
+## one injected frame advances 0.2s, under the flip's 0.273s 90-degree
+## crossing (so "is_flipping && swap not yet run" still catches the turn
+## mid-flight) and two frames advance 0.4s, under the full 0.65s turn
+## (so the interrupted-flip test still interrupts a genuinely in-flight
+## flip). after() restores 1.0 so no sibling suite ever sees the fast
+## clock.
 extends GdUnitTestSuite
 
 const SPREAD_SCENE := "res://ui/screens/spread/spread_screen.tscn"
 const SpreadScreen := preload("res://ui/screens/spread/spread_screen.gd")
 
+## Injected-time scale for watched tweens (see WAITING STRATEGY above).
+const MOTION_SCALE := 12.0
+
 var _dir_seq := 0
 
 
+func before_test() -> void:
+	Engine.time_scale = MOTION_SCALE
+
+
 func after() -> void:
+	Engine.time_scale = 1.0  # never leak the injected fast clock
 	## MotionProfile.forced is a process-global static — never leak a
 	## reduced-motion override into sibling suites.
 	MotionProfile.forced = -1

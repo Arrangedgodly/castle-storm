@@ -22,10 +22,26 @@
 ##     run ended; the storm action opens the table from an army card;
 ##   - LAYOUT: the pure siege-lane rects (castle at the head/edge) and
 ##     the mounted screen unclipped at the four common sizes with grips.
+##
+## WAITING STRATEGY (T-UI-05 fix round — the harness budget): the
+## vignette's authored pacing is real SceneTreeTimers + Tweens living in
+## GAME code (untouchable here), so this suite INJECTS TIME instead of
+## waiting the wall clock: `Engine.time_scale = WATCH_SCALE` makes every
+## beat timer, march tween and wash tween advance ~20x per frame, and a
+## watched ~10s paced replay costs ~0.5s of wall while the REAL paced
+## path still runs end to end (every await, tween, generation guard and
+## signal order — the settled-state contract is separately pinned by the
+## cold-twin test, which needs no time at all). The scale stays below
+## every pinned in-flight window (nothing here asserts mid-motion against
+## frame counts; all waits are state polls with generous frame caps), and
+## after() restores 1.0 so no sibling suite ever sees the fast clock.
 extends GdUnitTestSuite
 
 const SPREAD_SCENE := "res://ui/screens/spread/spread_screen.tscn"
 const SpreadScreen := preload("res://ui/screens/spread/spread_screen.gd")
+
+## Injected-time scale for watched pacing (see WAITING STRATEGY above).
+const WATCH_SCALE := 20.0
 
 ## Probed deterministic floor-assault outcomes (2 t1 knights, power 30):
 ## 20261207 iron_rotunda WINS (army-side modifier); 20261200
@@ -46,7 +62,12 @@ const EXPECTED_PORTRAIT := [true, false, false, true]
 var _dir_seq := 0
 
 
+func before_test() -> void:
+	Engine.time_scale = WATCH_SCALE
+
+
 func after() -> void:
+	Engine.time_scale = 1.0  # never leak the injected fast clock
 	MotionProfile.forced = -1
 	_erase_dir("user://cs_ui07_tests")
 	get_window().size = Vector2i(720, 720)
