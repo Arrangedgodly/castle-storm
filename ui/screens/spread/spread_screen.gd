@@ -611,15 +611,26 @@ func _design_bounds() -> Rect2:
 	return Rect2(Vector2.ZERO, router.design_size())
 
 
-## The active slot's chronicle strip top (the blockquote clears it).
-func _chronicle_top() -> float:
+## The blockquote's floor: the lowest paper edge a quote must clear
+## (SuspicionEvents.quote_rect parks the panel 8px above it). Portrait:
+## the BOTTOM chronicle strip's top. Landscape: the table's bottom edge —
+## the strip is at the TOP there, so passing its top would clamp the
+## quote to the screen's top (the round-1 verifier's secondary find);
+## the table's floor parks it center-bottom, clear of the bottom pips
+## rail — the documented bottom/center-bottom intent in BOTH topologies.
+func _quote_floor() -> float:
 	var active := get_active_slot() as OrientationSlot
 	if active == null:
 		return _design_bounds().size.y
-	var line := active.get_chronicle_line(0)
-	if line == null:
+	if active.portrait_topology:
+		var line := active.get_chronicle_line(0)
+		if line == null:
+			return _design_bounds().size.y
+		return line.get_global_rect().position.y
+	var spread := active.get_spread()
+	if spread == null:
 		return _design_bounds().size.y
-	return line.get_global_rect().position.y
+	return spread.get_global_rect().end.y
 
 
 ## Open a suspicion choice card (warn / telegraph) — live moments only:
@@ -689,7 +700,7 @@ func _on_crackdown_struck(event: Dictionary) -> void:
 			eye.play_strike()
 	_flash_grounds()
 	stats[&"quotes_printed"] += 1
-	_suspicion.begin_quote(event, host, _design_bounds().size, _chronicle_top())
+	_suspicion.begin_quote(event, host, _design_bounds().size, _quote_floor())
 
 
 ## One seized-resource row into the open blockquote (the system's own
@@ -763,7 +774,8 @@ func _start_crush_beat() -> void:
 		for child in spread.get_children():
 			if child is Control and child.has_meta(&"spread_card_id"):
 				cards.append(child)
-	_suspicion.play_crush(cards, SuspicionEvents.crush_lines(host), _on_crush_strike_fx)
+	_suspicion.play_crush(cards, SuspicionEvents.crush_lines(host), _on_crush_strike_fx,
+		_design_bounds().size, _quote_floor())
 
 
 ## The beat's strike moment: the Eye strikes hard and the ground flashes.
@@ -1115,7 +1127,7 @@ func _on_layout_changed() -> void:
 	if _suspicion != null:
 		var bounds := _design_bounds().size
 		_suspicion.replace_choice.call_deferred(bounds)
-		_suspicion.replace_quote.call_deferred(bounds, _chronicle_top())
+		_suspicion.replace_quote.call_deferred(bounds, _quote_floor())
 
 
 ## The adaptive column ladder, re-derived from the CURRENT spread height

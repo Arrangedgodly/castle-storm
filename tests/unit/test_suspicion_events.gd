@@ -15,6 +15,12 @@
 ##     run_crushed, the table is struck + swept, the crushing quote
 ##     prints the REAL bank, and T-UI-05's loss-restart reveal mounts
 ##     only after the beat resolves (skip lands it synchronously);
+##   - THE BEAT-PATH QUOTE PLACEMENT (round-1 verifier FAIL, re-dispatch):
+##     on a FIRST crush with no prior crackdown the quote is PLACED —
+##     designed width, centered over the cleared table, inside the table
+##     region below the header — in BOTH orientations, with landscape
+##     pinned center-bottom (never the round-1 top-center clamp) and
+##     portrait pinned above the bottom chronicle strip;
 ##   - INPUT PARITY on the choice card (touch press / pad primary /
 ##     routed Enter), skippable non-urgent cards (the table stays live),
 ##     focus never stranded, offline (catch-up) beats never slide stale
@@ -270,8 +276,13 @@ func test_crush_lines_read_the_regime_and_the_real_bank() -> void:
 	var lines := SuspicionEventsScript.crush_lines(host)
 	assert_int(lines.size()).is_equal(3)
 	assert_str(String(lines[0]["text"])).contains(Inks.regime_name(host.run().regime_id()))
-	assert_int(lines[2]["class"]).is_equal(Inks.LineClass.PLAIN)
+	assert_int(int(lines[2]["class"])).is_equal(Inks.LineClass.PLAIN)
 	assert_str(String(lines[2]["text"])).contains("231")
+	# LINE BUDGET: the quote panel's rows clip past the label edge — every
+	# line fits the panel even at the worst regime name (the mounted
+	# placement tests pin the REAL font-metric no-clip guarantee).
+	for line: Dictionary in lines:
+		assert_int(String(line["text"]).length()).is_less_equal(62)
 
 
 func test_panel_rects_stay_inside_the_design() -> void:
@@ -622,6 +633,10 @@ func test_crush_plays_the_beat_then_mounts_the_loss_reveal() -> void:
 	assert_str(String(rows[0]["text"])).contains(
 		Inks.regime_name(host.run().regime_id()))
 	assert_str(String(rows[2]["text"])).contains(str(host.meta.legacy_points))
+	# PLACEMENT holds on this path too (the round-1 suite gap: the CRUSH_SEED
+	# drive lands a crackdown first, whose quote placed the control — the
+	# beat quote must be placed on its OWN, fresh OR inherited session).
+	_assert_quote_placed_over_the_table(screen)
 	print("[ui06] crush beat after %.0fh — bank %d, quote read end to end"
 		% [hours, host.meta.legacy_points])
 	# The beat resolves on its own pacing (injected time): the reveal is
@@ -687,6 +702,141 @@ func test_crush_without_the_intro_keeps_the_cleared_table() -> void:
 		if not screen._suspicion.quote_is_open():
 			break
 	assert_bool(screen._suspicion.quote_is_open()).is_false()
+	screen.queue_free()
+	await get_tree().process_frame
+
+
+# --- the beat-path quote PLACEMENT (round-1 verifier FAIL, re-dispatch) -----------------------
+
+
+## The FRESH first-death path the round-1 verifier caught: NO prior
+## crackdown in the session ever placed the quote control, so the beat's
+## quote rendered at the control's unplaced default corner at raw min
+## size (probe: position (0,0), size (220,180)) with text spilling over
+## the header. The meter jumps to the crush line through the documented
+## seam — on_tick checks the crush BEFORE the telegraph/landing checks,
+## so the run dies with ZERO crackdowns (the premise, asserted).
+func _crush_now(host: GameHost) -> void:
+	host.suspicion().set_suspicion(host.suspicion().max_points())
+	# Tick 1 fires run_crushed (the crush check runs BEFORE the telegraph/
+	# landing checks, so no crackdown ever lands — the premise); the defeat
+	# resolution command drains run_lost a tick later, tick-aligned like
+	# every write. A few ticks settle both.
+	host.fast_forward(5)
+
+
+## Resize + wait for the router to land the topology (deadband + dwell
+## under the injected fast clock), then let the slot's deferred layout
+## settle — the quote's floor reads the SETTLED slot geometry.
+func _settle_orientation(window_size: Vector2i, want_portrait: bool, screen: SpreadScreen) -> void:
+	get_window().size = window_size
+	var router := screen.get_router()
+	for i in 240:
+		await get_tree().process_frame
+		if router.is_portrait() == want_portrait and router.design_size().x > 1.0:
+			break
+	for i in 6:
+		await get_tree().process_frame
+
+
+## The beat quote must be PLACED like every blockquote this layer prints:
+## content-sized to the DESIGNED width, centered over the cleared table,
+## inside the table region — below the header, above the quote's floor —
+## and never the unplaced (0,0) corner at the raw min size.
+func _assert_quote_placed_over_the_table(screen: SpreadScreen) -> void:
+	var quote := screen._suspicion._quote as Control
+	var bounds := screen._design_bounds().size
+	var rect := quote.get_global_rect()
+	# NOT the unplaced defect: neither axis parked at the origin corner.
+	assert_float(rect.position.x).is_greater(1.0)
+	assert_float(rect.position.y).is_greater(1.0)
+	# The designed panel width, horizontally centered in the design.
+	var want_width := minf(560.0, bounds.x - 12.0)
+	assert_float(rect.size.x).is_equal(want_width)
+	assert_float(rect.position.x).is_equal((bounds.x - want_width) * 0.5)
+	# Content-sized height (never the raw ~180 min-size stub).
+	assert_float(rect.size.y).is_greater_equal(quote.get_combined_minimum_size().y - 0.5)
+	# Inside the table region: below the header strip...
+	var header := (screen.get_active_slot() as OrientationSlot).get_header()
+	if header != null:
+		assert_float(rect.position.y).is_greater_equal(header.get_global_rect().end.y)
+	# ...above the floor (portrait: the bottom chronicle strip's top;
+	# landscape: the table's bottom edge), and inside the design bounds.
+	assert_float(rect.end.y).is_less_equal(screen._quote_floor() + 0.5)
+	assert_float(rect.end.x).is_less_equal(bounds.x + 0.5)
+	assert_float(rect.position.y).is_greater_equal(0.0)
+	# NOTHING CLIPPED MID-SENTENCE: every printed row's text fits its label
+	# measured in the REAL theme font (the round-2 capture find — the first
+	# placeholder lines ran past the panel's right border).
+	for line: Control in screen._suspicion._quote._lines:
+		var label := _chronicle_label_of(line)
+		if label == null:
+			continue
+		var width := label.get_theme_font("font").get_string_size(
+			String(label.text), HORIZONTAL_ALIGNMENT_LEFT, -1,
+			label.get_theme_font_size("font")).x
+		assert_float(width).is_less_equal(label.size.x + 0.5)
+
+
+## The printed row's Label (ChronicleLine -> HBox -> [rule, label]).
+func _chronicle_label_of(row: Control) -> Label:
+	for child in row.get_children():
+		if child is HBoxContainer:
+			for leaf in child.get_children():
+				if leaf is Label:
+					return leaf
+	return null
+
+
+func _await_beat_quote(screen: SpreadScreen) -> void:
+	for i in 300:
+		await get_tree().process_frame
+		if screen._suspicion.beat_phase == SuspicionEvents.BeatPhase.QUOTE:
+			break
+	assert_int(screen._suspicion.beat_phase).is_equal(SuspicionEvents.BeatPhase.QUOTE)
+
+
+func test_first_crush_quote_places_over_the_cleared_table_portrait() -> void:
+	get_window().size = Vector2i(720, 1280)  # resize before the mount: the first layout is portrait
+	var host := _test_host()
+	var screen: SpreadScreen = await _mounted_screen(host, false)
+	await _settle_orientation(Vector2i(720, 1280), true, screen)
+	assert_bool(screen.get_router().is_portrait()).is_true()
+	_crush_now(host)
+	assert_int(host.suspicion().crackdowns_total).is_zero()  # the fresh-path premise
+	assert_bool(await _await_beat_active(screen)).is_true()
+	await _await_beat_quote(screen)
+	_assert_quote_placed_over_the_table(screen)
+	# PORTRAIT: parked bottom-center ABOVE the bottom chronicle strip.
+	var strip_top := ((screen.get_active_slot() as OrientationSlot) \
+		.get_chronicle_line(0) as Control).get_global_rect().position.y
+	assert_float((screen._suspicion._quote as Control).get_global_rect().end.y) \
+		.is_less_equal(strip_top + 0.5)
+	screen._suspicion.skip_beat()
+	screen.queue_free()
+	await get_tree().process_frame
+
+
+func test_first_crush_quote_places_over_the_cleared_table_landscape() -> void:
+	var host := _test_host()
+	var screen: SpreadScreen = await _mounted_screen(host, false)
+	await _settle_orientation(Vector2i(1280, 800), false, screen)
+	assert_bool(screen.get_router().is_portrait()).is_false()
+	_crush_now(host)
+	assert_int(host.suspicion().crackdowns_total).is_zero()  # the fresh-path premise
+	assert_bool(await _await_beat_active(screen)).is_true()
+	await _await_beat_quote(screen)
+	_assert_quote_placed_over_the_table(screen)
+	# LANDSCAPE (the round-1 secondary find): the strip is at the TOP, so
+	# the quote parks CENTER-BOTTOM of the table — never the old top-center
+	# clamp — above the table's bottom edge, clear of the pips rail.
+	var bounds := screen._design_bounds().size
+	var rect := (screen._suspicion._quote as Control).get_global_rect()
+	assert_float(rect.position.y).is_greater_equal(bounds.y * 0.5)
+	var spread_end := (screen.get_active_slot() as OrientationSlot) \
+		.get_spread().get_global_rect().end.y
+	assert_float(rect.end.y).is_less_equal(spread_end + 0.5)
+	screen._suspicion.skip_beat()
 	screen.queue_free()
 	await get_tree().process_frame
 

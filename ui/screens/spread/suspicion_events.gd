@@ -37,11 +37,14 @@
 ##
 ##   THE CRUSHED BEAT — the run-death story beat (T-UI-05's loss-restart
 ##     reveal mounts AFTER it): the table's cards print STRUCK, then
-##     sweep off the paper; the crushing blockquote prints (regime voice
-##     placeholder; Prof X deepens in T-COPY-01) with the banked-legacy
-##     line read from the REAL meta bank; then the beat resolves and the
-##     intro's loss-restart reveal is dealt. Skippable with one input
-##     from every mode (a player who has read it deals the next hand).
+##     sweep off the paper; the crushing blockquote prints CENTERED over
+##     the cleared table (placed in the beat path — content-sized, above
+##     the table's floor, never the control's unplaced default corner)
+##     with the regime voice placeholder (Prof X deepens in T-COPY-01)
+##     and the banked-legacy line read from the REAL meta bank; then the
+##     beat resolves and the intro's loss-restart reveal is dealt.
+##     Skippable with one input from every mode (a player who has read it
+##     deals the next hand).
 ##
 ## Everything here is paper over the table (the ActionFan/AssaultScreen
 ## composition rule): screen-level chrome outside the slots, re-placed on
@@ -92,6 +95,8 @@ var _beat_tweens: Array[Tween] = []
 var _beat_timers: Array[SceneTreeTimer] = []
 var _beat_done := false
 var _beat_lines: Array[Dictionary] = []
+var _beat_bounds := Vector2.ZERO
+var _beat_floor := 0.0
 var _strike_fx := Callable()  # the screen's eye-strike + ground-flash wiring
 
 
@@ -226,7 +231,14 @@ static func scatter_line(pre_cards: Array, event: Dictionary) -> Dictionary:
 
 
 ## The crushing blockquote's lines (regime voice placeholder; the banked
-## number is the REAL meta bank, read after the loss resolved). Pure.
+## number is the REAL meta bank, read after the loss resolved). LINE
+## BUDGET: the blockquote panel is QUOTE_WIDTH wide and its chronicle
+## rows CLIP past the label edge (the row grammar) — the round-2 capture
+## find: the first placeholder lines ran ~700px of text against a ~476px
+## label and cut off mid-sentence, so every line now fits the panel in
+## the REAL font metrics (worst regime name measured ~380px; the mounted
+## placement tests pin the no-clip guarantee); T-COPY-01 deepens the
+## voice inside the same budget. Pure.
 static func crush_lines(host: GameHost) -> Array[Dictionary]:
 	var regime_name := Inks.regime_name(host.run().regime_id())
 	if regime_name.is_empty():
@@ -234,9 +246,9 @@ static func crush_lines(host: GameHost) -> Array[Dictionary]:
 	var article := regime_name if regime_name.begins_with("The ") else "the " + regime_name
 	return [
 		{"class": Inks.LineClass.STRIKE,
-			"text": "%s closes its hand: the presses stop, the barns burn, the names are read aloud." % article},
+			"text": "%s closes its hand. The barns burn." % article},
 		{"class": Inks.LineClass.STRIKE,
-			"text": "The revolution is crushed. The chronicle remembers, and the next leader inherits the bank."},
+			"text": "The revolution is crushed. The chronicle remembers."},
 		{"class": Inks.LineClass.PLAIN,
 			"text": "The bank keeps what the fire could not: %d legacy points." % host.meta.legacy_points},
 	]
@@ -251,14 +263,17 @@ static func choice_rect(bounds: Vector2, panel_size: Vector2) -> Rect2:
 	return Rect2(Vector2(10.0, y), panel)
 
 
-## Where a blockquote prints: bottom-center, clear of the chronicle strip
-## (portrait: the strip is at the bottom — the quote sits above it;
-## landscape: the strip is at the top — `chronicle_top` sits high, so the
-## clamp parks the quote above the bottom edge). Pure.
-static func quote_rect(bounds: Vector2, panel_size: Vector2, chronicle_top: float) -> Rect2:
+## Where a blockquote prints: bottom-center, parked one breath (8px)
+## above `floor_y` — the lowest paper edge the quote must clear. PORTRAIT
+## passes the bottom chronicle strip's top (the quote sits above the
+## strip); LANDSCAPE passes the table's bottom edge (the strip is at the
+## top there, so its implied bound is negative — the old clamp parked the
+## quote at the TOP, contradicting the bottom/center-bottom intent; the
+## table's floor parks it center-bottom, clear of the bottom pips rail).
+## Always fully inside the design bounds. Pure.
+static func quote_rect(bounds: Vector2, panel_size: Vector2, floor_y: float) -> Rect2:
 	var panel := Vector2(minf(QUOTE_WIDTH, bounds.x - 12.0), panel_size.y)
-	var y := chronicle_top - panel.y - 8.0
-	y = clampf(y, 8.0, maxf(8.0, bounds.y - panel.y - 8.0))
+	var y := clampf(floor_y - panel.y - 8.0, 8.0, maxf(8.0, bounds.y - panel.y - 8.0))
 	return Rect2(Vector2((bounds.x - panel.x) * 0.5, y), panel)
 
 
@@ -353,14 +368,15 @@ func _on_choice_made(action: Dictionary) -> void:
 ## Begin the crackdown blockquote: headline from the struck event, in the
 ## system's own voice. Seized/scattered rows append as they arrive (the
 ## same drain). `pre_cards` is the pre-crackdown view model (the gate
-## crowd's names — see scatter_names).
-func begin_quote(event: Dictionary, host: GameHost, bounds: Vector2, chronicle_top: float) -> void:
+## crowd's names — see scatter_names). `floor_y` is the blockquote's
+## floor (see quote_rect).
+func begin_quote(event: Dictionary, host: GameHost, bounds: Vector2, floor_y: float) -> void:
 	var line: String = host.suspicion().chronicle_line(_as_sim_event(event))
 	var rows: Array[Dictionary] = []
 	if not line.is_empty():
 		rows.append({"class": Inks.line_class_for_event(event["type"]), "text": line})
 	_quote.open_rows(rows, QUOTE_DWELL * 2.0)
-	_place_quote(bounds, chronicle_top)
+	_place_quote(bounds, floor_y)
 
 
 ## Append one printed row to the open quote (extends the dwell — the
@@ -375,14 +391,14 @@ func append_scatter_row(pre_cards: Array, event: Dictionary) -> void:
 
 
 ## Re-place an open quote after a layout change.
-func replace_quote(bounds: Vector2, chronicle_top: float) -> void:
+func replace_quote(bounds: Vector2, floor_y: float) -> void:
 	if _quote.is_open():
-		_place_quote(bounds, chronicle_top)
+		_place_quote(bounds, floor_y)
 
 
-func _place_quote(bounds: Vector2, chronicle_top: float) -> void:
+func _place_quote(bounds: Vector2, floor_y: float) -> void:
 	_quote.size = _quote.get_combined_minimum_size()
-	var rect := quote_rect(bounds, _quote.size, chronicle_top)
+	var rect := quote_rect(bounds, _quote.size, floor_y)
 	_quote.size = rect.size
 	_quote.position = rect.position
 
@@ -407,15 +423,22 @@ func fold_quote() -> void:
 
 ## Play the beat: the table's cards print STRUCK (the Eye strikes + the
 ## ground flashes via `strike_fx`), then sweep off the paper, then the
-## crushing blockquote dwells, then `beat_finished` fires (once — pacing,
-## dwell or skip all land the same completion). Reduced motion collapses
-## the strike + sweep; the quote still dwells.
-func play_crush(cards: Array[Control], lines: Array[Dictionary], strike_fx: Callable) -> void:
+## crushing blockquote dwells — PLACED like every blockquote this layer
+## prints (content-sized, centered over the cleared table within `bounds`
+## above `floor_y` — the beat must not inherit a stale placement or, on a
+## first death with no prior crackdown, the control's unplaced default
+## corner), then `beat_finished` fires (once — pacing, dwell or skip all
+## land the same completion). Reduced motion collapses the strike + sweep;
+## the quote still dwells.
+func play_crush(cards: Array[Control], lines: Array[Dictionary], strike_fx: Callable,
+		bounds: Vector2, floor_y: float) -> void:
 	if beat_phase != BeatPhase.IDLE:
 		return  # one death at a time; the run is over anyway
 	_strike_fx = strike_fx
 	_beat_cards = cards.duplicate()
 	_beat_lines = lines.duplicate()
+	_beat_bounds = bounds
+	_beat_floor = floor_y
 	_beat_done = false
 	_fold_all()  # the choice card and any stale quote fold — the beat owns the paper
 	beat_phase = BeatPhase.STRIKE
@@ -503,6 +526,7 @@ func _beat_open_quote(lines: Array[Dictionary]) -> void:
 	beat_phase = BeatPhase.QUOTE
 	if not lines.is_empty():
 		_quote.open_rows(lines, QUOTE_DWELL)
+		_place_quote(_beat_bounds, _beat_floor)
 		_after(QUOTE_DWELL, _finish_beat)
 	else:
 		_finish_beat()
