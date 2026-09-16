@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://ui/theme/pip_mark.gd" id="1_pip"]
+
+[node name="PipMark" type="HBoxContainer"]
+script = ExtResource("1_pip")

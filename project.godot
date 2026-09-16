@@ -24,6 +24,10 @@ window/handheld/orientation="sensor"
 
 enabled=PackedStringArray("res://addons/gdUnit4/plugin.cfg")
 
+[gui]
+
+theme/custom="res://ui/theme/spread_theme.tres"
+
 [input]
 
 back={

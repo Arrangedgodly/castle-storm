@@ -26,8 +26,11 @@ extends SceneTree
 ##                 decode errors and zero-sized renders fail loudly here.
 ##   3. ATTRIBUT — generate assets/vendor/ATTRIBUTIONS.md: CC-BY entries
 ##                 with artist + license + link (credits-ready), CC0 packs
-##                 listed for provenance, pending packs noted. Deterministic
+##                 listed for provenance, OFL font families with their
+##                 license links, pending packs noted. Deterministic
 ##                 content (sorted, no timestamps) so re-runs are no-ops.
+##                 Font files skip the @2x render step (not SVG) but stage
+##                 and checksum exactly like art (T-UI-01 extension).
 ##
 ## Downloads are deliberately NOT done here (scripts/vendor_assets.sh
 ## --fetch does them with curl): game code stays network-free per
@@ -245,6 +248,7 @@ func _write_attributions(manifest: Dictionary) -> void:
 	lines.append("")
 	var ccby: Array[String] = []
 	var cc0: Array[String] = []
+	var ofl: Array[String] = []
 	var commercial: Array[String] = []
 	var pending: Array[String] = []
 	for pack: Dictionary in manifest.get("packs", []):
@@ -269,6 +273,16 @@ func _write_attributions(manifest: Dictionary) -> void:
 		elif license.to_lower() == "cc0" or license.to_lower().contains("public domain"):
 			cc0.append("- %s — CC0 — %s — files: %s" % [
 				String(pack.get("artist", "?")), String(pack.get("homepage", "?")), file_list])
+		elif license.to_upper().contains("OFL"):
+			# Open Font License families (T-UI-01): OFL.txt is vendored beside
+			# the font files, so the section points at it rather than inlining
+			# terms; family + artist + specimen homepage + file list for
+			# credits (the family name is the string tests and the credits
+			# screen key on — human-spelled, not URL-encoded).
+			ofl.append("- %s — %s — OFL-1.1 — %s — files: %s (full license text: `OFL.txt` beside the fonts)" % [
+				String(pack.get("family", pack.get("artist", "?"))),
+				String(pack.get("artist", "?")),
+				String(pack.get("homepage", "?")), file_list])
 		else:
 			commercial.append("- %s — %s — %s — files: %s" % [
 				String(pack.get("artist", "?")), license, String(pack.get("homepage", "?")), file_list])
@@ -279,6 +293,10 @@ func _write_attributions(manifest: Dictionary) -> void:
 	lines.append("## CC0 / public domain (credited for provenance, not required)")
 	lines.append("")
 	lines.append_array(cc0 if not cc0.is_empty() else ["- (none)"])
+	lines.append("")
+	lines.append("## Open Font License (OFL-1.1 — license text vendored beside each family)")
+	lines.append("")
+	lines.append_array(ofl if not ofl.is_empty() else ["- (none)"])
 	lines.append("")
 	lines.append("## Commercial (license terms in the pack's LICENSE.txt)")
 	lines.append("")

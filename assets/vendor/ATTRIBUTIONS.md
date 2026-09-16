@@ -21,6 +21,11 @@ and regenerate. License texts per pack live beside the files they cover
 - Kenney (kenney.nl) — CC0 — https://kenney.nl/assets/board-game-icons — files: icons/resource_wheat.svg, icons/resource_lumber.svg, icons/shield.svg, LICENSE.txt
 - Kenney (kenney.nl) — CC0 — https://kenney.nl/assets/toon-characters — files: male-person/vector/character_malePerson.svg, female-person/vector/character_femalePerson.svg, male-adventurer/vector/character_maleAdventurer.svg, LICENSE.txt
 
+## Open Font License (OFL-1.1 — license text vendored beside each family)
+
+- IM Fell English SC — Igino Marini (inkwelltype.com) — OFL-1.1 — https://fonts.google.com/specimen/IM+Fell+English+SC — files: IMFellEnglishSC-Regular.ttf, OFL.txt (full license text: `OFL.txt` beside the fonts)
+- Alegreya Sans — Juan Pablo del Peral (huertatipografica.com) — OFL-1.1 — https://fonts.google.com/specimen/Alegreya+Sans — files: AlegreyaSans-Regular.ttf, AlegreyaSans-Medium.ttf, AlegreyaSans-Bold.ttf, AlegreyaSans-Italic.ttf, OFL.txt (full license text: `OFL.txt` beside the fonts)
+
 ## Commercial (license terms in the pack's LICENSE.txt)
 
 - (none)

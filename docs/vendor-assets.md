@@ -77,6 +77,28 @@ Limitations, honestly:
   re-derived by the tests, so a render can never silently drift from its
   declared scale.
 
+## Fonts (T-UI-01, 2026-09-15)
+
+The theme's typography rides the same pipeline: two OFL-1.1 families are
+vendored under `assets/vendor/fonts/` as plain per-file URL packs
+(game-icons pattern — no zip, sha256 per file, OFL.txt vendored beside
+each family):
+
+- **IM Fell English SC** (Igino Marini) — the display face: a digitization
+  of the c.1667 Fell types that keeps their rough, unevenly-inked
+  impressions; the "deliberate misprint" character lives in the
+  letterforms themselves. Small-caps titling for card name plates.
+- **Alegreya Sans** (Juan Pablo del Peral) — the workhorse: humanist sans
+  with a calligraphic skeleton from the Alegreya literature superfamily;
+  readable at phone-scale sizes, true weight range + italic for chronicle
+  lines. Weights kept: Regular, Medium, Bold, Italic.
+
+Fonts skip the @2x render step (not SVG) but stage and checksum exactly
+like art. ATTRIBUTIONS.md gains an OFL section with family + artist +
+specimen link per family (the `family` manifest field is the
+human-spelled name tests and credits key on). Pairing rationale lives in
+`ui/theme/inks.gd`'s header and the T-UI-01 production-log entry.
+
 ## Pending packs (as of 2026-09-15)
 
 - **tzunghaor Cartoon Vector Characters** (CC0, OpenGameArt) — opengameart.org

@@ -32,6 +32,12 @@
 vendor-assets:
 	scripts/vendor_assets.sh $(if $(FETCH),--fetch,)
 
+# Theme gallery (T-UI-01): windowed visual inspection of the component
+# grammar — every component in every state at the 720x720 design base:
+#     make run-gallery
+run-gallery:
+	$(GODOT_BIN) --path . res://ui/theme/theme_gallery.tscn
+
 # Boundary validation (T-ARCH-01 acceptance):
 #     make version   # expect 4.7.2.stable.official.ed1daf0bf
 #     make import    # godot --headless --path . --import
@@ -41,10 +47,10 @@ vendor-assets:
 GODOT_BIN ?= tools/godot/godot
 
 .DEFAULT_GOAL := help
-.PHONY: help version import check run test save-debug balance-sweep vendor-assets export
+.PHONY: help version import check run test save-debug balance-sweep vendor-assets run-gallery export
 
 help:
-	@echo "Targets: version | import | check | run | test | save-debug | balance-sweep | vendor-assets | export  (GODOT_BIN defaults to tools/godot/godot)"
+	@echo "Targets: version | import | check | run | run-gallery | test | save-debug | balance-sweep | vendor-assets | export  (GODOT_BIN defaults to tools/godot/godot)"
 
 version:
 	@$(GODOT_BIN) --version

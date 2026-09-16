@@ -140,6 +140,65 @@
       ]
     },
     {
+      "id": "fonts-im-fell-english-sc",
+      "family": "IM Fell English SC",
+      "dir": "assets/vendor/fonts/im-fell-english-sc",
+      "license": "OFL-1.1",
+      "artist": "Igino Marini (inkwelltype.com)",
+      "homepage": "https://fonts.google.com/specimen/IM+Fell+English+SC",
+      "license_url": "https://openfontlicense.org/",
+      "note": "Theme display face (T-UI-01, per R6 vendor pattern): digitization of the c.1667 Fell English types with their authentic rough impressions — the 'deliberate misprint' character in letterform; small-caps titling for card name plates.",
+      "files": [
+        {
+          "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/imfellenglishsc/IMFeENsc28P.ttf",
+          "dest": "IMFellEnglishSC-Regular.ttf",
+          "sha256": "102324fb5434bb5da7963533426b0ad44c85bbc9e7755067535c9d11464a176b"
+        },
+        {
+          "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/imfellenglishsc/OFL.txt",
+          "dest": "OFL.txt",
+          "sha256": "2a3ca501fc4d5efcad9798531e3e06962b1e20c60e464f6cbd6c17630112c773"
+        }
+      ]
+    },
+    {
+      "id": "fonts-alegreya-sans",
+      "family": "Alegreya Sans",
+      "dir": "assets/vendor/fonts/alegreya-sans",
+      "license": "OFL-1.1",
+      "artist": "Juan Pablo del Peral (huertatipografica.com)",
+      "homepage": "https://fonts.google.com/specimen/Alegreya+Sans",
+      "license_url": "https://openfontlicense.org/",
+      "note": "Theme workhorse face (T-UI-01, per R6 vendor pattern): humanist sans with a calligraphic skeleton from the Alegreya literature superfamily — readable at phone scale for labels/numerals, true weight range + italic for chronicle lines. Weights kept: Regular, Medium, Bold, Italic.",
+      "files": [
+        {
+          "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/alegreyasans/AlegreyaSans-Regular.ttf",
+          "dest": "AlegreyaSans-Regular.ttf",
+          "sha256": "8fab634196007afca839f1e5a6fb300976daff55d8528b590ef032f01b14ea10"
+        },
+        {
+          "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/alegreyasans/AlegreyaSans-Medium.ttf",
+          "dest": "AlegreyaSans-Medium.ttf",
+          "sha256": "4b89fe7804fd1485ec2757795a53ffdb66e1206dd56f844c2d72b3c944815b43"
+        },
+        {
+          "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/alegreyasans/AlegreyaSans-Bold.ttf",
+          "dest": "AlegreyaSans-Bold.ttf",
+          "sha256": "a3055a1893759bdbd7504bb22abc583769e7974c49353176eac0b03792c9fb8e"
+        },
+        {
+          "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/alegreyasans/AlegreyaSans-Italic.ttf",
+          "dest": "AlegreyaSans-Italic.ttf",
+          "sha256": "f49f6f2bdd84df850b25b0f8185d8a051e1d1eb2dd08e2f91b8c7b86d9a9e1a6"
+        },
+        {
+          "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/alegreyasans/OFL.txt",
+          "dest": "OFL.txt",
+          "sha256": "0677891e6a143f297350d260ad766ad33bfc18ed5fa4f213acf648d6b597ec1a"
+        }
+      ]
+    },
+    {
       "id": "tzunghaor-cartoon-vector-characters",
       "dir": "assets/vendor/tzunghaor/cartoon-vector-characters",
       "status": "pending",
