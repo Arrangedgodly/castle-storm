@@ -49,25 +49,30 @@ const MVP := preload("res://tests/acceptance/suites/_mvp_pack.gd")
 ## host hands to every engine it builds; `stipend` overrides the pack's
 ## starting grants (pass MVP.MARATHON_STIPEND for marathon funds; the
 ## default `{}` boots the honest pack stipend — what the shipped game does).
-static func game_stack(run_seed: int, meta: RunMeta, stipend: Dictionary = {}) -> SimEngine:
+## `p_tunables` overrides the pack's tunables — used ONLY by the T-SIM-08
+## balance sweep (`scripts/balance_sweep.gd`) to evaluate candidate values
+## against exactly this composition; the default `null` runs the pack's
+## tuned content, which is what CI asserts and what ships.
+static func game_stack(run_seed: int, meta: RunMeta, stipend: Dictionary = {}, p_tunables: EconomyTunables = null) -> SimEngine:
 	var pack := MVP.load_mvp()
+	var tunables := p_tunables if p_tunables != null else pack.tunables
 	var engine := SimEngine.new(run_seed)
 	engine.register_system(HeartbeatSystem.new())
 	engine.register_system(RunLifecycleSystem.new(pack.regimes, pack.identity, meta, stipend if not stipend.is_empty() else pack.starting_grants))
-	engine.register_system(UnitLifecycleSystem.new(pack.units, pack.gear, pack.tunables))
-	engine.register_system(ProductionSystem.new(pack.buildings, pack.tunables, null))
-	engine.register_system(AssaultResolver.new(pack.tunables))
-	engine.register_system(SuspicionSystem.new(pack.tunables, pack.units))
+	engine.register_system(UnitLifecycleSystem.new(pack.units, pack.gear, tunables))
+	engine.register_system(ProductionSystem.new(pack.buildings, tunables, null))
+	engine.register_system(AssaultResolver.new(tunables))
+	engine.register_system(SuspicionSystem.new(tunables, pack.units))
 	return engine
 
 
 ## HostSession factory (the ONLY supported construction path — it injects
 ## the canonical composition, so a session can never be built from a stale
 ## copy of the system order).
-static func session(run_seed: int, stipend: Dictionary = {}) -> HostSession:
+static func session(run_seed: int, stipend: Dictionary = {}, p_tunables: EconomyTunables = null) -> HostSession:
 	var factory := func(p_seed: int, p_meta: RunMeta, p_stipend: Dictionary) -> SimEngine:
-		return game_stack(p_seed, p_meta, p_stipend)
-	return HostSession.new(run_seed, stipend, factory)
+		return game_stack(p_seed, p_meta, p_stipend, p_tunables)
+	return HostSession.new(run_seed, stipend, factory, p_tunables)
 
 
 ## One host session: the meta bank + the catch-up service + the current
@@ -96,9 +101,9 @@ class HostSession:
 	var _factory: Callable
 
 
-	func _init(p_run_seed: int, p_stipend: Dictionary, p_factory: Callable) -> void:
+	func _init(p_run_seed: int, p_stipend: Dictionary, p_factory: Callable, p_tunables: EconomyTunables = null) -> void:
 		meta = RunMeta.new()
-		catch_up = CatchUpService.new(MVP.load_mvp().tunables)
+		catch_up = CatchUpService.new(p_tunables if p_tunables != null else MVP.load_mvp().tunables)
 		_run_seed = p_run_seed
 		_stipend = p_stipend
 		_factory = p_factory
@@ -146,6 +151,11 @@ class HostSession:
 ##                              (a small conspiracy is a quiet conspiracy —
 ##                              but see the gate-crowd presence trade the
 ##                              stability suite measures).
+##   &"no_dismiss"       bool  — true = the pre-T-SIM-08 player: never uses
+##                              the dismissal affordance (the balance
+##                              sweep's "before" decomposition row; CI
+##                              suites leave it off — sensible play sends
+##                              the loiterers home).
 ##
 ## Returns the spend LEDGER for the batch — {resource id -> int spent} for
 ## every upgrade cost + gear recipe the submitted commands will pay when
@@ -156,6 +166,7 @@ static func manage(engine: SimEngine, military_cap: int, opts: Dictionary = {}) 
 	var production := engine.get_system(&"production") as ProductionSystem
 	var laying_low := bool(opts.get(&"laying_low", false))
 	var population_cap := int(opts.get(&"population_cap", 0))
+	var no_dismiss := bool(opts.get(&"no_dismiss", false))
 	var funds := {}
 	for id in engine.resources.keys():
 		funds[id] = int(engine.resources[id])
@@ -163,11 +174,28 @@ static func manage(engine: SimEngine, military_cap: int, opts: Dictionary = {}) 
 
 	# 1) Gate: keep it thin — pending offers are presence (0.25/h each) and
 	#    a crowded gate turns every arrival into a loud act. Accepting is
-	#    quiet; a cap only slows the estate's growth.
+	#    quiet; a cap only slows the estate's growth. ROOM is counted
+	#    locally: the accepts are commands that drain NEXT tick, so reading
+	#    total_units() inside the loop would see stale state and overshoot
+	#    the cap by up to the offer count (measured by the T-SIM-08 sweep:
+	#    26 units under a 24 cap). At the cap the remaining loiterers are
+	#    SENT HOME (T-SIM-08's dismissal affordance): turning a recruit
+	#    away is the quiet lever — it costs nothing, drops the gate's
+	#    presence to zero, and unfreezes the arrival countdown if the gate
+	#    was full.
+	var room := maxi(0, population_cap - units.total_units()) if population_cap > 0 else units.pending_offers()
+	var accepted := {}
 	for uid in units.offer_ids():
-		if population_cap > 0 and units.total_units() >= population_cap:
+		if room <= 0:
 			break
 		engine.submit_command(&"recruit_accept", &"", uid)
+		accepted[uid] = true
+		room -= 1
+	if not no_dismiss and population_cap > 0 \
+			and units.total_units() + units.pending_offers() > population_cap:
+		for uid in units.offer_ids():
+			if not accepted.has(uid):
+				engine.submit_command(&"dismiss_offer", &"", uid)
 
 	# 2) Roles: peasants branch — military up to the cap (never while laying
 	#    low), everyone else into the workforce.

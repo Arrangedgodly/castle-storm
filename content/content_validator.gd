@@ -404,6 +404,16 @@ static func _check_tunables(t: EconomyTunables, errors: Array[String]) -> void:
 		_err(errors, "tunables: recruit_arrival_interval_hours must be > 0 (got %s)" % t.recruit_arrival_interval_hours)
 	elif t.recruit_arrival_jitter_hours < 0.0 or t.recruit_arrival_jitter_hours >= t.recruit_arrival_interval_hours:
 		_err(errors, "tunables: recruit_arrival_jitter_hours must be within [0, recruit_arrival_interval_hours) (got %s vs interval %s)" % [t.recruit_arrival_jitter_hours, t.recruit_arrival_interval_hours])
+	# --- The opening rush + gate capacity (T-SIM-08 additive fields) ---
+	if t.recruit_arrival_early_count < 0:
+		_err(errors, "tunables: recruit_arrival_early_count must be >= 0 (got %d)" % t.recruit_arrival_early_count)
+	elif t.recruit_arrival_early_count > 0:
+		if t.recruit_arrival_early_interval_hours <= 0.0 or t.recruit_arrival_early_interval_hours > t.recruit_arrival_interval_hours:
+			_err(errors, "tunables: recruit_arrival_early_interval_hours must be within (0, recruit_arrival_interval_hours] (got %s vs interval %s)" % [t.recruit_arrival_early_interval_hours, t.recruit_arrival_interval_hours])
+		if t.recruit_arrival_early_step < 1.0:
+			_err(errors, "tunables: recruit_arrival_early_step must be >= 1.0 — the ramp grows toward the base interval (got %s)" % t.recruit_arrival_early_step)
+	if t.recruit_gate_capacity < 0:
+		_err(errors, "tunables: recruit_gate_capacity must be >= 0 — 0 = uncapped (got %d)" % t.recruit_gate_capacity)
 	if not (0 < t.suspicion_warn_threshold and t.suspicion_warn_threshold < t.suspicion_crackdown_threshold and t.suspicion_crackdown_threshold < t.suspicion_max):
 		_err(errors, "tunables: suspicion thresholds must satisfy 0 < warn < crackdown < max (got warn=%d crackdown=%d max=%d)" % [t.suspicion_warn_threshold, t.suspicion_crackdown_threshold, t.suspicion_max])
 	if t.suspicion_decay_per_hour < 0.0 or t.suspicion_decay_high_tier_per_hour < 0.0:

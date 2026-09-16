@@ -16,15 +16,24 @@ extends GdUnitTestSuite
 func _metronome() -> EconomyTunables:
 	# 1h interval, zero jitter: arrivals at exact ticks 61, 121, 181...
 	# and NO rng draws anywhere (the deterministic backbone for tick math).
+	# Gate uncapped + no rush: the pre-T-SIM-08 cadence shape (the T-SIM-08
+	# mechanics get their own explicit tests at the bottom of this file).
 	var tunables := EconomyTunables.new()
 	tunables.recruit_arrival_interval_hours = 1.0
 	tunables.recruit_arrival_jitter_hours = 0.0
+	tunables.recruit_arrival_early_count = 0
+	tunables.recruit_gate_capacity = 0
 	return tunables
 
 
 func _default_cadence() -> EconomyTunables:
-	# R4 seed shape: 2h +/- 0.25h (the class defaults).
-	return EconomyTunables.new()
+	# R4 seed shape: 2h +/- 0.25h, no rush, uncapped gate (the class
+	# defaults now carry the T-SIM-08 tuned values, so the R4 shape is
+	# pinned explicitly here for the cadence-math tests).
+	var tunables := EconomyTunables.new()
+	tunables.recruit_arrival_early_count = 0
+	tunables.recruit_gate_capacity = 0
+	return tunables
 
 
 func _def(id: StringName, training_hours: float, paths: Array) -> UnitDef:
@@ -902,3 +911,192 @@ func test_worker_handoff_without_production_is_loud_not_fatal() -> void:
 	engine.fast_forward(32)
 	assert_int(_units_system(engine).unit_count(&"worker")).is_equal(1)
 	assert_int(_events_of_type(engine, &"command_rejected").size()).is_equal(1)
+
+
+# --- T-SIM-08: the opening rush, gate capacity, dismissal ---------------------
+
+
+## A tuned-rush helper: metronome 2h base + early count / first interval /
+## step exactly as passed (jitter 0 so every tick is exact).
+func _rush(early_count: int, early_interval: float, early_step: float) -> EconomyTunables:
+	var tunables := EconomyTunables.new()
+	tunables.recruit_arrival_interval_hours = 2.0
+	tunables.recruit_arrival_jitter_hours = 0.0
+	tunables.recruit_arrival_early_count = early_count
+	tunables.recruit_arrival_early_interval_hours = early_interval
+	tunables.recruit_arrival_early_step = early_step
+	tunables.recruit_gate_capacity = 0
+	return tunables
+
+
+## The rush shape: early 3 / first 0.1h / step 2.0 on a 2h base — early
+## intervals 6, 12, 24 min (the cap at the base is not reached), then the
+## normal 120-min cadence. First tick schedules: arrivals at 7, 19, 43,
+## 163, 283. Exact tick math, and the rush is metronome (no rng draws).
+func test_opening_rush_cadence_is_exact_and_metronome() -> void:
+	var engine := _engine(_rush(3, 0.1, 2.0))
+	var rng_state_before := engine.rng.state
+	engine.fast_forward(300)
+	var arrivals := _events_of_type(engine, &"recruit_arrived")
+	assert_int(arrivals.size()).is_equal(5)
+	for i in arrivals.size():
+		assert_int(int(arrivals[i]["tick"])).is_equal([7, 19, 43, 163, 283][i])
+	assert_int(engine.rng.state).is_equal(rng_state_before)
+
+
+## The ramp caps at the base interval: early 6 / first 0.1h / step 2.0 on a
+## 2h base ramps 6, 12, 24, 48, 96, then 120 (capped) — the 6th interval
+## never exceeds the normal cadence.
+func test_opening_rush_ramp_caps_at_base_interval() -> void:
+	var engine := _engine(_rush(6, 0.1, 2.0))
+	engine.fast_forward(420)
+	var arrivals := _events_of_type(engine, &"recruit_arrived")
+	assert_int(arrivals.size()).is_equal(6)
+	# Cumulative from tick 1: 7, 19, 43, 91, 187, 307; the 7th (the normal
+	# cadence) lands at 427 — just outside the 420 horizon.
+	for i in arrivals.size():
+		assert_int(int(arrivals[i]["tick"])).is_equal([7, 19, 43, 91, 187, 307][i])
+	engine.fast_forward(7)
+	assert_int(_events_of_type(engine, &"recruit_arrived").size()).is_equal(7)
+
+
+## The rush draws NO jitter even on a jittered base: the early intervals
+## are the precomputed ramp; rng.state first moves only when the NORMAL
+## cadence schedules (after the last rush arrival).
+func test_opening_rush_skips_jitter_draws() -> void:
+	var tunables := _default_cadence()  # 2h +/- 0.25h, everything else off
+	tunables.recruit_arrival_early_count = 2
+	tunables.recruit_arrival_early_interval_hours = 0.1
+	tunables.recruit_arrival_early_step = 2.0
+	var engine := _engine(tunables)
+	var rng_state_before := engine.rng.state
+	engine.fast_forward(18)  # first rush arrival landed @7; no draws
+	assert_int(_units_system(engine).arrivals_total).is_equal(1)
+	assert_int(engine.rng.state).is_equal(rng_state_before)
+	engine.fast_forward(1)  # arrival @19 + the jittered base schedule draws
+	assert_int(_units_system(engine).arrivals_total).is_equal(2)
+	assert_int(engine.rng.state).is_not_equal(rng_state_before)
+
+
+## reset_run re-opens the rush: after a run restart the arrival counter is
+## zero and the next interval is the EARLY one again (every run starts eager).
+func test_reset_run_reopens_the_rush() -> void:
+	var engine := _engine(_rush(1, 0.1, 2.0))
+	engine.fast_forward(10)
+	assert_int(_units_system(engine).arrivals_total).is_equal(1)  # rush arrival @7
+	_units_system(engine).reset_run()
+	engine.fast_forward(10)
+	var arrivals := _events_of_type(engine, &"recruit_arrived")
+	assert_int(arrivals.size()).is_equal(2)
+	assert_int(int(arrivals[1]["tick"])).is_equal(17)  # 7 after the reset
+
+
+## A capped-gate helper: metronome 1h base + `capacity` concurrent offers.
+func _capped_engine(capacity: int) -> SimEngine:
+	var tunables := EconomyTunables.new()
+	tunables.recruit_arrival_interval_hours = 1.0
+	tunables.recruit_arrival_jitter_hours = 0.0
+	tunables.recruit_arrival_early_count = 0
+	tunables.recruit_gate_capacity = capacity
+	var engine := SimEngine.new(7)
+	engine.register_system(UnitLifecycleSystem.new(_units(), _gear(), tunables))
+	return engine
+
+
+## Gate capacity: while the gate holds `capacity` offers the arrival
+## countdown PAUSES (no new offers however long), and resumes the tick a
+## slot frees. Metronome 1h, capacity 2: arrivals at 61 and 121, then frozen.
+func test_gate_capacity_pauses_arrivals_and_resumes_on_accept() -> void:
+	var engine := _capped_engine(2)
+	var units := _units_system(engine)
+	assert_int(units.gate_capacity()).is_equal(2)
+	engine.fast_forward(121)
+	assert_int(units.pending_offers()).is_equal(2)
+	assert_int(units.arrivals_total).is_equal(2)
+	engine.fast_forward(600)  # ten more hours: the gate stays full
+	assert_int(units.arrivals_total).is_equal(2)
+	# Free one slot: the frozen countdown resumes and the offer lands.
+	engine.submit_command(&"recruit_accept", &"", units.offer_ids()[0])
+	engine.fast_forward(61)
+	assert_int(units.arrivals_total).is_equal(3)
+	assert_int(units.pending_offers()).is_equal(2)
+
+
+## Dismissal: the offer is sent home (no unit exists, uid never reused),
+## the event carries the remaining count, and an unknown/stale uid is
+## denied with the accept reason code.
+func test_dismiss_offer_sends_the_recruit_home() -> void:
+	var engine := _engine(_metronome())
+	engine.fast_forward(181)  # three offers: 61, 121, 181
+	var units := _units_system(engine)
+	var uid := units.offer_ids()[1]
+	engine.submit_command(&"dismiss_offer", &"", uid)
+	engine.submit_command(&"dismiss_offer", &"", uid)  # stale
+	engine.submit_command(&"dismiss_offer", &"", 999)  # never existed
+	engine.tick()
+	assert_int(units.pending_offers()).is_equal(2)
+	assert_int(units.total_units()).is_equal(0)
+	assert_int(units.arrivals_total).is_equal(3)  # dismissal is not an arrival change
+	var dismissed := _events_of_type(engine, &"recruit_dismissed")
+	assert_int(dismissed.size()).is_equal(1)
+	assert_int(int(dismissed[0]["value"])).is_equal(uid)
+	assert_int(int(dismissed[0]["value2"])).is_equal(2)  # remaining offers
+	var denied := _events_of_type(engine, &"lifecycle_denied")
+	assert_int(denied.size()).is_equal(2)
+	assert_int(int(denied[0]["value"])).is_equal(UnitLifecycleSystem.REASON_UNKNOWN_RECRUIT)
+	assert_int(int(denied[1]["value"])).is_equal(UnitLifecycleSystem.REASON_UNKNOWN_RECRUIT)
+	# The dismissed uid is never reused: the next arrival draws a fresh one.
+	engine.fast_forward(60)
+	var arrivals := _events_of_type(engine, &"recruit_arrived")
+	assert_int(int(arrivals[arrivals.size() - 1]["value"])).is_not_equal(uid)
+
+
+## Dismissal frees a full gate: capacity 1, one offer pending, the next
+## arrival frozen; dismiss -> the arrival resumes.
+func test_dismissal_frees_a_full_gate() -> void:
+	var engine := _capped_engine(1)
+	var units := _units_system(engine)
+	engine.fast_forward(61)
+	assert_int(units.pending_offers()).is_equal(1)
+	engine.fast_forward(300)
+	assert_int(units.arrivals_total).is_equal(1)  # frozen full gate
+	engine.submit_command(&"dismiss_offer", &"", units.offer_ids()[0])
+	engine.fast_forward(61)
+	assert_int(units.arrivals_total).is_equal(2)
+	assert_int(units.pending_offers()).is_equal(1)
+
+
+## Round-trip mid-rush: the countdown toward the next EARLY arrival
+## serializes; the restored twin replays the identical arrival stream from
+## the capture point (the twin's ring only holds post-restore events, so
+## the comparison starts there).
+func test_round_trip_mid_rush_preserves_the_stream() -> void:
+	var tunables := _rush(2, 0.1, 2.0)
+	var engine := _engine(tunables)
+	engine.fast_forward(10)  # arrival @7 landed; countdown toward @19
+	var captured := engine.to_dict()
+	var twin := _engine(tunables)
+	twin.apply_state_dict(captured)
+	engine.fast_forward(400)
+	twin.fast_forward(400)
+	var first := _events_of_type(engine, &"recruit_arrived")
+	var second := _events_of_type(twin, &"recruit_arrived")
+	# The twin sees every arrival AFTER the capture tick, exactly.
+	var post_capture: Array[Dictionary] = []
+	for event in first:
+		if int(event["tick"]) > 10:
+			post_capture.append(event)
+	assert_int(post_capture.size()).is_equal(second.size())
+	for i in second.size():
+		assert_int(int(post_capture[i]["tick"])).is_equal(int(second[i]["tick"]))
+		assert_int(int(post_capture[i]["value"])).is_equal(int(second[i]["value"]))
+	# The full stream: rush arrival @7 + @19, then the normal 2h cadence.
+	assert_array(_ticks_of(first)).is_equal([7, 19, 139, 259, 379])
+
+
+## Tick list helper for the round-trip test (copy out of the pooled ring).
+func _ticks_of(events: Array[Dictionary]) -> Array[int]:
+	var ticks: Array[int] = []
+	for event in events:
+		ticks.append(int(event["tick"]))
+	return ticks

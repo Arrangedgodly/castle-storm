@@ -384,16 +384,35 @@ recruit_arrived (RNG cadence)      stable: offers wait at the gate, never expire
 
 Arrivals are a **tunable, not per-regime data**:
 `EconomyTunables.recruit_arrival_interval_hours` (default 2.0) +
-`recruit_arrival_jitter_hours` (default 0.25, ±). Each interval is drawn
-from `engine.rng` INSIDE `on_tick` (the only sanctioned draw site) —
+`recruit_arrival_jitter_hours` (default 0.25, ±). Each NORMAL interval is
+drawn from `engine.rng` INSIDE `on_tick` (the only sanctioned draw site) —
 identical seeds produce identical arrival sequences (unit- and
 marathon-tested); jitter 0 is a metronome that draws nothing (rng.state
 frozen). The first tick schedules, so the first arrival lands at
 ~interval+1 tick. Per-regime cadence can arrive later as an additive
 `RegimeModifier` kind (content-schema §4 registry is forward-compatible)
-if design wants flavor-differentiated gates; the tunable keeps T-SIM-08's
-simulator in control at MVP. Recruit tolerance pressure (too many
-recruits) is T-SIM-05's suspicion concern — the gate itself is uncapped.
+if design wants flavor-differentiated gates; the tunable keeps the
+simulator in control at MVP.
+
+**The opening rush (T-SIM-08, docs/balance.md)**: every run's FIRST
+`recruit_arrival_early_count` arrivals (6) use a metronome ramp —
+intervals `early_interval × early_step^i` capped at the base (tuned
+6 → 12 → 24 → 48 → 96 → 120 min) — so journey 1's "first recruit within
+10–15 min" holds (measured: first arrival at tick 7, zero variance; the
+rush draws NO jitter). The rush index is the run's own arrival counter
+(reset_run zeroes it): every restart re-opens eager.
+
+**Gate capacity (T-SIM-08)**: while the gate holds
+`recruit_gate_capacity` (6) concurrent offers the arrival countdown
+PAUSES — a crowded gate draws no new peasants — and resumes the tick a
+slot frees (accept / dismiss / scatter). One uniform rule, online or
+offline: an away window stacks at most a gate's worth of recruits (the R4
+`knight_assembly_offline` shape without forking the sim —
+docs/catch-up.md §8). 0 = uncapped (the pre-T-SIM-08 behavior; arrivals
+are suspicion presence and pile without bound — the T-QA-02 finding).
+The UI reads the pause as `pending_offers() >= gate_capacity()` (no
+extra state, no event spam). Recruit tolerance pressure (too many
+recruits) is T-SIM-05's suspicion concern.
 
 ### Timers (integer, milli-ticks)
 
@@ -412,6 +431,7 @@ permille) — bounded per training, never per-tick spam.
 | Command | Subject | Value | Effect |
 |---|---|---|---|
 | `recruit_accept` | — | offer uid | offer → peasant |
+| `dismiss_offer` | — | offer uid | offer sent home (T-SIM-08: quiet, free, frees a gate slot; uid never reused) |
 | `assign_role` | target def id | unit uid | peasant branch choice (worker/militia) |
 | `start_training` | target def id | unit uid | any later hop (trainee, knight/archer) |
 | `equip_gear` | gear id | unit uid | pay recipe, fill slot (tier-up replaces) |
@@ -419,7 +439,8 @@ permille) — bounded per training, never per-tick spam.
 
 Events (subject = content id, value = unit uid unless noted):
 `recruit_arrived` (value2 = pending offers), `recruit_accepted`
-(value2 = base-def count), `training_started` (value2 = duration in
+(value2 = base-def count), `recruit_dismissed` (value2 = remaining
+offers), `training_started` (value2 = duration in
 milli-ticks), `training_progress` (value2 = permille), `training_complete`
 (value2 = 1 held-for-gear / 0 auto-promoted; subject resolves
 `UnitDef.suspicion_on_train` for T-SIM-05), `gear_equipped`
@@ -446,23 +467,24 @@ identically after restore.
 
 ### Read API (for the UI; pure queries)
 
-`pending_offers()`, `offer_ids()`, `unit_ids()`, `unit_count(id)`,
-`total_units()`, `unit_def(uid)`, `training_target(uid)`,
-`training_progress_milli(uid)`, `training_duration_milli(id)`,
-`is_awaiting_promotion(uid)`, `unit_gear(uid)`, `gear_tier(uid, slot)`,
-`missing_gear_slots(uid)`, `idle_units(id)`,
-`awaiting_promotion_ids()`, `army_roster()`, `army_power()`,
-`gear_ids_for_slot(slot)` (tier-sorted), `arrivals_total`.
+`pending_offers()`, `gate_capacity()` (T-SIM-08), `offer_ids()`,
+`unit_ids()`, `unit_count(id)`, `total_units()`, `unit_def(uid)`,
+`training_target(uid)`, `training_progress_milli(uid)`,
+`training_duration_milli(id)`, `is_awaiting_promotion(uid)`,
+`unit_gear(uid)`, `gear_tier(uid, slot)`, `missing_gear_slots(uid)`,
+`idle_units(id)`, `awaiting_promotion_ids()`, `army_roster()`,
+`army_power()`, `gear_ids_for_slot(slot)` (tier-sorted), `arrivals_total`.
 
 Measured at 1000h: `marathon_units_1000h` — 60,000 ticks of the full
-stack (heartbeat + units + production; 498 arrivals, 385 workers, 50
-knights + 50 archers promoted with paid gear, army power 1150, a 10h
-management cadence, and a 500h save round-trip) in ~0.31s
-(~190,000 ticks/s; hash 191601477, reproduced identically across
-processes). The engine-only marathon still holds ~1.67M ticks/s
-(hash 3567881493) and the production marathon ~143k ticks/s
-(hash 2971927959) — both byte-identical to their T-SIM-01/02 records:
-T-SIM-03 added zero core drag.
+stack (heartbeat + units + production; 499 arrivals — 6 rush + the normal
+cadence, 384 workers, 51 knights + 51 archers promoted with paid gear,
+army power 2023, a 10h management cadence, and a 500h save round-trip)
+in ~0.38s (~160,000 ticks/s; hash 75817539, reproduced identically
+across processes; T-SIM-08's rush + gate changed the arrival stream and
+with it the recorded hash — reproducibility here is twin-based, no test
+pins absolute hashes). The engine-only marathon still holds ~1.67M ticks/s
+and the production marathon ~143k ticks/s — both byte-identical to their
+T-SIM-01/02 records: T-SIM-03 and T-SIM-08 added zero core drag.
 
 ## 12. Run lifecycle system (T-SIM-04)
 
@@ -836,8 +858,9 @@ iron_rotunda army x1.1, paper_crown x0.95); a regime-less run (restore
 edge, §12 warns loudly) is neutral x1.000 both sides. Monotone by
 construction — more power NEVER lowers the odds (unit-tested across the
 growth curve and all four flavors); at parity 500; the floor assault
-(power 23 vs garrison 60) opens at **277**, 2x floor ≈ 434, the M1
-100-power line 625. The breakdown dict carries per-unit contributions
+(power 23 vs garrison 50, the T-SIM-08 tuned base) opens at **277–338
+by flavor** (neutral 315), 2x floor ≈ 44–49%, the M1
+100-power line ≈ 63–69%. The breakdown dict carries per-unit contributions
 (`{uid, def, def_power, gear_power, total}` in roster order), the army
 sums + multiplier, the garrison composition (base, modifier kind,
 multiplier, strength), `floor_power`, `floor_met`, and `win_permille` —

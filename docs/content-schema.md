@@ -170,12 +170,15 @@ garrison ×1.2 (archers on the walls) + timber ×0.85 (timber tax).
 | `personality_tags: Array[StringName]` | ≥ 4, unique, non-empty |
 | `recruit_names: Array[String]` | ≥ 8, unique, non-empty |
 
-### EconomyTunables (`content/schema/economy_tunables.gd`) — the R4 vocabulary
+### EconomyTunables (`content/schema/economy_tunables.gd`) — the R4 vocabulary, T-SIM-08 tuned
 
-Defaults = R4 seeds. Consumed by T-SIM-07 (offline), T-SIM-02 (band),
-T-SIM-03 (recruit arrival cadence), T-SIM-05 (suspicion), T-SIM-06
-(assault block), T-SIM-08 (all; tuned in the simulator), T-SEC-01
-(cap/clamp policy).
+Defaults started as R4 seeds and were tuned by the T-SIM-08 balance pass in
+the simulator (docs/balance.md — the sweep tables and the reasoning). The
+MVP pack `.tres` sets nothing; class defaults flow through (pinned by
+`test_mvp_pack.test_tunables_equal_the_tuned_class_defaults`). Consumed by
+T-SIM-07 (offline), T-SIM-02 (band), T-SIM-03 (recruit arrival cadence),
+T-SIM-05 (suspicion), T-SIM-06 (assault block), T-SIM-08 (all),
+T-SEC-01 (cap/clamp policy).
 
 | Field (default) | R4 row | Validator constraint |
 |---|---|---|
@@ -183,9 +186,13 @@ T-SIM-03 (recruit arrival cadence), T-SIM-05 (suspicion), T-SIM-06
 | `offline_rate` (1.0) | A: 100% linear | within (0, 1] — sub-1.0 is an F2P lever |
 | `cost_growth_band_min/max` (1.08/1.12) | B: r per building | 1.0 < min ≤ max < 2.0; buildings checked against it |
 | `milestone_multiplier` (2.0) | B: ×2 at 10/20 | ≥ 1.0 |
-| `knight_cost_step` (1.6) | B: ~1.6× per knight | within (1.0, 3.0) |
+| `knight_cost_step` (1.6) | B: ~1.6× per knight | within (1.0, 3.0) — declared-but-unconsumed at MVP (docs/balance.md §2: gear recipes + training time ARE the knight cost curve; no system models per-copy scaling) |
 | `recruit_arrival_interval_hours` (2.0) | T-SIM-03: base interval between peasant arrivals (additive field, no format bump) | > 0 |
 | `recruit_arrival_jitter_hours` (0.25) | T-SIM-03: ± jitter per interval, drawn from the engine's seeded RNG (0 = metronome, no draws) | within [0, interval) |
+| `recruit_arrival_early_count` (6) | T-SIM-08: the opening rush — the run's FIRST N arrivals on a metronome ramp (additive field; 0 = disabled; reset_run re-opens it every run) | ≥ 0 |
+| `recruit_arrival_early_interval_hours` (0.1) | T-SIM-08: the first early interval — 6 sim-min, inside journey 1's 10–15 min window | within (0, interval] when count > 0 |
+| `recruit_arrival_early_step` (2.0) | T-SIM-08: multiplicative ramp per early arrival, capped at the base interval (1.0 = uniform fast cadence) | ≥ 1.0 when count > 0 |
+| `recruit_gate_capacity` (6) | T-SIM-08: max concurrent gate offers — a full gate PAUSES arrivals (online or offline, one rule; docs/catch-up.md §8). 0 = uncapped (pre-T-SIM-08) | ≥ 0 |
 | `suspicion_max` (100) | C: range | ordering input |
 | `suspicion_warn_threshold` (35) | C: tier 1 | 0 < warn < crackdown < max |
 | `suspicion_crackdown_threshold` (70) | C: tier 2 | (same ordering) |
@@ -197,16 +204,16 @@ T-SIM-03 (recruit arrival cadence), T-SIM-05 (suspicion), T-SIM-06
 | `post_crackdown_suspicion` (45) | C: drop to 45 | < crackdown threshold |
 | `post_crackdown_rise_multiplier` (0.5) | C: ×0.5 | within (0, 1] |
 | `post_crackdown_relief_hours` (24) | C: 24h window | > 0 |
-| `suspicion_presence_army_per_hour` (0.5) | T-SIM-05 heat profile: presence per army unit (additive field) | ≥ 0 |
-| `suspicion_presence_follower_per_hour` (0.1) | T-SIM-05: presence per non-army tracked unit | ≥ 0 |
-| `suspicion_presence_building_per_hour` (0.0) | T-SIM-05: continuous presence per building level — DEFAULT 0 (buildings are loud when they GROW, via the medium act; always-on estate heat would make the tier-2 decay dip unreachable = an un-cancellable telegraph, which R4's tension mechanic forbids) | ≥ 0 |
-| `suspicion_presence_offer_per_hour` (0.25) | T-SIM-05: presence per recruit offer waiting at the gate | ≥ 0 |
-| `suspicion_recruit_tolerance` (3) | T-SIM-05: arrivals while offers EXCEED this are loud acts (+rise_loud); the gate itself stays uncapped | ≥ 0 |
+| `suspicion_presence_army_per_hour` (**0.3**, R4 seed 0.5) | T-SIM-05 heat profile; T-SIM-08 tuned — the measured estate must sit below the tier-2 decay or laying low can never cancel a telegraph (docs/balance.md §2) | ≥ 0 |
+| `suspicion_presence_follower_per_hour` (**0.05**, R4-derived 0.1) | T-SIM-05: presence per non-army tracked unit (tuned with the army weight) | ≥ 0 |
+| `suspicion_presence_building_per_hour` (0.0) | T-SIM-05: continuous presence per building level — DEFAULT 0, re-affirmed CONSCIOUSLY by T-SIM-08 (buildings are loud when they GROW, via the medium act; always-on estate heat would make the tier-2 decay dip unreachable = an un-cancellable telegraph, which R4's tension mechanic forbids) | ≥ 0 |
+| `suspicion_presence_offer_per_hour` (0.25) | T-SIM-05: presence per recruit offer waiting at the gate (bounded structurally by `recruit_gate_capacity`) | ≥ 0 |
+| `suspicion_recruit_tolerance` (3) | T-SIM-05: arrivals while offers EXCEED this are loud acts (+rise_loud); the gate capacity bounds the crowd | ≥ 0 |
 | `suspicion_decay_pause_hours` (1.0) | T-SIM-05: a loud act above warn freezes decay this long (R4 decay_reset_rule) | ≥ 0 |
 | `crackdown_scatter_fraction` (0.5) | T-SIM-05: fraction of the unassigned pool (offers + idle peasants) a crackdown scatters; rounds UP; never touches army/workers/buildings | within (0, 1] |
 | `crackdown_rearm_hours` (4.0) | T-SIM-05: minimum hours after a crackdown before the next telegraph may arm (recur gate) | ≥ 0 |
 | `assault_knight_floor_power` (23) | T-SIM-06: minimum army POWER to commit an assault — the knight FLOOR (a floor, not a trigger; 23 = the M1-measured 1 knight t1 + 1 archer t1 line, m1-findings) | > 0 |
-| `assault_garrison_base_power` (60) | T-SIM-06: base castle garrison strength before the regime combat modifier (floor assault ≈ 277 permille, 2x floor ≈ 434, 100 power ≈ 625) | > 0 |
+| `assault_garrison_base_power` (**50**, derived seed 60) | T-SIM-06: base castle garrison strength before the regime combat modifier; T-SIM-08 tuned for the first-win band (floor ≈ 277–338 permille by flavor, 2x floor ≈ 44–49%, 100 power ≈ 63–69%; docs/balance.md §2) | > 0 |
 | `assault_loss_fraction` (0.5) | T-SIM-06: fraction of ARMY UNITS that fall when an assault FAILS; rounds UP; newest first, gear and all; the run continues (set-back, not death) | within (0, 1] — never annihilation |
 | `assault_failure_suspicion` (20) | T-SIM-06: suspicion spike on a failed assault (the Crown watched the whole army break); relief-damped, clamped; CAN crush at the meter's edge | within [0, `suspicion_max`] |
 

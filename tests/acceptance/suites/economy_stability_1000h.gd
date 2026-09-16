@@ -22,19 +22,24 @@
 ##                 cannot stall a staffed producer.
 ##   HEALTH      — no negative/non-int stocks, suspicion always within
 ##                 [0, max], every run builds its estate, the bank grows.
-##   SUSPICION   — asserted HONESTLY, whichever way the content rules take
-##                 it. This pack's measured reality (recorded in the digest
-##                 for T-SIM-08): arrivals never stop, pending gate offers
-##                 are presence, and decay is capped — so a growing estate
-##                 eventually loses a telegraph race and is CRUSHED AT
-##                 EXACTLY 100. Sensible play folds a new run and continues.
-##                 The suite asserts BOTH regimes per their rules: every
-##                 strike lands at its telegraph's exact land tick (>=4h
-##                 warning), every armed telegraph strikes / cancels / is
-##                 orphaned by a crush, every crush fires at max with a
-##                 same-tick run_lost and full banking, every restart resets
-##                 the whole run-scoped estate, and the stream still ends
-##                 with a LIVE run.
+##   SUSPICION   — asserted HONESTLY per the tuned content (T-SIM-08): the
+##                 pre-tuning reality (recorded 2026-09-15: arrivals never
+##                 stop, gate offers are presence, decay is capped — a
+##                 growing estate lost a telegraph race and was CRUSHED 7
+##                 times over 1000h) was a BALANCE finding, and the balance
+##                 pass resolved it in the content: the dismissal
+##                 affordance + gate capacity + retuned presence weights
+##                 keep a MEASURED estate (army 4, population 24) under the
+##                 warn threshold indefinitely — sensible play is never
+##                 crushed (<= 1 tolerated), and the crush failure mode
+##                 lives on the GREED side of the line (proven in
+##                 economy_balance_band's greed probe). The structural
+##                 rules still assert exactly: every strike lands at its
+##                 telegraph's exact land tick, every armed telegraph
+##                 strikes / cancels / is orphaned by a crush / is pending,
+##                 every crush fires at max with same-tick run_lost + full
+##                 banking, every restart resets the run-scoped estate, and
+##                 the stream ends with a LIVE run.
 ##   DETERMINISM — the whole script is a pure function of the seed: an
 ##                 in-process replay is bit-identical (hash + all counters),
 ##                 and the digest prints the hash so the double-ci.sh
@@ -77,14 +82,16 @@ func run(harness) -> void:
 	harness.check(bool(stream["suspicion_in_range"]), "suspicion always within [0, %d]" % MVP.load_mvp().tunables.suspicion_max)
 	harness.check(int(stream["builds"]) >= (int(stream["restarts"]) + 1) * MVP.building_ids().size(), "every run built its full estate (%d building_built events across %d runs)" % [stream["builds"], int(stream["restarts"]) + 1])
 
-	# --- Suspicion verdict, per the rules (whichever regime the content
-	# chose — the digest records which; this seed exercises BOTH).
+	# --- Suspicion verdict, per the tuned rules (whichever regime the content
+	# chooses — the digest records which; this seed's measured estate stays
+	# below warn end to end after T-SIM-08, and the structural rules still
+	# assert exactly).
 	var strikes: int = stream["strikes"]
 	var crushes: int = stream["crushes"]
-	harness.check(strikes > 0, "the tension rhythm is live in CI: %d crackdown strikes over 1000h" % strikes)
-	harness.check(bool(stream["strikes_landed_at_telegraph"]), "every strike landed at its telegraph's exact land tick (the >=4h warning held)")
 	harness.check(int(stream["telegraphs"]) == strikes + int(stream["cancels"]) + int(stream["orphaned_telegraphs"]) + int(stream["pending_telegraphs"]), "every armed telegraph struck, was cancelled, was orphaned by a crush, or is still pending (%d armed = %d struck + %d cancelled + %d orphaned + %d pending)" % [stream["telegraphs"], strikes, stream["cancels"], stream["orphaned_telegraphs"], stream["pending_telegraphs"]])
-	harness.check(crushes > 0, "the content's long-horizon reality is encoded, not hidden: %d crush(es), each per the rules (balance note for T-SIM-08 in the digest)" % crushes)
+	harness.check(bool(stream["strikes_landed_at_telegraph"]), "every strike landed at its telegraph's exact land tick (the >=4h warning held; vacuous at 0 strikes, exact when they land)")
+	harness.check(crushes <= 1, "sensible play is never crushed by EXISTING: %d crush(es) over 1000h under the tuned content (<= 1 tolerated; the crush failure mode lives on the greed side — economy_balance_band's greed probe)" % crushes)
+	harness.check(int(stream["suspicion_peak"]) < MVP.load_mvp().tunables.suspicion_warn_threshold, "a measured estate stays below the warn threshold indefinitely: suspicion peaked at %d (< warn %d — decay dominates the tuned presence weights)" % [stream["suspicion_peak"], MVP.load_mvp().tunables.suspicion_warn_threshold])
 	harness.check(bool(stream["crushes_at_max"]), "every crush fired at exactly max suspicion with same-tick run_lost + full banking")
 	harness.check(crushes == int(stream["restarts"]), "sensible play folded a fresh run after every crush (%d restarts)" % stream["restarts"])
 	harness.check(bool(stream["restart_reset"]), "each restart emptied roster/estate/pool and reset the meter to 0")
@@ -123,6 +130,7 @@ func _stream(engine: SimEngine, meta: RunMeta, with_twin: bool) -> Dictionary:
 		"strikes_landed_at_telegraph": true,
 		"crushes_at_max": true,
 		"restart_reset": true,
+		"suspicion_peak": 0,
 		"peaks": {},
 		"gross_produced": {},
 	}
@@ -222,6 +230,7 @@ func _stream(engine: SimEngine, meta: RunMeta, with_twin: bool) -> Dictionary:
 				report["in_bounds"] = false
 		if suspicion.suspicion_points() < 0 or suspicion.suspicion_points() > suspicion_max:
 			report["suspicion_in_range"] = false
+		report["suspicion_peak"] = maxi(report["suspicion_peak"], suspicion.suspicion_points())
 
 		# --- Collapse floor + gross production: measured production >= the
 		# exact content floor in every staffed window. Restarts deliberately
@@ -379,11 +388,12 @@ func _worst_production_quirk_milli(pack: ContentPack, resource: StringName) -> i
 
 func _print_digest(report: Dictionary, wall: float) -> void:
 	print(
-		"[economy_stability_1000h] seed %d: 1000h (%d ticks) in %.2fs — peaks %s; gross %d food / %d timber / %d iron; suspicion %d warns / %d telegraphs / %d strikes / %d cancels / %d crushes / %d restarts, %d seized, %d builds; bank %d lp over %d chronicle runs; alive at end %s; 500h hash %d; final hash %d"
+		"[economy_stability_1000h] seed %d: 1000h (%d ticks) in %.2fs — peaks %s; gross %d food / %d timber / %d iron; suspicion peak %d (%d warns / %d telegraphs / %d strikes / %d cancels / %d crushes / %d restarts, %d seized, %d builds); bank %d lp over %d chronicle runs; alive at end %s; 500h hash %d; final hash %d"
 		% [
 			RUN_SEED, WINDOWS * WINDOW_TICKS, wall,
 			str(report["peaks"]), report["gross_produced"][&"food"],
 			report["gross_produced"][&"timber"], report["gross_produced"][&"iron"],
+			report["suspicion_peak"],
 			report["warns"], report["telegraphs"], report["strikes"],
 			report["cancels"], report["crushes"], report["restarts"],
 			report["seized"], report["builds"], report["bank"],
@@ -391,4 +401,4 @@ func _print_digest(report: Dictionary, wall: float) -> void:
 			report["hash_500h"], report["hash"],
 		]
 	)
-	print("[economy_stability_1000h] balance note for T-SIM-08: arrivals never stop, gate offers are presence, decay is capped — long runs ratchet to crush; measured here, not tuned here")
+	print("[economy_stability_1000h] T-SIM-08 resolved the recorded finding (7 crushes pre-tune): dismissal affordance + gate capacity + presence weights — existing is quiet, greed still crushes (economy_balance_band)")

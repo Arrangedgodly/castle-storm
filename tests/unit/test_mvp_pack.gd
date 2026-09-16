@@ -216,9 +216,11 @@ func test_starting_grants_cover_all_four_constructions() -> void:
 		assert_int(int(pack.starting_grants.get(resource, 0))).is_greater_equal(int(needed[resource]))
 
 
-func test_tunables_equal_the_r4_seed_defaults() -> void:
-	# Every exported EconomyTunables field equals the class default (R4 seeds)
-	# — property-walk so future additive fields are covered automatically.
+func test_tunables_equal_the_tuned_class_defaults() -> void:
+	# Every exported EconomyTunables field equals the class default — the
+	# T-SIM-08 TUNED values (R4 seeds superseded by the balance pass,
+	# docs/balance.md; the .tres sets nothing, defaults flow through) —
+	# property-walk so future additive fields are covered automatically.
 	var defaults := EconomyTunables.new()
 	for property in defaults.get_property_list():
 		if not (int(property["usage"]) & PROPERTY_USAGE_SCRIPT_VARIABLE):

@@ -22,7 +22,11 @@ const RUN_SEED := 20260916
 
 ## Tunables dial: metronome arrivals (jitter 0 — zero RNG draws anywhere in
 ## the stack), selectable decay, selectable presence, selectable arrival
-## interval (huge = "no arrivals inside this test's horizon").
+## interval (huge = "no arrivals inside this test's horizon"). Presence
+## weights are PINNED to the R4-seed values the exact milli-math below was
+## written against (army 0.5 / follower 0.1 / offer 0.25) — self-contained
+## like every other fixture here; the T-SIM-08 TUNED pack defaults are
+## covered by economy_balance_band / economy_stability_1000h.
 func _tunables(
 	decay := 5.0,
 	high_decay := 2.5,
@@ -32,8 +36,13 @@ func _tunables(
 	var tunables := EconomyTunables.new()
 	tunables.recruit_arrival_jitter_hours = 0.0
 	tunables.recruit_arrival_interval_hours = interval_hours
+	tunables.recruit_arrival_early_count = 0
+	tunables.recruit_gate_capacity = 0
 	tunables.suspicion_decay_per_hour = decay
 	tunables.suspicion_decay_high_tier_per_hour = high_decay
+	tunables.suspicion_presence_army_per_hour = 0.5
+	tunables.suspicion_presence_follower_per_hour = 0.1
+	tunables.suspicion_presence_offer_per_hour = 0.25
 	if not presence:
 		tunables.suspicion_presence_army_per_hour = 0.0
 		tunables.suspicion_presence_follower_per_hour = 0.0

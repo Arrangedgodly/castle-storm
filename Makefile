@@ -18,6 +18,11 @@
 #     CS_SAVE_HOURS=500 make save-debug
 #     CS_SAVE_ROOT=res://saves make save-debug
 #
+# Balance sweep (T-SIM-08): the tuning harness — sweeps EconomyTunables
+# candidates against the canonical host and prints the measurement tables
+# recorded in docs/balance.md (CS_SWEEP_SEEDS=n adjusts the seed count):
+#     make balance-sweep
+#
 # Boundary validation (T-ARCH-01 acceptance):
 #     make version   # expect 4.7.2.stable.official.ed1daf0bf
 #     make import    # godot --headless --path . --import
@@ -27,10 +32,10 @@
 GODOT_BIN ?= tools/godot/godot
 
 .DEFAULT_GOAL := help
-.PHONY: help version import check run test save-debug export
+.PHONY: help version import check run test save-debug balance-sweep export
 
 help:
-	@echo "Targets: version | import | check | run | test | save-debug | export  (GODOT_BIN defaults to tools/godot/godot)"
+	@echo "Targets: version | import | check | run | test | save-debug | balance-sweep | export  (GODOT_BIN defaults to tools/godot/godot)"
 
 version:
 	@$(GODOT_BIN) --version
@@ -49,6 +54,9 @@ test:
 
 save-debug:
 	$(GODOT_BIN) --headless --path . -s res://scripts/save_debug.gd
+
+balance-sweep:
+	$(GODOT_BIN) --headless --path . -s res://scripts/balance_sweep.gd
 
 export:
 	@echo "export: presets land in T-ARCH-02 (Windows x86_64 / macOS Universal / Linux-X11 x86_64)"

@@ -100,6 +100,7 @@ func _tunables(interval_hours := 1.0, follower_weight := 0.0) -> EconomyTunables
 	var tunables := EconomyTunables.new()
 	tunables.recruit_arrival_jitter_hours = 0.0  # metronome: zero RNG draws
 	tunables.recruit_arrival_interval_hours = interval_hours
+	tunables.recruit_arrival_early_count = 0  # no opening rush: interval_hours IS the whole cadence
 	# Quiet estate: presence weights 0 so away-window suspicion is pure decay.
 	tunables.suspicion_presence_army_per_hour = 0.0
 	tunables.suspicion_presence_follower_per_hour = follower_weight

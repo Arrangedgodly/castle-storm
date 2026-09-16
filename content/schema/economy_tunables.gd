@@ -1,6 +1,8 @@
 ## Economy tunables — the R4 research vocabulary as data, not code constants
-## (docs/ultron/research/r4-idle-balance-references.md; every default below is
-## an R4 seed value; T-SIM-08 tunes them in the simulator). Consumed by:
+## (docs/ultron/research/r4-idle-balance-references.md). Defaults started as
+## R4 seed values and were TUNED by the T-SIM-08 balance pass in the
+## simulator (docs/balance.md records every change + the reasoning table;
+## comments at each field mark the tuned values and why). Consumed by:
 ## T-SIM-07 (offline block), T-SIM-02 (cost band), T-SIM-08 (all),
 ## T-SIM-05 (suspicion block), T-SIM-03 (recruit arrival cadence),
 ## T-SIM-06 (assault block), T-SEC-01 (cap/clamp policy).
@@ -46,6 +48,39 @@ extends Resource
 ## +/- jitter on each arrival interval, in sim-hours (0 = metronome cadence
 ## that draws no RNG at all). Must be < the base interval.
 @export var recruit_arrival_jitter_hours: float = 0.25
+
+## --- The opening rush (T-SIM-08; M1 finding F2) ---
+
+## The FIRST N arrivals of every run come on a fast, METRONOME cadence (no
+## jitter — the village is eager) that ramps up to the normal interval, so
+## journey 1 ("first recruit within 10-15 min of the first session") holds
+## without compressing the whole game's idle pace. 0 disables the rush (the
+## pure R4 cadence). Per run: the early index is the run's own arrival
+## counter (reset_run zeroes it), so every restart re-opens eager. Tuned in
+## the simulator sweep — docs/balance.md.
+@export var recruit_arrival_early_count: int = 6
+
+## Interval of the FIRST early arrival, in sim-hours (0.1 = 6 sim-minutes —
+## inside the 10-15 min journey-1 window with UI margin to spare). Must be
+## > 0 and <= recruit_arrival_interval_hours.
+@export var recruit_arrival_early_interval_hours: float = 0.1
+
+## Multiplicative ramp per early arrival toward the base interval (>= 1.0;
+## 1.0 = one uniform fast interval for the whole rush; the ramp caps at the
+## base interval). Tuned 2.0 with count 6 / first interval 0.1h: the opening
+## intervals run 6 -> 12 -> 24 -> 48 -> 96 -> 120 min, then the normal
+## jittered 2h cadence takes over.
+@export var recruit_arrival_early_step: float = 2.0
+
+## The gate holds at most this many concurrent recruit offers (T-SIM-08; the
+## T-QA-02 stability finding): while the gate is FULL the arrival countdown
+## PAUSES (a crowded gate draws no new peasants) and resumes the tick a slot
+## frees (accept / dismiss / scatter). One uniform rule, online or offline:
+## an away window stacks at most a gate's worth of recruits — the R4
+## `knight_assembly_offline` shape without forking the sim
+## (docs/catch-up.md §8). 0 = uncapped, the pre-T-SIM-08 behavior
+## (arrivals are presence and pile up without bound).
+@export var recruit_gate_capacity: int = 6
 
 ## --- Suspicion / pressure curve (R4 §C) ---
 
@@ -97,13 +132,19 @@ extends Resource
 ## own hour-scale numbers; T-SIM-08 tunes them in the simulator) ---
 
 ## Suspicion points per sim-hour per ARMY unit on the roster (knights,
-## archers — armor and weapons are maximally visible; default 0.5).
-@export var suspicion_presence_army_per_hour: float = 0.5
+## archers — armor and weapons are maximally visible). R4 seed 0.5, tuned to
+## 0.3 in the T-SIM-08 sweep: at 0.5 the sensible steady estate (army 4 +
+## 20 followers) alone out-shouts the tier-2 decay (2.5/h) — an un-cancellable
+## telegraph, which R4's tension mechanic forbids; at 0.3 laying low works
+## and GREED (army ~8+) still ratchets. docs/balance.md.
+@export var suspicion_presence_army_per_hour: float = 0.3
 
 ## Suspicion points per sim-hour per NON-army tracked unit (workers,
 ## peasants, militia, trainees — every body in the conspiracy's camp is a
-## co-conspirator to the Crown's eyes, but quietly; default 0.1).
-@export var suspicion_presence_follower_per_hour: float = 0.1
+## co-conspirator to the Crown's eyes, but quietly). R4-derived seed 0.1,
+## tuned to 0.05 in the T-SIM-08 sweep (same reasoning as the army weight:
+## 20 followers at 0.1 = 2.0/h alone approached the tier-2 decay line).
+@export var suspicion_presence_follower_per_hour: float = 0.05
 
 ## Suspicion points per sim-hour per TOTAL building level. DEFAULT 0.0 — a
 ## design decision, not an omission: buildings are loud when they GROW (the
@@ -152,9 +193,13 @@ extends Resource
 
 ## Base castle garrison strength before the regime combat modifier (a
 ## garrison_multiplier regime scales it; an army_score_multiplier regime
-## scales the army instead). With the default 60: the floor assault (23)
-## opens at ~27.7% odds, 2x floor at ~43%, the M1 100-power line at ~62.5%.
-@export var assault_garrison_base_power: int = 60
+## scales the army instead). R4-derived seed 60, tuned to 50 in the T-SIM-08
+## sweep: at 60 the sensible commit line (~450 permille) arrives ~72h in and
+## the multi-loss tail pushes first wins past the 2-4 day band; at 50 the
+## same line arrives ~15h earlier and every flavor still spans a real odds
+## curve (floor ~277-338 permille, 2x floor ~44-49, 100 power ~63-69).
+## docs/balance.md.
+@export var assault_garrison_base_power: int = 50
 
 ## Fraction of ARMY UNITS (knights/archers, gear and all) that fall when an
 ## assault FAILS. Rounds UP (the rout is thorough). Survivors keep their

@@ -17,10 +17,12 @@ const RUN_SEED := 20260915
 
 
 func _tunables() -> EconomyTunables:
-	# Metronome arrivals (jitter 0): the units system draws NOTHING from the
-	# rng, so the run system's generation draws are the only stream consumers.
+	# Metronome arrivals (jitter 0, no opening rush — the pre-T-SIM-08
+	# cadence shape): the units system draws NOTHING from the rng, so the
+	# run system's generation draws are the only stream consumers.
 	var tunables := EconomyTunables.new()
 	tunables.recruit_arrival_jitter_hours = 0.0
+	tunables.recruit_arrival_early_count = 0
 	return tunables
 
 

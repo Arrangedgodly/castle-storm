@@ -141,10 +141,21 @@ simulation into offline/live variants that can drift, for a balance nicety).
 Consequences while away: arrivals stack up as gate offers (and their gate
 presence accrues suspicion pressure honestly), training timers run out,
 assaults are impossible (a commit is a player command — commands only
-exist while playing). If T-SIM-08's balance pass wants arrivals paused
-offline, the right shape is a tunable the UNITS system consumes during
-catch-up ticks — not a second accrual path. Recorded here so the decision
-is findable.
+exist while playing).
+
+**RESOLVED 2026-09-15, T-SIM-08 (recorded decision): implemented in
+SPIRIT as the gate capacity, not as a gate.**
+`EconomyTunables.recruit_gate_capacity` (tuned 6) makes the units system
+PAUSE the arrival countdown while the gate holds a full capacity of
+concurrent offers — one uniform rule that cannot tell offline from online
+ticks, so there is no sim fork: an away window of any length stacks AT
+MOST a gate's worth of recruits (an 8h capped window stacks ≤5 at the 2h
+cadence — the gate does not even fill; a longer-future cadence or slower
+check-ins self-limit at exactly 6). You still cannot amass an army
+offline — accepting is a player command — which is the R4 row's actual
+concern, and the `dismiss_offer` command (T-SIM-08's refusal affordance)
+plus this bound keep gate-offer pressure manageable forever
+(docs/balance.md §2/§3 — the T-QA-02 crush-ratchet finding this closes).
 
 ## 9. Test map
 

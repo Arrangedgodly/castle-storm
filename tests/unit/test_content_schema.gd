@@ -325,3 +325,27 @@ func _first(errors: Array[String], fragment: String) -> String:
 		if e.contains(fragment):
 			return e
 	return "<no error containing '%s'; errors were: %s>" % [fragment, "\n".join(errors)]
+
+
+func test_opening_rush_tunables_bounds_fail() -> void:
+	# T-SIM-08: the rush's first interval must be a real interval inside
+	# (0, base], the ramp must grow toward the base (step >= 1.0), the count
+	# cannot be negative, and the gate capacity cannot be negative (0 =
+	# uncapped, the pre-T-SIM-08 shape).
+	var pack := _scratch_pack()
+	pack.tunables.recruit_arrival_early_count = -1
+	var errors := ContentValidator.validate_pack(pack)
+	assert_int(_count(errors, "recruit_arrival_early_count must be >= 0")).is_equal(1)
+
+	pack = _scratch_pack()
+	pack.tunables.recruit_arrival_early_count = 4
+	pack.tunables.recruit_arrival_early_interval_hours = 2.5  # > the 2h base
+	pack.tunables.recruit_arrival_early_step = 0.5
+	errors = ContentValidator.validate_pack(pack)
+	assert_int(_count(errors, "recruit_arrival_early_interval_hours must be within (0, recruit_arrival_interval_hours]")).is_equal(1)
+	assert_int(_count(errors, "recruit_arrival_early_step must be >= 1.0")).is_equal(1)
+
+	pack = _scratch_pack()
+	pack.tunables.recruit_gate_capacity = -2
+	errors = ContentValidator.validate_pack(pack)
+	assert_int(_count(errors, "recruit_gate_capacity must be >= 0")).is_equal(1)

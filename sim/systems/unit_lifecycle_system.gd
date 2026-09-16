@@ -5,12 +5,15 @@
 ## Second real system on the T-SIM-01 seam after production (§10): it
 ## registers via `register_system()`, the core never changes. Full
 ## contract in docs/sim-engine.md §11. Determinism rules apply in full:
-##   - content floats (training hours, arrival interval/jitter) cross ONE
-##     boundary — `SimFixed.milli_from_float` at construction; after that
-##     every timer is integer math in MILLI-TICKS (one tick adds MILLI)
+##   - content floats (training hours, arrival interval/jitter, the opening
+##     rush ramp) cross ONE boundary — `SimFixed.milli_from_float` at
+##     construction; after that every timer is integer math in MILLI-TICKS
 ##   - the ONLY RNG draws are the arrival-interval jitters, drawn inside
 ##     `on_tick` (the sanctioned site) — identical run seeds produce
-##     identical arrival sequences, and `rng.state` is hashed by the engine
+##     identical arrival sequences, and `rng.state` is hashed by the engine.
+##     The opening rush (T-SIM-08) is metronome: its intervals draw NOTHING,
+##     so the eager cadence is exact and the first-recruit time has zero
+##     variance
 ##   - all external writes arrive as commands drained at tick start; the
 ##     one system-to-system handoff (recruit -> worker) flows through the
 ##     same command queue: worker promotion submits `add_worker` to
@@ -65,6 +68,8 @@ var next_uid := 1
 var _base_unit: StringName = &""  # def that arrives (peasant)
 var _interval_milli := 0  # arrival interval in milli-ticks
 var _jitter_milli := 0  # +/- jitter in milli-ticks (0 = no RNG draws)
+var _early_intervals_milli: Array[int] = []  # opening rush (T-SIM-08); empty = none
+var _gate_capacity := 0  # max concurrent offers; 0 = uncapped (T-SIM-08)
 var _arrival_countdown_milli := -1  # -1 = not yet scheduled (first tick schedules)
 var _units: Array[UnitState] = []
 var _by_uid: Dictionary = {}  # int uid -> UnitState
@@ -99,6 +104,18 @@ func _init(
 	var tunables := p_tunables if p_tunables != null else EconomyTunables.new()
 	_interval_milli = SimFixed.milli_from_float(tunables.recruit_arrival_interval_hours) * SimEngine.TICKS_PER_SIM_HOUR
 	_jitter_milli = SimFixed.milli_from_float(tunables.recruit_arrival_jitter_hours) * SimEngine.TICKS_PER_SIM_HOUR
+	_gate_capacity = maxi(0, tunables.recruit_gate_capacity)
+	# The opening rush (T-SIM-08, M1 finding F2): the run's first N arrivals
+	# use a metronome cadence ramping up to the base interval. The ramp is
+	# precomputed at the construction float boundary (pow HERE, integers
+	# after); each entry is capped at the normal interval, and the table is
+	# keyed by the RUN's arrival counter — reset_run re-opens the rush.
+	var early_count := maxi(0, tunables.recruit_arrival_early_count)
+	if early_count > 0:
+		var first_milli := SimFixed.milli_from_float(tunables.recruit_arrival_early_interval_hours) * SimEngine.TICKS_PER_SIM_HOUR
+		for i in early_count:
+			var interval := mini(_interval_milli, int(first_milli * pow(tunables.recruit_arrival_early_step, i)))
+			_early_intervals_milli.append(maxi(SimFixed.MILLI, interval))
 	var incoming: Dictionary = {}  # def ids reachable via any promotion path
 	for def in p_units:
 		if def == null:
@@ -161,6 +178,13 @@ func system_name() -> StringName:
 ## is a stable state; tolerance pressure is T-SIM-05's call).
 func pending_offers() -> int:
 	return _offers.size()
+
+
+## The gate's concurrent-offer capacity (T-SIM-08; 0 = uncapped). While
+## `pending_offers() >= gate_capacity()` the arrival countdown is paused —
+## the UI's "the gate is full; the road home has gone quiet" state.
+func gate_capacity() -> int:
+	return _gate_capacity
 
 
 ## Offer uids in arrival order (for accept buttons / marathon scripting).
@@ -377,14 +401,19 @@ func gear_ids_for_slot(slot: StringName) -> Array[StringName]:
 func on_tick(engine: SimEngine) -> void:
 	# Arrival scheduling: the FIRST tick schedules (draws the interval);
 	# every later tick counts down, fires the offer, draws the next
-	# interval. The only RNG draws in this system.
+	# interval. While the gate is at capacity (T-SIM-08) the countdown
+	# PAUSES — a crowded gate draws no new peasants — and resumes the tick
+	# a slot frees (accept / dismiss / scatter); the pause is visible to
+	# the UI as pending_offers() == gate capacity (no state, no event
+	# spam). The only RNG draws in this system are the jittered NORMAL
+	# intervals; the opening rush is metronome.
 	if _arrival_countdown_milli < 0:
-		_arrival_countdown_milli = _draw_interval_milli(engine)
-	else:
+		_arrival_countdown_milli = _next_interval_milli(engine)
+	elif not _gate_full():
 		_arrival_countdown_milli -= SimFixed.MILLI
 		if _arrival_countdown_milli <= 0:
 			_spawn_offer(engine)
-			_arrival_countdown_milli = _draw_interval_milli(engine)
+			_arrival_countdown_milli = _next_interval_milli(engine)
 	# Training timers: one milli-tick per tick, quarter progress events,
 	# completion when the target def's duration is reached.
 	for i in range(_training.size() - 1, -1, -1):
@@ -410,6 +439,8 @@ func on_command(engine: SimEngine, command: SimCommand) -> bool:
 	match command.kind:
 		&"recruit_accept":
 			_handle_recruit_accept(engine, command)
+		&"dismiss_offer":
+			_handle_dismiss_offer(engine, command)
 		&"assign_role", &"start_training":
 			# assign_role is the peasant's branch-choice semantic (worker vs
 			# militia); start_training is the same mechanic for every later
@@ -438,6 +469,23 @@ func _handle_recruit_accept(engine: SimEngine, command: SimCommand) -> void:
 	_counts[_base_unit] = int(_counts.get(_base_unit, 0)) + 1
 	engine.events.record(
 		engine.tick_count, &"recruit_accepted", _base_unit, uid, int(_counts[_base_unit])
+	)
+
+
+## Dismiss a pending gate offer (T-SIM-08, the refusal affordance): the
+## recruit is sent home — no cost, no suspicion act (turning someone away is
+## the QUIET option; that is the point), the gate slot frees (arrivals
+## resume if the gate was at capacity). The unit never exists; uid is never
+## reused. Unknown uid (never an offer / already dismissed) denied with the
+## same reason code as accept.
+func _handle_dismiss_offer(engine: SimEngine, command: SimCommand) -> void:
+	var uid := command.value
+	if not _offers.has(uid):
+		_deny(engine, command, REASON_UNKNOWN_RECRUIT)
+		return
+	_offers.erase(uid)
+	engine.events.record(
+		engine.tick_count, &"recruit_dismissed", _base_unit, uid, _offers.size()
 	)
 
 
@@ -623,8 +671,25 @@ func from_dict(state: Dictionary) -> void:
 # --- Internals ---------------------------------------------------------------
 
 
+## Interval for the run's NEXT arrival (milli-ticks): the opening-rush entry
+## when the run's arrival counter is still inside the rush (metronome — no
+## RNG draw), otherwise the jittered normal cadence. Zero jitter draws
+## nothing — a metronome cadence leaves rng.state untouched.
+func _next_interval_milli(engine: SimEngine) -> int:
+	if arrivals_total < _early_intervals_milli.size():
+		return _early_intervals_milli[arrivals_total]
+	return _draw_interval_milli(engine)
+
+
+## True while the gate holds its full capacity of concurrent offers (the
+## T-SIM-08 arrivals pause; 0 capacity = never full = uncapped gate).
+func _gate_full() -> bool:
+	return _gate_capacity > 0 and _offers.size() >= _gate_capacity
+
+
 ## Draw the next arrival interval from the engine RNG (milli-ticks). Zero
 ## jitter draws nothing — a metronome cadence leaves rng.state untouched.
+## Normal cadence only; the opening rush never calls this.
 func _draw_interval_milli(engine: SimEngine) -> int:
 	if _jitter_milli <= 0:
 		return _interval_milli
@@ -690,7 +755,9 @@ func _slot_required(unit: UnitState, slot: StringName) -> bool:
 ## Run-reset seam (T-SIM-04 reset contract, docs/sim-engine.md §12): the
 ## roster, the gate and the arrival cadence back to boot state. The next
 ## tick re-schedules the first arrival with a fresh RNG draw — the new
-## run's stream, identical in shape to a freshly constructed engine.
+## run's stream, identical in shape to a freshly constructed engine. The
+## opening rush (T-SIM-08) re-opens too: it is keyed on the run's own
+## arrival counter, which this reset zeroes — every restart starts eager.
 ## Called synchronously by the run system at the run_restart drain.
 func reset_run(_p_regime: RegimeDef = null) -> void:
 	_units.clear()
