@@ -78,6 +78,25 @@ Rules the contract rests on:
    event ring is deliberately NOT hashed: it is presentation history, not
    simulation state (live-ticking and fast-forwarding produce identical
    hashes — proven by the ffwd-equivalence test).
+6. **Canonical TEXT order for id collections (T-QA-02 fix).** Wherever the
+   hash (or an event stream) iterates ids in a "sorted" order, the sort is
+   by STRING TEXT (`sort_custom(func(a, b): return String(a) < String(b))`),
+   never plain `sort()` on StringNames: Variant ordering of StringNames is
+   interning-order sensitive, so a plain sort made `state_hash()`'s
+   resource-id loop depend on which names the PROCESS interned first —
+   observed live when adding one acceptance suite shifted every sibling
+   marathon digest without touching them (M1 finding F6's root cause: same
+   state, different sort, different hash, per process). The oracle is a
+   function of state alone. RunLifecycleSystem's grant loop and
+   SuspicionSystem's seizure loop already used the text pattern; the engine
+   core now matches them. Regression-pinned by
+   `tests/unit/test_sim_engine.gd > test_state_hash_resource_order_is_text_canonical`
+   (decoy-interned names + insertion-order-independent + full mix re-derived
+   in text order). Hash VALUES of resource-bearing states migrated once by
+   this fix (engine-only states never had resources in the pool and are
+   unchanged — e.g. the engine-only marathon digest 3567881493 is stable
+   across the fix); all reproducibility tests are twin-based, none pin
+   absolute values.
 
 ## 3. Event stream (change log)
 
@@ -967,3 +986,42 @@ var report := service.apply(engine, run.meta, now_epoch)  # host: foreground/loa
   capped 8h = 480 ticks resolves in ~7ms (budget 100ms); two away
   windows + a kill-mid-catch-up revival + first-launch + rewind all
   twin-verified in ~0.1s total.
+
+## 17. The reference host composition (T-QA-02)
+
+`tests/acceptance/suites/_full_stack.gd` is the canonical "real game host"
+composition, defined ONCE so CI and the UI cannot drift apart:
+
+- `game_stack(seed, meta, stipend)` — one engine + ALL five gameplay
+  systems + the heartbeat placeholder, in the ONE contractual order:
+  heartbeat → run → units → production → assault → suspicion (suspicion
+  LAST: it audits siblings at the tick boundary, §14; the resolver is
+  stateless, §15). Content is the MVP pack through the loud gate; the
+  stipend defaults to the pack's own starting grants (the honest boot).
+- `HostSession` — the host wiring beyond the engine: ONE `RunMeta` (meta
+  save domain) shared by every engine the session builds, ONE
+  `CatchUpService` from the pack tunables, `build_engine()` (the
+  host-side restart: fresh engine around the same meta — equivalent to
+  in-engine `run_restart` by §12's both-forms rule), `mark_seen(now)` /
+  `foreground(now)` (the docs/catch-up.md boundary; timestamps always
+  injected by the platform host). T-UI-03 builds its live engine from
+  this shape; T-PERF-01 owns the platform boundary around it.
+- `manage(engine, military_cap, opts)` — the scripted sensible-play policy
+  shared by the T-QA-02 suites (build order, staffing, training queues,
+  gear crafting; reads → commands only, zero test-side RNG). `opts`:
+  `laying_low` (the R4 tension response — no new trainings/upgrades in the
+  crackdown zone) and `population_cap` (measured growth).
+- The opt-in rule stands: the older `full_stack` in `_mvp_pack.gd` stays
+  suspicion/assault-free so pre-T-SIM-05/06 marathon constructions are
+  untouched; `_full_stack.gd` is where the complete five-system stack
+  lives and what the two T-QA-02 suites drive
+  (`economy_stability_1000h`, `full_run_ci`).
+
+Sibling digest note: pre-T-QA-02 the resource-bearing marathon digests
+were quietly process-order sensitive (§2 rule 6) — the recorded values
+were never truly stable across machines. After the fix they are
+bit-reproducible across processes (proven by back-to-back `ci.sh accept`
+runs) and were re-recorded once: engine-only 3567881493 (unchanged),
+production 306376767, units 2731020335, run_thin 659828436,
+gate_m1 145325186, assault_storm 1090049983,
+economy_stability 500h 3692574814 / final 460399411.

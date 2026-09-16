@@ -261,6 +261,45 @@ func test_resource_pool_is_integer() -> void:
 	assert_int(other.state_hash()).is_equal(engine.state_hash())
 
 
+func test_state_hash_resource_order_is_text_canonical() -> void:
+	# Regression (T-QA-02): Variant ordering of StringNames is interning-
+	# order sensitive across processes, so a plain sort() over resource ids
+	# made state_hash() depend on which names the PROCESS interned first —
+	# observed live: adding one acceptance suite shifted every sibling
+	# marathon digest without touching them (M1 finding F6's real root
+	# cause). The oracle must be a function of state alone, so the canonical
+	# resource order is STRING TEXT. Pinned here by re-deriving the whole
+	# mix in text order against the engine's own hash, with decoy names
+	# interned first to perturb the intern table (any intern-, insertion-,
+	# or dict-order sensitivity diverges from the text-order construction).
+	var decoys: Array[StringName] = [&"zz_decoy", &"aa_decoy", &"mm_decoy"]
+	for decoy in decoys:  # touching each name interns it, in this order
+		assert_int(String(decoy).length()).is_greater(0)
+	var engine := SimEngine.new(20260915)
+	engine.set_resource(&"timber", 36)  # inserted deliberately NOT in text order
+	engine.set_resource(&"food", 42)
+	engine.set_resource(&"iron", 0)
+
+	# The engine's documented mix (docs/sim-engine.md §2), re-derived here
+	# with resource ids in TEXT order only.
+	var mix := func(h: int, value: int) -> int:
+		var x := (h ^ (value & 0xFFFFFFFF)) & 0xFFFFFFFF
+		x = (x * 16777619) & 0xFFFFFFFF
+		x = (x ^ ((value >> 32) & 0xFFFFFFFF)) & 0xFFFFFFFF
+		return (x * 16777619) & 0xFFFFFFFF
+	var expected := 0x811C9DC5
+	expected = mix.call(expected, SimEngine.STATE_FORMAT_VERSION)
+	expected = mix.call(expected, engine.run_seed)
+	expected = mix.call(expected, engine.tick_count)
+	expected = mix.call(expected, engine.rng.state)
+	expected = mix.call(expected, 0)  # not paused
+	expected = mix.call(expected, 0)  # no pending commands
+	for id in [&"food", &"iron", &"timber"]:  # TEXT order: food < iron < timber
+		expected = mix.call(expected, String(id).hash())
+		expected = mix.call(expected, engine.get_resource(id))
+	assert_int(engine.state_hash()).is_equal(expected)
+
+
 # --- Serialization hooks (save seam reserved for T-ARCH-03) ------------------
 
 

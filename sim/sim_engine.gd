@@ -213,7 +213,15 @@ func state_hash() -> int:
 		h = _mix(h, String(command.subject).hash())
 		h = _mix(h, command.value)
 	var resource_ids: Array = resources.keys()
-	resource_ids.sort()
+	# Sort by STRING text, never plain sort() on the StringNames themselves:
+	# Variant ordering of StringNames is not reliably text-ordered across
+	# processes (interning-order sensitive — the same dict sorts differently
+	# depending on which names the process interned first; observed when a
+	# T-QA-02 suite shifted every sibling marathon digest without touching
+	# them). The oracle must depend on state only, so the canonical order is
+	# text (run_lifecycle's grant loop and suspicion's seizure loop already
+	# use this exact pattern for the same reason).
+	resource_ids.sort_custom(func(a, b): return String(a) < String(b))
 	for id in resource_ids:
 		h = _mix(h, String(id).hash())
 		h = _mix(h, int(resources[id]))
