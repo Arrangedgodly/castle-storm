@@ -23,6 +23,15 @@
 # recorded in docs/balance.md (CS_SWEEP_SEEDS=n adjusts the seed count):
 #     make balance-sweep
 #
+# Vendor asset pipeline (T-ARCH-04, per R6): stage declared art packs into
+# assets/vendor/ (sha256-verified), pre-render every staged SVG to a sibling
+# @2x PNG, and regenerate assets/vendor/ATTRIBUTIONS.md. Idempotent; offline
+# (staged files are committed). To (re-)download packs first:
+#     make vendor-assets FETCH=1
+# Cache lives outside the repo (CS_VENDOR_CACHE, default ~/.cache/castle-storm/vendor).
+vendor-assets:
+	scripts/vendor_assets.sh $(if $(FETCH),--fetch,)
+
 # Boundary validation (T-ARCH-01 acceptance):
 #     make version   # expect 4.7.2.stable.official.ed1daf0bf
 #     make import    # godot --headless --path . --import
@@ -32,10 +41,10 @@
 GODOT_BIN ?= tools/godot/godot
 
 .DEFAULT_GOAL := help
-.PHONY: help version import check run test save-debug balance-sweep export
+.PHONY: help version import check run test save-debug balance-sweep vendor-assets export
 
 help:
-	@echo "Targets: version | import | check | run | test | save-debug | balance-sweep | export  (GODOT_BIN defaults to tools/godot/godot)"
+	@echo "Targets: version | import | check | run | test | save-debug | balance-sweep | vendor-assets | export  (GODOT_BIN defaults to tools/godot/godot)"
 
 version:
 	@$(GODOT_BIN) --version

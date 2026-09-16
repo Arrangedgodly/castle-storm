@@ -1,0 +1,163 @@
+{
+  "manifest_version": 1,
+  "comment": "Vendor asset manifest (T-ARCH-04, per R6). Declares every third-party art pack staged into assets/vendor/: where it comes from, under which license, the exact files we keep, and the sha256 each staged file must hash to. Staging + verification + @2x pre-render: scripts/vendor_assets.gd (run via `make vendor-assets`). Downloading (--fetch mode): scripts/vendor_assets.sh. Files here are pipeline metadata, NOT game content — the game-facing side is content/mvp/art_manifest.tres (asset keys), validated by ContentValidator.",
+  "render": {
+    "method": "godot-image-load-svg-from-buffer",
+    "scale": 2.0,
+    "output_suffix": "@2x.png",
+    "note": "Renderer decision of record: this machine has no Inkscape/rsvg-convert/ImageMagick and its ffmpeg lacks an SVG decoder (probed 2026-09-15). The R1-pinned vendored Godot 4.7.2-stable binary rasterizes SVGs deterministically via ThorVG (Image.load_svg_from_buffer), so the pipeline ships zero new dependencies and is reproducible by construction. Limitation (R6 documents it): ThorVG's SVG feature support is limited — complex vectors (gradients, filters, text elements) may render imperfectly. If fidelity issues appear when the Armorial pack lands, install Inkscape and add an inkscape renderer path before re-rendering."
+  },
+  "packs": [
+    {
+      "id": "kenney-board-game-icons",
+      "dir": "assets/vendor/kenney/board-game-icons",
+      "license": "CC0",
+      "artist": "Kenney (kenney.nl)",
+      "homepage": "https://kenney.nl/assets/board-game-icons",
+      "download": {
+        "url": "https://kenney.nl/media/pages/assets/board-game-icons/19cae04050-1721645690/kenney_board-game-icons.zip",
+        "format": "zip",
+        "sha256": "05f4358381d8b16b303b2f056393b76ce3f6a58228599e88caa2eab11d4c2946"
+      },
+      "files": [
+        {
+          "member": "Vector/Icons/resource_wheat.svg",
+          "dest": "icons/resource_wheat.svg",
+          "sha256": "98a050c63904409a803fa98f8cd3a54dd04e236ee6a0d5cf0b27c2bbda8641d1"
+        },
+        {
+          "member": "Vector/Icons/resource_lumber.svg",
+          "dest": "icons/resource_lumber.svg",
+          "sha256": "f39b9e1b93ec24dc21ba2aae904324f6ac2069a294f75302f09dac20a58483f6"
+        },
+        {
+          "member": "Vector/Icons/shield.svg",
+          "dest": "icons/shield.svg",
+          "sha256": "377da5c6c7bac6cfdd8cd9702ed53017ff2e25bedffdf689346e4f282766ba1c"
+        },
+        {
+          "member": "License.txt",
+          "dest": "LICENSE.txt",
+          "sha256": "ee984bc143c380c108199620d18bfdf55001a566951bbda485c2a5d94254350a"
+        }
+      ]
+    },
+    {
+      "id": "kenney-toon-characters",
+      "dir": "assets/vendor/kenney/toon-characters",
+      "license": "CC0",
+      "artist": "Kenney (kenney.nl)",
+      "homepage": "https://kenney.nl/assets/toon-characters",
+      "render_scale": 1.0,
+      "render_scale_note": "Character SVGs are naturally 864x640 — already >2x the largest plausible card-figure display size in the 720x720 design base, so '@2x display-ready' is the NATURAL size here. Rendering 2x-of-natural (1728x1280, ~2MB per file) would commit ~6MB of pixels no screen in the target set can use.",
+      "download": {
+        "url": "https://kenney.nl/media/pages/assets/toon-characters/4e8a6e4e53-1774770819/kenney_toon-characters.zip",
+        "format": "zip",
+        "sha256": "d4c0eb31f9d9af074315af251a53e8c74925dec84fbd53703c91c9ed4a4cace9"
+      },
+      "files": [
+        {
+          "member": "Male person/Vector/character_malePerson.svg",
+          "dest": "male-person/vector/character_malePerson.svg",
+          "sha256": "c1893552f097447e4b20bb512ca72062f0228cad865e659bd262f96aa0328936"
+        },
+        {
+          "member": "Female person/Vector/character_femalePerson.svg",
+          "dest": "female-person/vector/character_femalePerson.svg",
+          "sha256": "8a7e4b0791e845dd5f4c6406af6f7c3d1d554a498c2e2750619e6d784d562f8b"
+        },
+        {
+          "member": "Male adventurer/Vector/character_maleAdventurer.svg",
+          "dest": "male-adventurer/vector/character_maleAdventurer.svg",
+          "sha256": "0cd7c255388f1f0cf0db3a4df7abfdd41598fb7f8471be209fb166a33f205538"
+        },
+        {
+          "member": "License.txt",
+          "dest": "LICENSE.txt",
+          "sha256": "39ed9b4ac5b411331b3b18fc68c393cdf9f909a22c62796f750b0ccee60e8c99"
+        }
+      ]
+    },
+    {
+      "id": "game-icons",
+      "dir": "assets/vendor/game-icons",
+      "license": "CC-BY-3.0",
+      "artist": "Lorc, Delapouite (game-icons.net)",
+      "homepage": "https://game-icons.net/about.html",
+      "license_url": "https://creativecommons.org/licenses/by/3.0/",
+      "attribution": "Icons by Lorc and Delapouite, game-icons.net — CC BY 3.0",
+      "note": "Fetched per-icon in the canonical single-ink form (black on transparent, 512x512 viewBox) that R6 flags as ideal for two-ink recolor; T-UI-01 applies the ink palette.",
+      "files": [
+        {
+          "url": "https://game-icons.net/icons/000000/transparent/1x1/lorc/anvil.svg",
+          "artist": "Lorc",
+          "dest": "lorc/anvil.svg",
+          "sha256": "c357a994a822976dd68c6245f39a1ec24d8be02f13c0313dadaf5dcf9a0c09e9",
+          "attribution": "Lorc, game-icons.net — CC BY 3.0"
+        },
+        {
+          "url": "https://game-icons.net/icons/000000/transparent/1x1/lorc/crossed-swords.svg",
+          "artist": "Lorc",
+          "dest": "lorc/crossed-swords.svg",
+          "sha256": "e81dc3a86844c9287a456b0b813a465d5a72a27434846034acb4ef223d3aa4a5",
+          "attribution": "Lorc, game-icons.net — CC BY 3.0"
+        },
+        {
+          "url": "https://game-icons.net/icons/000000/transparent/1x1/lorc/broadsword.svg",
+          "artist": "Lorc",
+          "dest": "lorc/broadsword.svg",
+          "sha256": "4da0be0f53477ffb489abe26abcac44fe49e223e25bca820d4fd800d24d9eeaf",
+          "attribution": "Lorc, game-icons.net — CC BY 3.0"
+        },
+        {
+          "url": "https://game-icons.net/icons/000000/transparent/1x1/delapouite/two-handed-sword.svg",
+          "artist": "Delapouite",
+          "dest": "delapouite/two-handed-sword.svg",
+          "sha256": "38851aa95168f87b76e7e0a1d695a9e0cba4038692375fab0f0b2dc64c086ea6",
+          "attribution": "Delapouite, game-icons.net — CC BY 3.0"
+        },
+        {
+          "url": "https://game-icons.net/icons/000000/transparent/1x1/lorc/leather-vest.svg",
+          "artist": "Lorc",
+          "dest": "lorc/leather-vest.svg",
+          "sha256": "ee5a524650d974dbd7d945c08eed90d1e59411d5f1520988ae12bc59409f2a71",
+          "attribution": "Lorc, game-icons.net — CC BY 3.0"
+        },
+        {
+          "url": "https://game-icons.net/icons/000000/transparent/1x1/lorc/mail-shirt.svg",
+          "artist": "Lorc",
+          "dest": "lorc/mail-shirt.svg",
+          "sha256": "d3b72d2c2d6f5beb27950c272a9037b1eff3d68df714a2b65529a7f8569b88b6",
+          "attribution": "Lorc, game-icons.net — CC BY 3.0"
+        },
+        {
+          "url": "https://game-icons.net/icons/000000/transparent/1x1/lorc/breastplate.svg",
+          "artist": "Lorc",
+          "dest": "lorc/breastplate.svg",
+          "sha256": "f7a7c9780981e720a7953c65700de2469509cead1eaec86fdff7f59f9041c981",
+          "attribution": "Lorc, game-icons.net — CC BY 3.0"
+        }
+      ]
+    },
+    {
+      "id": "tzunghaor-cartoon-vector-characters",
+      "dir": "assets/vendor/tzunghaor/cartoon-vector-characters",
+      "status": "pending",
+      "license": "CC0",
+      "artist": "tzunghaor (via qubodup, OpenGameArt)",
+      "homepage": "https://opengameart.org/content/cartoon-vector-characters",
+      "note": "Not vendored yet: opengameart.org was unreachable from the build machine (2026-09-15) and the pack ships as .7z (no extractor on this machine). Fetched + staged by hand in a later pass; entries in content/mvp/art_manifest.tres referencing it are pending=true until then.",
+      "files": []
+    },
+    {
+      "id": "armorial",
+      "dir": "assets/vendor/armorial",
+      "status": "pending",
+      "license": "commercial",
+      "artist": "Defaulted19 (itch.io)",
+      "homepage": "https://defaulted19.itch.io/armorial-procedural-heraldry",
+      "note": "Not vendored yet: paid pack ($12, unlimited commercial, no attribution required, raw-file reselling barred). A human purchase step is required; after buying, stage crests here, vendor the pack's LICENSE.txt as assets/vendor/armorial/LICENSE.txt, and flip pending=false in the art manifest.",
+      "files": []
+    }
+  ]
+}

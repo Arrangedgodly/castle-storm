@@ -6,13 +6,13 @@
 [sub_resource type="Resource" id="ArtAssetDef_1"]
 script = ExtResource("1_g")
 id = &"face_peasant"
-source_path = "res://assets/vendor/kenney/toon-characters/vector/character_farmer.svg"
+source_path = "res://assets/vendor/kenney/toon-characters/male-person/vector/character_malePerson.svg"
 license = "CC0"
 
 [sub_resource type="Resource" id="ArtAssetDef_2"]
 script = ExtResource("1_g")
 id = &"face_worker"
-source_path = "res://assets/vendor/kenney/toon-characters/vector/character_baker.svg"
+source_path = "res://assets/vendor/kenney/toon-characters/female-person/vector/character_femalePerson.svg"
 license = "CC0"
 
 [sub_resource type="Resource" id="ArtAssetDef_3"]
@@ -20,11 +20,12 @@ script = ExtResource("1_g")
 id = &"face_militia"
 source_path = "res://assets/vendor/tzunghaor/cartoon-vector-characters/viking.svg"
 license = "CC0"
+pending = true
 
 [sub_resource type="Resource" id="ArtAssetDef_4"]
 script = ExtResource("1_g")
 id = &"face_trainee"
-source_path = "res://assets/vendor/kenney/toon-characters/vector/character_adventurer.svg"
+source_path = "res://assets/vendor/kenney/toon-characters/male-adventurer/vector/character_maleAdventurer.svg"
 license = "CC0"
 
 [sub_resource type="Resource" id="ArtAssetDef_5"]
@@ -32,23 +33,25 @@ script = ExtResource("1_g")
 id = &"face_knight"
 source_path = "res://assets/vendor/tzunghaor/cartoon-vector-characters/knight.svg"
 license = "CC0"
+pending = true
 
 [sub_resource type="Resource" id="ArtAssetDef_6"]
 script = ExtResource("1_g")
 id = &"face_archer"
 source_path = "res://assets/vendor/tzunghaor/cartoon-vector-characters/archer.svg"
 license = "CC0"
+pending = true
 
 [sub_resource type="Resource" id="ArtAssetDef_7"]
 script = ExtResource("1_g")
 id = &"icon_farm"
-source_path = "res://assets/vendor/kenney/board-game-icons/vector/icons/wheat.svg"
+source_path = "res://assets/vendor/kenney/board-game-icons/icons/resource_wheat.svg"
 license = "CC0"
 
 [sub_resource type="Resource" id="ArtAssetDef_8"]
 script = ExtResource("1_g")
 id = &"icon_lumber_camp"
-source_path = "res://assets/vendor/kenney/board-game-icons/vector/icons/axe.svg"
+source_path = "res://assets/vendor/kenney/board-game-icons/icons/resource_lumber.svg"
 license = "CC0"
 
 [sub_resource type="Resource" id="ArtAssetDef_9"]
@@ -61,7 +64,7 @@ attribution = "Lorc, game-icons.net — CC BY 3.0"
 [sub_resource type="Resource" id="ArtAssetDef_10"]
 script = ExtResource("1_g")
 id = &"icon_training_grounds"
-source_path = "res://assets/vendor/kenney/board-game-icons/vector/icons/shield.svg"
+source_path = "res://assets/vendor/kenney/board-game-icons/icons/shield.svg"
 license = "CC0"
 
 [sub_resource type="Resource" id="ArtAssetDef_11"]
@@ -74,21 +77,21 @@ attribution = "Lorc, game-icons.net — CC BY 3.0"
 [sub_resource type="Resource" id="ArtAssetDef_12"]
 script = ExtResource("1_g")
 id = &"icon_longsword"
-source_path = "res://assets/vendor/game-icons/lorc/two-handed-sword.svg"
+source_path = "res://assets/vendor/game-icons/lorc/broadsword.svg"
 license = "CC-BY-3.0"
 attribution = "Lorc, game-icons.net — CC BY 3.0"
 
 [sub_resource type="Resource" id="ArtAssetDef_13"]
 script = ExtResource("1_g")
 id = &"icon_greatsword"
-source_path = "res://assets/vendor/game-icons/delapouite/broadsword.svg"
+source_path = "res://assets/vendor/game-icons/delapouite/two-handed-sword.svg"
 license = "CC-BY-3.0"
 attribution = "Delapouite, game-icons.net — CC BY 3.0"
 
 [sub_resource type="Resource" id="ArtAssetDef_14"]
 script = ExtResource("1_g")
 id = &"icon_padded"
-source_path = "res://assets/vendor/game-icons/lorc/leather-armor.svg"
+source_path = "res://assets/vendor/game-icons/lorc/leather-vest.svg"
 license = "CC-BY-3.0"
 attribution = "Lorc, game-icons.net — CC BY 3.0"
 
@@ -111,24 +114,28 @@ script = ExtResource("1_g")
 id = &"crest_gilded_crown"
 source_path = "res://assets/vendor/armorial/crests/crown_ornate.svg"
 license = "commercial"
+pending = true
 
 [sub_resource type="Resource" id="ArtAssetDef_18"]
 script = ExtResource("1_g")
 id = &"crest_iron_rotunda"
 source_path = "res://assets/vendor/armorial/crests/roundel_chained.svg"
 license = "commercial"
+pending = true
 
 [sub_resource type="Resource" id="ArtAssetDef_19"]
 script = ExtResource("1_g")
 id = &"crest_velvet_fist"
 source_path = "res://assets/vendor/armorial/crests/gauntlet_cushioned.svg"
 license = "commercial"
+pending = true
 
 [sub_resource type="Resource" id="ArtAssetDef_20"]
 script = ExtResource("1_g")
 id = &"crest_paper_crown"
 source_path = "res://assets/vendor/armorial/crests/crown_unadorned.svg"
 license = "commercial"
+pending = true
 
 [resource]
 script = ExtResource("2_g")

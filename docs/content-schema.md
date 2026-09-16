@@ -78,12 +78,16 @@ carries an **asset key**:
 - `ArtAssetDef` (`content/schema/art_asset_def.gd`) is the **only** place
   a vendor path appears: `id`, `source_path`
   (`assets/vendor/<pack>/...`), `license` (`CC0`, `CC-BY-3.0`,
-  `commercial`, ...), `attribution`. **CC-BY-family licenses require a
-  non-empty attribution** — the validator enforces R6's license hygiene
-  (game-icons.net credits).
-- Path *existence* is deliberately not checked until T-ARCH-04 lands (the
-  packs are not vendored yet); the example manifest's paths are forward
-  declarations of the vendored layout.
+  `commercial`, ...), `attribution`, `pending`. **CC-BY-family licenses
+  require a non-empty attribution** — the validator enforces R6's license
+  hygiene (game-icons.net credits).
+- **Path existence is validated** (T-ARCH-04): every non-pending entry's
+  `source_path` must exist at validation time — staged bytes come from the
+  vendor pipeline (`make vendor-assets`; the authoritative pipeline doc is
+  docs/vendor-assets.md) and are sha256-pinned by
+  `assets/vendor/manifest.json`. `pending = true` is the explicit hatch for
+  packs not yet vendored so art can land incrementally without red CI;
+  every pending entry MUST flip to a real staged file before ship.
 - `RegimeDef` carries the two ink colors (`ink_ground`,
   `ink_secondary`, must differ) that T-UI-01's theme applies to authored
   frames and recolored pack art; the crest key resolves through the same
@@ -250,11 +254,12 @@ to start, never silently default"):
     self-consistency, regime quirk-shape coverage, no-orphan art, no
     duplicate display names, and a zero-backdoor grant-verb boot).
   - *Red path*: `tests/unit/fixtures/pack_invalid.tres` (a real broken
-    pack on disk) — `load_pack` must return `null`; plus 11 in-code
+    pack on disk) — `load_pack` must return `null`; plus 12 in-code
     mutation tests asserting exact messages (empty id, unknown promotion
     target, promotion cycle, duplicate id, cost growth outside the R4
     band, threshold ordering, telegraph floor, missing art key, CC-BY
-    without attribution, undeclared slot, required-slot-without-gear).
+    without attribution, art source path missing on disk / `pending`
+    hatch, undeclared slot, required-slot-without-gear).
     A deliberate-break check (wrong expected message → gdUnit4 exit 100)
     confirmed the assertions bite.
 

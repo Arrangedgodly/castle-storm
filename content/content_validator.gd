@@ -140,6 +140,12 @@ static func _check_art_manifest(manifest: ArtManifest, errors: Array[String]) ->
 			keys[asset.id] = true
 		if asset.source_path.is_empty():
 			_err(errors, "art-asset '%s': source_path must not be empty" % asset.id)
+		# T-ARCH-04: path existence is validated at load time UNLESS the entry
+		# is explicitly pending (the vendor pack is not staged yet — see
+		# assets/vendor/manifest.json). The hatch lets art land incrementally;
+		# flip pending=false once `make vendor-assets` stages the file.
+		elif not asset.pending and not FileAccess.file_exists(asset.source_path):
+			_err(errors, "art-asset '%s': source_path '%s' does not exist (stage it via `make vendor-assets` or mark pending=true)" % [asset.id, asset.source_path])
 		if asset.license.is_empty():
 			_err(errors, "art-asset '%s': license must not be empty (R6 license hygiene)" % asset.id)
 		elif asset.license.to_upper().contains("BY") and asset.attribution.is_empty():

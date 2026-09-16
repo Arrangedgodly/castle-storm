@@ -19,3 +19,10 @@ extends Resource
 
 ## Attribution line for CC-BY assets (e.g. game-icons.net: "Lorc, CC BY 3.0").
 @export var attribution: String = ""
+
+## True while the vendor pack backing this asset is not yet vendored
+## (T-ARCH-04: `make vendor-assets`). The validator SKIPS the path-existence
+## check for pending entries so packs can land incrementally (T-UI-01 fills
+## faces without red CI) — every entry MUST flip to pending=false (real
+## staged file) before ship; the acceptance sweep greps for strays.
+@export var pending: bool = false

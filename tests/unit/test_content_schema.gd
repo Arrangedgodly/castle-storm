@@ -190,11 +190,31 @@ func test_ccby_art_requires_attribution() -> void:
 	var asset := ArtAssetDef.new()
 	asset.id = &"icon_extra"
 	asset.source_path = "res://assets/vendor/game-icons/lorc/extra.svg"
+	asset.pending = true  # this test owns the ATTRIBUTION rule, not path existence
 	asset.license = "CC-BY-3.0"
 	pack.art.assets.append(asset)
 	var errors := ContentValidator.validate_pack(pack)
 	assert_str(_first(errors, "requires attribution")).is_equal(
 		"art-asset 'icon_extra': license 'CC-BY-3.0' requires attribution (CC-BY family)")
+
+
+func test_art_source_path_existence_enforced_and_pending_escapes() -> void:
+	# T-ARCH-04 wiring: a non-pending entry whose source_path is not on disk
+	# fails loudly, and pending=true is the explicit hatch that lets T-UI-01
+	# fill faces incrementally without red CI (both halves in one test: the
+	# SAME missing path flips from error to clean on the flag alone).
+	var pack := _scratch_pack()
+	var asset := ArtAssetDef.new()
+	asset.id = &"face_ghost"
+	asset.source_path = "res://assets/vendor/nowhere/ghost.svg"
+	asset.license = "CC0"
+	pack.art.assets.append(asset)
+	var errors := ContentValidator.validate_pack(pack)
+	assert_str(_first(errors, "does not exist")).is_equal(
+		"art-asset 'face_ghost': source_path 'res://assets/vendor/nowhere/ghost.svg' does not exist (stage it via `make vendor-assets` or mark pending=true)")
+	asset.pending = true
+	errors = ContentValidator.validate_pack(pack)
+	assert_int(_count(errors, "does not exist")).is_equal(0)
 
 
 func test_undeclared_gear_slot_fails() -> void:
@@ -311,7 +331,10 @@ func _scratch_pack() -> ContentPack:
 func _art(id: StringName) -> ArtAssetDef:
 	var asset := ArtAssetDef.new()
 	asset.id = id
-	asset.source_path = "res://assets/vendor/kenney/board-game-icons/vector/%s.svg" % id
+	# T-ARCH-04: source paths are existence-checked now — fixture entries
+	# point at a real staged vendor file (sharing one file across keys is
+	# fine: the manifest maps keys, the pipeline owns bytes).
+	asset.source_path = "res://assets/vendor/kenney/board-game-icons/icons/shield.svg"
 	asset.license = "CC0"
 	return asset
 
