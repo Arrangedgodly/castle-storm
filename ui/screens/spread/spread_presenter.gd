@@ -434,6 +434,11 @@ func chronicle_line_for(event: Dictionary, host: GameHost) -> Variant:
 			return _row(kind, "The standard is folded up and buried. %d points banked all the same." % event["value"])
 		&"assault_casualties":
 			return _row(kind, "%d of the vanguard fall at the walls." % event["value"])
+		&"assault_lost":
+			# The spread's rolling record (the vignette owns the moment; the
+			# chronicle owns the history — both in-world, never chrome).
+			return _row(kind, "The assault breaks against the walls of the %s." % (
+				Inks.regime_name(event["subject"]) if event["subject"] != &"" else "Crown"))
 		&"assault_denied":
 			return _row(kind, "The assault is refused — the army is not yet an army (power %d)." % event["value2"])
 		&"catch_up_applied":

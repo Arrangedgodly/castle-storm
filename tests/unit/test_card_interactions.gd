@@ -328,12 +328,14 @@ func test_state_cards_carry_no_actions() -> void:
 	host.submit(&"assign_role", &"militia", other)
 	host.fast_forward(10)
 	assert_array(_ids(CardActions.actions_for(host, _unit_card(host, other)))).is_empty()
-	# A sworn knight: state, not choices (the assault is T-UI-07's).
+	# A sworn knight: the army's ONE verb is the storm — T-UI-07 landed on
+	# the seam this suite reserved ("the army waits for the assault"): a
+	# single signature action (opens the odds table), not a menu.
 	var knight := _geared_trainee(host, &"knight")
 	host.submit(&"promote", &"", knight)
 	host.fast_forward(2)
 	assert_str(String(host.units().unit_def(knight))).is_equal("knight")
-	assert_array(_ids(CardActions.actions_for(host, _unit_card(host, knight)))).is_empty()
+	assert_array(_ids(CardActions.actions_for(host, _unit_card(host, knight)))).is_equal(["storm"])
 
 
 func test_dead_run_has_no_actions() -> void:

@@ -63,6 +63,8 @@ run-responsive:
 #   CS_SPREAD_SHOT=/p.png CS_SPREAD_PROMOTE=1 make run-game  # promote, mid-flip
 #   CS_SPREAD_SHOT=/p.png CS_SPREAD_PROMOTE=2 make run-game  # promote, landed (flourish)
 #   CS_SPREAD_SHOT=/p.png CS_SPREAD_FAN=1 make run-game      # an open action fan
+#   CS_SPREAD_SHOT=/p.png CS_SPREAD_ASSAULT=1 make run-game  # assault odds table (T-UI-07)
+#   CS_SPREAD_SHOT=/p.png CS_SPREAD_ASSAULT=2 make run-game  # a beat mid-vignette (the storm)
 run-game:
 	$(GODOT_BIN) --path . res://ui/screens/spread/spread_screen.tscn
 

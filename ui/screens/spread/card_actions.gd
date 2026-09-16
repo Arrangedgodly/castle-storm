@@ -26,9 +26,10 @@
 ## gates (affordability, slots, worker pools) so the fan's disable reasons
 ## ARE the sim's denial reasons, restated in print.
 ##
-## Units in training, workers, and the sworn army expose NO actions: their
-## cards carry state, not choices (the dashed edge counts down; workers
-## live on the buildings' cards; the army waits for the assault, T-UI-07).
+## Units in training and workers expose NO actions: their cards carry
+## state, not choices (the dashed edge counts down; workers live on the
+## buildings' cards). The sworn army's ONE verb is the storm (T-UI-07):
+## the assault odds table opens from any army card — the signature chip.
 class_name CardActions
 extends RefCounted
 
@@ -67,6 +68,14 @@ static func unit_actions(host: GameHost, card: Dictionary) -> Array[Dictionary]:
 		return gear_actions(host, uid)
 	if units.training_target(uid) != &"":
 		return []  # in training: the card counts down, nothing to choose
+	# THE SWORN ARMY's one verb (T-UI-07): storm the castle. Content-driven
+	# (terminal combat rank = def power with no further paths); opening the
+	# odds table is PRESENTATION, not a sim verb — the action carries the
+	# screen id and the Spread intercepts it; the sim's own verb is
+	# commit_assault, submitted only when the player COMMITs there.
+	var def := _def(host, def_id)
+	if def != null and def.combat_power > 0 and def.promotion_paths.is_empty():
+		return [_action("storm", "Storm the castle", &"", &"", uid, true, "", true)]
 	var actions: Array[Dictionary] = []
 	match def_id:
 		&"militia":

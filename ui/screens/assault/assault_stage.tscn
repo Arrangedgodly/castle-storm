@@ -1,0 +1,9 @@
+; The assault vignette's ON-TABLE stage (T-UI-07): the siege lane laid
+; over the table ground — castle card, ranked army, print-block meters,
+; chronicle strip. Thin scene; all composition in the script.
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://ui/screens/assault/assault_stage.gd" id="1_stage"]
+
+[node name="AssaultStage" type="Control"]
+script = ExtResource("1_stage")

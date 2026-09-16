@@ -50,6 +50,8 @@ extends ResponsiveScreen
 const RUN_HEADER_SCRIPT := preload("res://ui/screens/spread/run_header.gd")
 const WATCHFUL_EYE_SCRIPT := preload("res://ui/screens/spread/watchful_eye.gd")
 const ACTION_FAN_SCRIPT := preload("res://ui/screens/spread/action_fan.gd")
+const AssaultScreenScript := preload("res://ui/screens/assault/assault_screen.gd")
+const ASSAULT_SCENE := preload("res://ui/screens/assault/assault_screen.tscn")
 
 ## Default demo seed (deterministic identity + arrival draw; override
 ## with CS_SEED).
@@ -75,11 +77,14 @@ var stats := {
 	&"eye_binds": 0, &"header_binds": 0, &"phase_binds": 0, &"chronicle_prints": 0,
 	&"fans_opened": 0, &"actions_submitted": 0, &"refusals_printed": 0,
 	&"flips_played": 0, &"flip_replays": 0, &"entrances": 0,
+	&"assaults_opened": 0, &"assaults_finished": 0,
 }
 
 var _view := {}
 var _scale_chip: Label
 var _fan: ActionFan
+var _assault: AssaultScreenScript
+var _pre_assault_focus: Control
 var _flip_queue := CardMotion.PromotionFlipQueue.new()
 ## Entrance deals are armed only after the FIRST full bind — the boot deal
 ## is the packet unfold's business (T-UI-05); cards JOINING a live table
@@ -95,6 +100,7 @@ func _ready() -> void:
 	super._ready()
 	_compose_slot_chrome()
 	_build_action_fan()
+	_build_assault_screen()
 	host.event_observed.connect(_on_event)
 	host.sim_advanced.connect(_on_ticks)
 	host.run_state_changed.connect(func(_running: bool) -> void: refresh_from_state())
@@ -253,6 +259,49 @@ func _on_ticks(ticks: int) -> void:
 		demo_policy.apply(host)
 
 
+# --- the assault vignette (T-UI-07) -------------------------------------------------------
+
+
+## Build the assault screen ONCE (paper over the table while open — the
+## same composition rule as the fan; it is never modal chrome).
+func _build_assault_screen() -> void:
+	_assault = ASSAULT_SCENE.instantiate()
+	_assault.name = "AssaultScreen"
+	add_child(_assault)
+	_assault.finished.connect(_on_assault_finished)
+
+
+## Open the assault odds table (the army card's storm action, or the
+## capture hook). Focus is remembered so closing returns the pad player
+## to the card that raised the standard.
+func open_assault() -> void:
+	if _assault == null or not host.is_run_running():
+		return
+	stats[&"assaults_opened"] += 1
+	_pre_assault_focus = get_viewport().gui_get_focus_owner()
+	close_fan()
+	_assault.open(host, get_router())
+
+
+## THE VICTORY-HANDOFF SEAM: T-UI-05's restart flow mounts here (the
+## win's "deal the next hand"). Today the spread simply takes focus back
+## and rebinds — the outcome events already drove every refresh, and the
+## loss blockquote stays printed in the chronicle's rolling record.
+func _on_assault_finished(_outcome: StringName, _script: Dictionary) -> void:
+	stats[&"assaults_finished"] += 1
+	var restore := _pre_assault_focus
+	_pre_assault_focus = null
+	if restore != null and is_instance_valid(restore) and restore.is_visible_in_tree():
+		restore.grab_focus()
+		return
+	var active := get_active_slot() as OrientationSlot
+	if active != null:
+		for child in active.get_spread().get_children():
+			if child is Control and child.has_meta(&"spread_card_id"):
+				child.grab_focus()
+				return
+
+
 # --- card interactions (T-UI-04) -------------------------------------------------------
 
 
@@ -403,9 +452,14 @@ func _validate_open_fan() -> void:
 
 ## One chosen action: one real command down the host's write path, then
 ## the fan folds and focus returns to the card (the promote command's
-## landing — the flip — arrives later, as the event it is).
+## landing — the flip — arrives later, as the event it is). The storm
+## action is the one intercept: it opens the assault odds table instead
+## of submitting (the sim's verb there is commit_assault, on COMMIT).
 func _on_action_chosen(action: Dictionary) -> void:
 	stats[&"actions_submitted"] += 1
+	if String(action["id"]) == "storm":
+		open_assault()
+		return
 	CardActions.submit(host, action)
 	close_fan()
 
@@ -808,10 +862,56 @@ func _capture_hook() -> void:
 		_promote_then_capture()
 	elif OS.get_environment("CS_SPREAD_FAN") == "1":
 		_fan_then_capture(settle)
+	elif not OS.get_environment("CS_SPREAD_ASSAULT").is_empty():
+		_assault_then_capture(int(OS.get_environment("CS_SPREAD_ASSAULT")), settle)
 	elif OS.get_environment("CS_SPREAD_LOUD") == "1":
 		_pressure_then_capture()
 	else:
 		_settle_then_capture(settle)
+
+
+## CS_SPREAD_ASSAULT=1: the odds table's honest capture — the demo is
+## driven (the screen's own policy cadence, fast) until the knight floor
+## is met, then the assault odds screen opens and settles.
+## CS_SPREAD_ASSAULT=2: COMMIT goes down the real write path and the
+## capture waits for a landed beat mid-vignette (the watchable storm).
+func _assault_then_capture(mode: int, settle: float) -> void:
+	var assault := host.assault()
+	var waited_hours := 0.0
+	while not assault.floor_met(host.engine) and waited_hours < 220.0:
+		host.fast_forward(SimEngine.TICKS_PER_SIM_HOUR)
+		if demo_policy != null and demo_policy.on_ticks(SimEngine.TICKS_PER_SIM_HOUR):
+			demo_policy.apply(host)
+		waited_hours += 1.0
+	refresh_from_state()
+	print("[spread] assault capture: floor met after %.0fh (power %d, odds %d in 1000)"
+		% [waited_hours, host.units().army_power(),
+			assault.assault_odds(host.engine)["win_permille"]])
+	_assault.open(host, get_router())
+	await get_tree().process_frame
+	if mode >= 2:
+		_assault.commit()
+		if mode == 2:
+			# A landed beat mid-vignette (the watchable storm).
+			for i in 900:
+				await get_tree().process_frame
+				if _assault.current_beat_index() >= 1:
+					break
+			print("[spread] assault capture: beat %d mid-vignette (state %d)"
+				% [_assault.current_beat_index(), _assault.state])
+			for i in 20:
+				await get_tree().process_frame
+		else:
+			# The settled outcome (rout + aftermath wash, or the fall).
+			for i in 2400:
+				await get_tree().process_frame
+				if _assault.state == 4:  # OUTCOME
+					break
+			for i in 90:
+				await get_tree().process_frame
+			print("[spread] assault capture: outcome '%s' (script %s)"
+				% [String(_assault._script.get("outcome", &"")), _assault.state])
+	_settle_then_capture(0.3)
 
 
 func _pressure_then_capture() -> void:
