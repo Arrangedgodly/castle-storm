@@ -248,6 +248,31 @@ verifier re-dispatch: the production system's applied regime multipliers
 are serialized payload — `regime_quirks` in the production sub-dict — and
 hashed state, so a quirked regime can no longer silently drop on restore).
 
+Full-stack integrity suite (`tests/acceptance/suites/save_integrity_full.gd`,
+T-QA-03, 384 checks) — the definitive zero-corruption proof on the canonical
+five-system host (`_full_stack.gd`, suspicion active, catch-up anchor live):
+(1) SIX milestone round-trips on one honest deterministic session — 10h,
+mid-training (a specific timer captured mid-countdown), mid-telegraph (armed
+countdown, lockstep carries it THROUGH the landing tick), post-crackdown
+(live relief window), pre-assault (floor + odds restored, a commit whose
+verdict lands identically on both timelines), 250h (chronicle grown across
+restarts, final continuation = a REAL catch-up foreground window on the
+restored engine, twin-parity) — each through the full process shape (fresh
+SaveManager + fresh engine + loaded meta re-pointed into the run system),
+asserting `state_hash`, 64-bit rng, and meta canonical equality; (2) a REAL
+simulated format bump: the on-disk payload surgically renamed backward
+(`rng_state`→`rng_stream`, `legacy_points`→`points`) with the checksum
+honestly recomputed, loaded by a schema-v2 manager whose registered v1→v2
+migration renames forward — hash equality proves the walk; plus future-version
+refusal both as a lone slot (loud refusal, bytes quarantined) and as the
+newest of a ring (quarantine + fallback to a real prior generation); (3)
+kill-during-save chaos — 120 interleaved cycles (96 good saves + 24
+kill-mid-write crash saves, ring never advancing on a failure) against a
+rotating rogue (truncation/garbage/empty/double-truncation/future-version
+on the newest slot, orphan-temp probes): 120/120 post-rogue loads landed on
+a recorded good generation, 80 quarantines each preserving the exact corrupt
+bytes, orphan temps always swept, the meta domain never touched.
+
 Manual probes: `make save-debug` (see Makefile / `scripts/save_debug.gd`)
 — run it twice to watch a continuation from disk; truncate/empty/mangle a
 slot file under the save root and run again to watch quarantine + fallback

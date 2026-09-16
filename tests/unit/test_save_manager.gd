@@ -58,9 +58,11 @@ class KilledBeforeRenameManager extends SaveManager:
 var _dir_seq := 0
 
 
-## gdUnit4 6.2.1 has no add_cleanup hook — erase the whole scratch tree
-## once at suite end instead (each test also cleans its own dir up front).
-func after_all() -> void:
+## gdUnit4 6.2.1 suite hooks are before()/after() — there is NO before_all/
+## after_all (the T-DATA-03 note: this was an `after_all` that silently never
+## ran, leaving every scratch root behind). `after()` fires once at suite end;
+## each test also cleans its own dir up front.
+func after() -> void:
 	_erase_dir("user://cs_save_tests")
 
 
