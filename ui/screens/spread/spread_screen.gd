@@ -66,17 +66,20 @@
 ## the landed flip with its flourish), with CS_SPREAD_FAN=1 to capture
 ## an open action fan, with CS_SPREAD_INTRO=1/2 for the leader intro at
 ## reveal / mid-unfold (T-UI-05), with CS_SPREAD_RESTART=win/loss for
-## a full restart session's reveal captures, or with
+## a full restart session's reveal captures, with
 ## CS_SPREAD_SUSPICION=1/2/3 for the suspicion moments (T-UI-06: the
 ## telegraph choice card / the landed-crackdown blockquote / the crushed
 ## beat's quote over the swept table), with CS_SPREAD_CHRONICLE=1/2 for
 ## the chronicle ledger (T-UI-08: three real hands / the 50-hand ring,
-## newest + oldest pages), or with CS_SPREAD_CATCHUP=1/2/4 for the
+## newest + oldest pages), with CS_SPREAD_CATCHUP=1/2/4 for the
 ## check-in beats (T-UI-09: a mid-session away window resolved on the
 ## live table / a full process-restart resume through a real save — via
 ## =2 then =3, the short unfold + the while-you-were-away print with the
 ## foreground->actionable measurement printed / a crackdown landing
-## INSIDE the away window: the print's STRIKE row + signed seizures).
+## INSIDE the away window: the print's STRIKE row + signed seizures),
+## or with CS_SPREAD_FIRST=1/2/3 for the first-session beats (T-UI-10:
+## the empty spread + the gate hint / the assignment + build hints with
+## the focused plot card / the trickle print + the pacing report).
 extends ResponsiveScreen
 
 const RUN_HEADER_SCRIPT := preload("res://ui/screens/spread/run_header.gd")
@@ -108,6 +111,12 @@ var presenter := SpreadPresenter.new()
 var demo_policy: DemoPolicy
 var time_scale_index := 0
 
+## The first-session onboarding layer (T-UI-10): guided-by-the-world
+## nudges — printed strip cues + focus on the affordance card, once per
+## install, never for a returning player. Inert unless this boot is the
+## one true first deal (see FirstSession.arms).
+var first_session: FirstSession
+
 ## Refresh instrumentation (tests assert targeted updates, no polling).
 var stats := {
 	&"view_builds": 0, &"card_rebinds": 0, &"card_list_renders": 0, &"pip_refreshes": 0,
@@ -120,6 +129,7 @@ var stats := {
 	&"crushes_played": 0, &"eye_strikes": 0, &"ground_flashes": 0,
 	&"chronicles_opened": 0, &"chronicles_closed": 0,
 	&"catch_up_prints": 0, &"quiet_lines": 0,
+	&"first_nudges": 0, &"first_focuses": 0,
 }
 
 ## The leader intro / restart reveal (T-UI-05): ON at boot, from the
@@ -189,6 +199,12 @@ func _ready() -> void:
 	get_viewport().size_changed.connect(_on_layout_changed)
 	get_router().orientation_changed.connect(func(_o: int) -> void: _on_layout_changed())
 	_build_debug_chip()
+	# THE FIRST SESSION (T-UI-10): arm the once-only nudge layer on the
+	# one true first deal — the fresh boot's "seen" flag persists here,
+	# so every later boot of this install (resume, restart, new hand) is
+	# nudge-free by construction.
+	first_session = FirstSession.new()
+	first_session.begin(host)
 	# DEFERRED: the slots lay themselves out via a deferred call at their
 	# own _ready (queued before this one), so the first bind must land
 	# AFTER settled slot rects — column ladders and the Eye's perch read
@@ -312,6 +328,15 @@ func _on_event(event: Dictionary) -> void:
 	if row != null:
 		presenter.push_row(row)
 		_bind_chronicle()
+	# The first-session beat (T-UI-10) runs BEFORE the targeted rebinds
+	# so run-boundary events reach the layer even on the "full" path
+	# (graduation); the ROW prints now (newest strip line — the row was
+	# already pushed above), while the FOCUS nudge defers to the end of
+	# the frame so the event's own card rebinds exist first.
+	if first_session != null:
+		var nudge: Dictionary = first_session.on_event(event, host)
+		if not nudge.is_empty():
+			_deliver_nudge(nudge)
 	_on_suspicion_event(event)
 	# A run ENDED by failure (the suspicion crush; the thin abort): the
 	# CRUSHED BEAT plays first when the death was a real crush (the table
@@ -427,12 +452,62 @@ func _on_ticks(ticks: int) -> void:
 	_bind_pips()
 	_rebind_training_cards()
 	_bind_phase()
+	# The first-session per-batch beats (T-UI-10): the build-order choice
+	# (affordability is state, not an event) and the trickle watch
+	# (production settles silently — the same channel the pips ride).
+	if first_session != null:
+		var nudge: Dictionary = first_session.on_ticks(host)
+		if not nudge.is_empty():
+			_deliver_nudge(nudge)
 	if demo_policy != null and demo_policy.on_ticks(ticks):
 		demo_policy.apply(host)
 
 
-# --- the assault vignette (T-UI-07) -------------------------------------------------------
+# --- the first-session nudges (T-UI-10) ----------------------------------------------------
 
+
+## One first-session beat landed: the hint prints as a strip row (the
+## world's own paper — it blocks nothing and scrolls away as the world
+## keeps printing), and the focus nudge moves focus to the beat's
+## affordance card when the table owns input — the highlight IS the
+## focus ring, the same ring pad/keyboard play sees (input parity by
+## construction). Paper politeness: never steal focus while a fan is
+## open or story paper (choice card, vignette, reveal, quote) is up.
+func _deliver_nudge(nudge: Dictionary) -> void:
+	stats[&"first_nudges"] += 1
+	presenter.push_row(nudge["row"])
+	_bind_chronicle()
+	var focus_id := String(nudge.get("focus", ""))
+	if focus_id.is_empty():
+		return
+	# DEFERRED: the beat's own card rebinds land later in this same event
+	# drain (the arrival creates the offer card on the "cards" target);
+	# the focus nudge lands once the paper exists.
+	_apply_nudge_focus.call_deferred(focus_id)
+
+
+## The focus half of a nudge (deferred past the event's rebinds): parks
+## focus on the beat's affordance card when the table owns input — the
+## highlight IS the focus ring, the same ring pad/keyboard play sees
+## (input parity by construction). Paper politeness: never steal focus
+## while a fan is open or story paper (choice card, vignette, reveal,
+## quote) is up.
+func _apply_nudge_focus(focus_id: String) -> void:
+	if _fan != null and _fan.is_open():
+		return
+	if _assault != null and _assault.is_open():
+		return
+	if _intro != null and _intro.is_open():
+		return
+	if _suspicion != null and (_suspicion.choice_is_open() or _suspicion.quote_is_open()):
+		return
+	var node := _card_node_in(get_active_slot() as OrientationSlot, focus_id)
+	if node != null:
+		stats[&"first_focuses"] += 1
+		node.grab_focus()
+
+
+# --- the assault vignette (T-UI-07) -------------------------------------------------------
 
 ## Build the assault screen ONCE (paper over the table while open — the
 ## same composition rule as the fan; it is never modal chrome).
@@ -1491,6 +1566,8 @@ func _capture_hook() -> void:
 		_suspicion_then_capture(int(OS.get_environment("CS_SPREAD_SUSPICION")), settle)
 	elif not OS.get_environment("CS_SPREAD_CHRONICLE").is_empty():
 		_chronicle_then_capture(int(OS.get_environment("CS_SPREAD_CHRONICLE")), settle)
+	elif not OS.get_environment("CS_SPREAD_FIRST").is_empty():
+		_first_session_then_capture(int(OS.get_environment("CS_SPREAD_FIRST")), settle)
 	elif not OS.get_environment("CS_SPREAD_CATCHUP").is_empty():
 		_catch_up_then_capture(int(OS.get_environment("CS_SPREAD_CATCHUP")), settle)
 	elif OS.get_environment("CS_SPREAD_LOUD") == "1":
@@ -1585,6 +1662,114 @@ func _suspicion_then_capture(mode: int, settle: float) -> void:
 		get_tree().quit(0)
 		return
 	_settle_then_capture(settle if settle > 0.0 else 0.4)
+
+
+## CS_SPREAD_FIRST=1/2/3 (T-UI-10): the first session played as the
+## PLAYER would (the demo policy is disabled for the drive — the hook
+## submits the sensible first moves itself, through the host's write
+## path). The world idles at 1x (the wall clock barely moves the sim)
+## while the drive steps the session with fast_forward — the honest
+## accel: every beat's tick is printed as its 1x wall-minute projection.
+## =1 the EMPTY SPREAD + the first gate hint at the arrival;
+## =2 the assignment + build-order hints (focus parked on the plot
+## card); =3 the full arc through the TRICKLE print and on to the
+## trainee hop, with the honest pacing report printed for the log.
+func _first_session_then_capture(mode: int, settle: float) -> void:
+	host.time_scale = 1.0  # the wall clock is scenery here; ffwd drives
+	time_scale_index = 0
+	demo_policy = null  # the player's session — no autopilot
+	# A player opens the game before they play it: the boot reveal folds
+	# before the drive acts.
+	for i in 240:
+		await get_tree().process_frame
+		if _intro != null and _intro.is_open():
+			break
+	if _intro != null and _intro.is_open():
+		_intro.unfold()
+		for i in 300:
+			await get_tree().process_frame
+			if not _intro.is_open():
+				break
+	var beat := {"empty_spread_cards": (_view.get("cards", []) as Array).size()}
+	# Moment 1: the first arrival — the gate hint prints, focus parks on
+	# the offer card (the highlight is the focus ring, never a mascot).
+	while int(stats[&"first_nudges"]) < 1 and host.engine.tick_count < 60:
+		host.fast_forward(1)
+	await get_tree().process_frame
+	beat["gate_tick"] = host.engine.tick_count
+	_print_first_session_state("gate hint", beat["gate_tick"])
+	if mode == 1:
+		_settle_then_capture(settle if settle > 0.0 else 0.4)
+		return
+	# The player answers the gate; the role choice prints, and the
+	# build-order hint lands on the next batch (affordability check).
+	host.submit(&"recruit_accept", &"", int(host.units().offer_ids()[0]))
+	while int(stats[&"first_nudges"]) < 3 and host.engine.tick_count < 80:
+		host.fast_forward(1)
+	await get_tree().process_frame
+	beat["assign_tick"] = beat["gate_tick"] + 1
+	beat["build_tick"] = host.engine.tick_count
+	_print_first_session_state("assign + build hints", beat["build_tick"])
+	var focus := get_viewport().gui_get_focus_owner()
+	print("[spread] first-session focus after the build hint: %s (plot card: %s)"
+		% [str(focus != null), str(focus != null
+			and focus.has_meta(&"spread_card_id")
+			and String(focus.get_meta(&"spread_card_id")).begins_with("bld_"))])
+	if mode == 2:
+		_settle_then_capture(settle if settle > 0.0 else 0.4)
+		return
+	# The sensible path continues: put them to work, raise the farm,
+	# lend the hand the moment the pool has one, and wait for the
+	# trickle — MOMENT 3, captured as the print lands.
+	var idle: Array = host.units().idle_units(host.units().base_unit_id())
+	if not idle.is_empty():
+		host.submit(&"assign_role", &"worker", int(idle[0]))
+	host.submit(&"upgrade_building", &"farm", 1)
+	var waited := 0
+	while int(stats[&"first_nudges"]) < 4 and waited < 120:
+		waited += 1
+		if host.production().idle_workers() > 0:
+			host.submit(&"assign_worker", &"farm", 1)
+		host.fast_forward(1)
+	await get_tree().process_frame
+	beat["trickle_tick"] = host.engine.tick_count if int(stats[&"first_nudges"]) >= 4 else -1
+	_print_first_session_state("trickle print", beat["trickle_tick"])
+	_capture_now("trickle")
+	# The session plays on to the arc's end: the second body drills the
+	# moment it stands idle, and the trainee hop is queued when the
+	# drills complete (2h — the idle cadence, reported honestly).
+	var worked_uid := -1
+	if not idle.is_empty():
+		worked_uid = int(idle[0])
+	var queued := false
+	while not queued and host.engine.tick_count < 600:
+		host.fast_forward(1)
+		for uid in host.units().offer_ids():
+			host.submit(&"recruit_accept", &"", int(uid))
+		for body in host.units().idle_units(host.units().base_unit_id()):
+			if int(body) == worked_uid:
+				continue
+			host.submit(&"assign_role", &"militia", int(body))
+		for body in host.units().idle_units(&"militia"):
+			host.submit(&"start_training", &"trainee", int(body))
+			queued = true
+	beat["trainee_tick"] = host.engine.tick_count
+	host.fast_forward(1)  # drain the queued hop so the report sees its print
+	await get_tree().process_frame
+	_print_first_session_state("trainee queued", beat["trainee_tick"])
+	print("[spread] FIRST-SESSION PACING (sim ticks == wall minutes at 1x): %s"
+		% str(beat))
+	print("[spread]   choice arc (gate answered, role chosen, plot raised) done by minute %d"
+		% int(beat["build_tick"]))
+	for row: Dictionary in presenter.chronicle_strip():
+		print("[spread]   strip: %s" % String(row["text"]))
+	get_tree().quit(0)
+
+
+func _print_first_session_state(label: String, tick: int) -> void:
+	print("[spread] first-session %s at tick %d (minute %d at 1x) — nudges %d, flags %s"
+		% [label, tick, tick, int(stats[&"first_nudges"]),
+			str(host.meta.first_session)])
 
 
 ## CS_SPREAD_CATCHUP=1 (T-UI-09): the MID-SESSION print — the demo runs

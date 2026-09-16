@@ -296,6 +296,22 @@ const DEFAULTS: Dictionary = {
 	&"chronicle_empty_2": [
 		"The first hand is still on the table.",
 	],
+	# --- the first session's printed cues (FirstSession, T-UI-10) ---
+	&"first_gate": [
+		"New paper at the gate — touch {name}'s card to answer.",
+	],
+	&"first_assign": [
+		"Idle hands, honest work — touch {name}'s card: chores or drills.",
+	],
+	&"first_build": [
+		"The stipend buys foundations — raise the {building}.",
+	],
+	&"first_trickle": [
+		"The stores tally the first {resource}: +{amount}.",
+	],
+	&"first_train": [
+		"{name} joins the drill line — the conspiracy counts soldiers.",
+	],
 }
 
 
@@ -391,6 +407,11 @@ const CONSUMERS: Dictionary = {
 	&"assault_loss_note": "assault outcome block — AssaultPresenter.outcome_rows",
 	&"chronicle_empty_1": "chronicle empty page — ChroniclePresenter",
 	&"chronicle_empty_2": "chronicle empty page — ChroniclePresenter",
+	&"first_gate": "first-session strip hint (the gate) — FirstSession",
+	&"first_assign": "first-session strip hint (the role fan) — FirstSession",
+	&"first_build": "first-session strip hint (the build order) — FirstSession",
+	&"first_trickle": "first-session strip line (the first produce) — FirstSession",
+	&"first_train": "first-session strip line (the drill line) — FirstSession",
 }
 
 

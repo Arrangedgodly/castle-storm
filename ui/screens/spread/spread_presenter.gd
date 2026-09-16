@@ -68,11 +68,13 @@ static func build_view(host: GameHost) -> Dictionary:
 	# The estate in arrival order (roster order is the chronicle's key).
 	for uid in units.unit_ids():
 		cards.append(unit_card_view(host, pack, uid))
-	# The buildings last, pack order (the estate's fixed furniture).
+	# The buildings last, pack order (the estate's fixed furniture) —
+	# UNBUILT buildings stake their plots too (T-UI-10): the empty spread
+	# carries the build-order menu as paper on the table, and the card
+	# id survives the raise (the plot becomes the building in place).
 	for building: BuildingDef in pack.buildings:
-		var level: int = production.building_level(building.id)
-		if level > 0:
-			cards.append(_building_card(production, building, level))
+		cards.append(_building_card(production, building,
+			production.building_level(building.id)))
 	# The regime's second ink hairlines every card on the table (one
 	# content-driven recolor pass — a regime swap re-inks the spread).
 	for card in cards:
@@ -118,11 +120,10 @@ static func cards_view(host: GameHost) -> Array[Dictionary]:
 		card["regime_id"] = regime_id
 		cards.append(card)
 	for building: BuildingDef in pack.buildings:
-		var level: int = production.building_level(building.id)
-		if level > 0:
-			var card := _building_card(production, building, level)
-			card["regime_id"] = regime_id
-			cards.append(card)
+		var card := _building_card(production, building,
+			production.building_level(building.id))
+		card["regime_id"] = regime_id
+		cards.append(card)
 	return cards
 
 
@@ -235,16 +236,25 @@ static func unit_card_view(host: GameHost, pack: ContentPack, uid: int) -> Dicti
 
 
 static func _building_card(production: ProductionSystem, building: BuildingDef, level: int) -> Dictionary:
+	# Level 0 = the STAKED PLOT (T-UI-10): the build-order choice as a
+	# card on the table — dashed edge (queued paper), the "Raise it" verb
+	# in its fan when the pool can pay. Same card id as the built card,
+	# so raising it rebinds the paper in place instead of re-dealing.
+	var role := "level %d · %d/%d workers" % [
+		level, production.assigned_workers(building.id), production.worker_slots(building.id)]
+	var edge := &"ready"
+	if level < 1:
+		role = "staked plot — unbuilt"
+		edge = &"queued"
 	return {
 		"id": "bld_%s" % String(building.id),
 		"uid": 0,
 		"kind": &"building",
 		"building_id": String(building.id),
 		"name": building.display_name,
-		"role": "level %d · %d/%d workers" % [
-			level, production.assigned_workers(building.id), production.worker_slots(building.id)],
+		"role": role,
 		"face_key": building.icon_id,
-		"edge_state": &"ready",
+		"edge_state": edge,
 		"misprint_seed": absi(String(building.id).hash() % 9973),
 	}
 

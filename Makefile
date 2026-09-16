@@ -82,6 +82,11 @@ run-responsive:
 #                                                               # foreground->actionable wall measurement
 #   CS_SPREAD_SHOT=/p.png CS_SPREAD_CATCHUP=4 make run-game    # crackdown landing INSIDE the away window — the print's STRIKE
 #                                                               # row + the signed seizure losses, from a real resolved window
+#   CS_SPREAD_SHOT=/p.png CS_SPREAD_FIRST=1 make run-game      # the first session, moment 1: the EMPTY SPREAD (staked plots)
+#                                                               # + the first gate hint at the 7-minute arrival (T-UI-10)
+#   CS_SPREAD_SHOT=/p.png CS_SPREAD_FIRST=2 make run-game      # moment 2: the assignment + build-order hints, focus on the plot
+#   CS_SPREAD_SHOT=/p.png CS_SPREAD_FIRST=3 make run-game      # moment 3: the arc to the TRICKLE print + the honest pacing
+#                                                               # report (each beat's sim tick = wall minute at 1x)
 run-game:
 	$(GODOT_BIN) --path . res://ui/screens/spread/spread_screen.tscn
 

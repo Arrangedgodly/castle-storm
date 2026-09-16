@@ -1,9 +1,10 @@
 ## Meta-progression bank reserve (T-SIM-04) — the data structure only.
 ##
 ## Owns everything that must SURVIVE a restart: the legacy-points bank
-## (town-hall: failure banks FULL progress — every run, win or loss, accrues)
-## and the chronicle, the append-only record of past runs (leader, regime,
-## outcome, duration, army stats) that T-UI-08 lists as spread history.
+## (town-hall: failure banks FULL progress — every run, win or loss, accrues),
+## the chronicle, the append-only record of past runs (leader, regime,
+## outcome, duration, army stats) that T-UI-08 lists as spread history,
+## and the first-session onboarding flags (T-UI-10 — once-only nudges).
 ## No spending yet — Layer 1's unlock tree is a post-MVP phase by the
 ## Ant-Man layer gate; at MVP the reserve only accumulates.
 ##
@@ -45,17 +46,47 @@ var chronicle: Array[Dictionary] = []
 ## which is exactly right.
 var last_seen_epoch := 0
 
+## First-session onboarding state (T-UI-10): beat-key -> true, once.
+## "seen" marks THE one true first session (a returning player — flag
+## set — is never nudged again, whatever became of the arc); the beat
+## keys ("gate", "assign", "build", "trickle", "train") mark their
+## printed nudges (each appears once, ever); "done" graduates the layer
+## (arc complete or the run ended — nothing prints after). Lives in the
+## META domain because the arc must survive engine rebuilds and process
+## restarts. Additive-optional key (save-schema §5): pre-feature metas
+## lack it and read back as {} — nobody is nudged, which is right.
+var first_session := {}
+
+
+## True when the beat's flag is set (never-printed beats read false).
+func first_session_flag(key: StringName) -> bool:
+	return bool(first_session.get(String(key), false))
+
+
+## Sets a beat flag. Returns true when it FLIPPED false→true — the
+## once-only edge callers gate their single print on.
+func set_first_session_flag(key: StringName) -> bool:
+	var k := String(key)
+	if bool(first_session.get(k, false)):
+		return false
+	first_session[k] = true
+	return true
+
 
 func to_dict() -> Dictionary:
 	var entries: Array[Dictionary] = []
 	for entry in chronicle:
 		entries.append(entry.duplicate(true))
+	var session := {}
+	for key in first_session.keys():
+		session[key] = first_session[key]
 	return {
 		"format_version": META_FORMAT_VERSION,
 		"legacy_points": legacy_points,
 		"runs_recorded": runs_recorded,
 		"chronicle": entries,
 		"last_seen_epoch": last_seen_epoch,
+		"first_session": session,
 	}
 
 
@@ -75,6 +106,11 @@ func apply_dict(state: Dictionary) -> bool:
 	# Tolerant read (additive-optional, docs/save-schema.md §5): a pre-T-SIM-07
 	# meta has no anchor — the first-launch sentinel, never a refusal.
 	last_seen_epoch = int(state.get("last_seen_epoch", 0))
+	# Same discipline for the T-UI-10 first-session state: a pre-feature
+	# meta has no block — {} is the honest read (no beat ever printed).
+	first_session = {}
+	for key in state.get("first_session", {}).keys():
+		first_session[key] = bool(state["first_session"][key])
 	chronicle.clear()
 	for entry in state.get("chronicle", []):
 		chronicle.append(entry)

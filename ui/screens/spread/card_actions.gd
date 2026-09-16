@@ -19,6 +19,8 @@
 ##                      PROMOTE (promote), the signature action
 ##   building        -> upgrade (upgrade_building) / lend a hand (assign_worker) /
 ##                      stand down (unassign_worker)
+##   staked plot     -> raise it (upgrade_building 0->1 — the build-order choice,
+##   (level 0)          T-UI-10; struck with the shortfall when unpayable)
 ##
 ## DISABLED ACTIONS STAY VISIBLE: {enabled: false, reason: "..."} — the fan
 ## renders them struck (line form, never hue) and activating one prints a
@@ -126,12 +128,21 @@ static func gear_actions(host: GameHost, uid: int) -> Array[Dictionary]:
 
 
 ## Buildings: growth + staffing (docs/sim-engine.md §10 command table).
+## A level-0 building is a STAKED PLOT (T-UI-10): its one verb is the
+## raise (upgrade_building 0→1 constructs at base_cost) — the build-order
+## choice as a card on the table, struck with the shortfall when the
+## pool cannot pay it yet (disabled-but-visible, the fan's grammar).
 static func building_actions(host: GameHost, card: Dictionary) -> Array[Dictionary]:
 	var production := host.production()
 	var building_id := StringName(String(card["building_id"]))
 	var def := _building(host, building_id)
-	if def == null or production.building_level(building_id) < 1:
+	if def == null:
 		return []
+	if production.building_level(building_id) < 1:
+		var raise_shortfall := _shortfall(host, production.upgrade_cost(building_id))
+		return [_action("build", "Raise the %s" % def.display_name,
+			&"upgrade_building", building_id, 0,
+			raise_shortfall.is_empty(), _shortfall_reason(raise_shortfall))]
 	var actions: Array[Dictionary] = []
 	# Upgrade — the growth verb; reasons mirror upgrade_denied's gates.
 	var level: int = production.building_level(building_id)

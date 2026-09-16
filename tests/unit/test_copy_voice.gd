@@ -89,6 +89,10 @@ const KEY_BUDGETS: Dictionary = {
 	&"assault_denied": STRIP_BUDGET, &"catch_up_clock_rewound": STRIP_BUDGET,
 	&"clerk_denied": STRIP_BUDGET, &"command_rejected": STRIP_BUDGET,
 	&"gate_thinned": STRIP_BUDGET, &"cards_kept_close": STRIP_BUDGET,
+	# the first session's printed cues (T-UI-10) — strip rows
+	&"first_gate": STRIP_BUDGET, &"first_assign": STRIP_BUDGET,
+	&"first_build": STRIP_BUDGET, &"first_trickle": STRIP_BUDGET,
+	&"first_train": STRIP_BUDGET,
 }
 
 
@@ -239,7 +243,7 @@ func _worst_case_params() -> Dictionary:
 		"stores": "+9999 food, +9999 timber, +9999 iron",
 		"hours": 127, "count": 999, "points": 1999, "level": 25,
 		"before": 100, "after": 100, "power": 150, "reason": 9,
-		"verb": "were", "hands": "12 hands",
+		"verb": "were", "hands": "12 hands", "amount": 999,
 	}
 
 

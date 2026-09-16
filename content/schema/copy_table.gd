@@ -141,6 +141,12 @@ const KEY_TOKENS: Dictionary = {
 	# --- the chronicle screen's empty page (ChroniclePresenter) ---
 	&"chronicle_empty_1": [],
 	&"chronicle_empty_2": [],
+	# --- the first session's printed cues (FirstSession, T-UI-10) ---
+	&"first_gate": [&"name"],
+	&"first_assign": [&"name"],
+	&"first_build": [&"building"],
+	&"first_trickle": [&"amount", &"resource"],
+	&"first_train": [&"name"],
 }
 
 ## Automated register floor: whole WORDS that BREAK the voice (modern
