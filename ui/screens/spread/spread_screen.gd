@@ -58,7 +58,9 @@
 ## a full restart session's reveal captures, or with
 ## CS_SPREAD_SUSPICION=1/2/3 for the suspicion moments (T-UI-06: the
 ## telegraph choice card / the landed-crackdown blockquote / the crushed
-## beat's quote over the swept table).
+## beat's quote over the swept table), with CS_SPREAD_CHRONICLE=1/2 for
+## the chronicle ledger (T-UI-08: three real hands / the 50-hand ring,
+## newest + oldest pages).
 extends ResponsiveScreen
 
 const RUN_HEADER_SCRIPT := preload("res://ui/screens/spread/run_header.gd")
@@ -69,6 +71,8 @@ const AssaultScreenScript := preload("res://ui/screens/assault/assault_screen.gd
 const ASSAULT_SCENE := preload("res://ui/screens/assault/assault_screen.tscn")
 const IntroScreenScript := preload("res://ui/screens/intro/intro_screen.gd")
 const INTRO_SCENE := preload("res://ui/screens/intro/intro_screen.tscn")
+const ChronicleScreenScript := preload("res://ui/screens/chronicle/chronicle_screen.gd")
+const CHRONICLE_SCENE := preload("res://ui/screens/chronicle/chronicle_screen.tscn")
 
 ## Default demo seed (deterministic identity + arrival draw; override
 ## with CS_SEED).
@@ -98,6 +102,7 @@ var stats := {
 	&"intros_opened": 0, &"intros_unfolded": 0,
 	&"choice_cards": 0, &"choices_made": 0, &"quotes_printed": 0,
 	&"crushes_played": 0, &"eye_strikes": 0, &"ground_flashes": 0,
+	&"chronicles_opened": 0, &"chronicles_closed": 0,
 }
 
 ## The leader intro / restart reveal (T-UI-05): ON at boot, from the
@@ -112,6 +117,7 @@ var _fan: ActionFan
 var _suspicion: SuspicionEvents
 var _assault: AssaultScreenScript
 var _intro: IntroScreenScript
+var _chronicle: ChronicleScreenScript
 var _pre_assault_focus: Control
 ## A run ended WHILE the vignette was open (the edge crush): the intro
 ## mounts after the vignette closes — paper never stacks on paper. When
@@ -151,6 +157,7 @@ func _ready() -> void:
 	_build_suspicion_layer()
 	_build_assault_screen()
 	_build_intro_screen()
+	_build_chronicle_screen()
 	host.event_observed.connect(_on_event)
 	host.sim_advanced.connect(_on_ticks)
 	host.run_state_changed.connect(func(_running: bool) -> void: refresh_from_state())
@@ -404,6 +411,51 @@ func _build_intro_screen() -> void:
 	_intro.closed.connect(_on_intro_closed)
 
 
+## Build the chronicle screen ONCE, TOPMOST paper (T-UI-08): the ledger
+## of past spreads. It never stacks with story paper — every story
+## layer (choice card, vignette, beat, reveal) closes it FIRST (the
+## story outranks the ledger; the ledger reopens from the header chip).
+func _build_chronicle_screen() -> void:
+	_chronicle = CHRONICLE_SCENE.instantiate()
+	_chronicle.name = "ChronicleScreen"
+	add_child(_chronicle)
+	_chronicle.closed.connect(_on_chronicle_closed)
+
+
+## Open the chronicle ledger (the header chip's verb): the run header's
+## chronicle affordance, in world grammar. Focus is remembered so
+## closing returns the pad player to the chip that opened it.
+func open_chronicle() -> void:
+	if _chronicle == null:
+		return
+	stats[&"chronicles_opened"] += 1
+	close_fan()
+	_chronicle.open(host, get_router())
+
+
+## The ledger folded away: focus returns to the chronicle chip on the
+## active slot's header strip (the affordance that opened it).
+func _on_chronicle_closed() -> void:
+	stats[&"chronicles_closed"] += 1
+	var active := get_active_slot() as OrientationSlot
+	if active == null:
+		return
+	var strip := active.get_header()
+	if strip != null and strip.get_child_count() > 1:
+		var chip := strip.get_child(1) as Control
+		if chip != null:
+			chip.grab_focus()
+			return
+	_focus_first_card()
+
+
+## Story paper outranks the ledger: fold the chronicle before a story
+## layer opens over it (choice card, vignette, crush beat, reveal).
+func _close_chronicle() -> void:
+	if _chronicle != null and _chronicle.is_open():
+		_chronicle.close()
+
+
 ## Open the assault odds table (the army card's storm action, or the
 ## capture hook). Focus is remembered so closing returns the pad player
 ## to the card that raised the standard.
@@ -413,6 +465,7 @@ func open_assault() -> void:
 	stats[&"assaults_opened"] += 1
 	_pre_assault_focus = get_viewport().gui_get_focus_owner()
 	close_fan()
+	_close_chronicle()
 	_assault.open(host, get_router())
 
 
@@ -482,6 +535,7 @@ func _open_intro(p_variant: StringName = &"") -> void:
 		return
 	if _suspicion != null:
 		_suspicion.fold_quote()  # the reveal is the paper now
+	_close_chronicle()  # the reveal papers over the ledger too
 	stats[&"intros_opened"] += 1
 	_intro.open(host, get_router(), p_variant)
 
@@ -640,6 +694,7 @@ func _open_suspicion_choice(event: Dictionary) -> void:
 	if _suspicion == null or not host.is_run_running():
 		return
 	stats[&"choice_cards"] += 1
+	_close_chronicle()  # the choice card is live story — the ledger folds
 	_suspicion.open_choice(SuspicionEvents.choice_card_for(host, event), _design_bounds().size)
 	# Focus seeding is polite: never steal from an open fan or over paper
 	# (the vignette/intro own input while they are up).
@@ -764,6 +819,7 @@ func _start_crush_beat() -> void:
 		return
 	stats[&"crushes_played"] += 1
 	close_fan()
+	_close_chronicle()  # the beat owns the table
 	_table_frozen = true
 	var cards: Array[Control] = []
 	for slot: OrientationSlot in [get_portrait_slot(), get_landscape_slot()]:
@@ -1076,6 +1132,23 @@ func _bind_header() -> void:
 			slot.layout_topology()
 		header.bind(_view["leader"], _view["sim_hours"], _view["army_power"],
 			Inks.ground_for(_view["leader"]["regime_id"], _view["phase"]))
+		# THE CHRONICLE AFFORDANCE (T-UI-08): the ledger chip at the
+		# letterhead's right end — the same ActionChip grammar as every
+		# verb, one per slot (the router's focus_id equivalence carries
+		# the pad player's place across orientation swaps).
+		var chip := strip.get_child(1) if strip.get_child_count() > 1 else null
+		if chip == null:
+			var ledger := ActionFan.ActionChip.new()
+			ledger.action = {
+				"id": "chronicle", "label": "The Chronicle", "command": &"",
+				"subject": &"", "value": 0, "enabled": true, "reason": "",
+				"signature": false,
+			}
+			ledger.custom_minimum_size = Vector2(172.0, float(Inks.TOUCH_GRIP_MIN))
+			ledger.set_meta(&"focus_id", "chronicle_chip")
+			ledger.pressed.connect(open_chronicle)
+			strip.add_child(ledger)
+			slot.layout_topology()
 
 
 ## Ground tone by run phase (regime ink + phase depth) in both slots.
@@ -1311,6 +1384,8 @@ func _capture_hook() -> void:
 		_assault_then_capture(int(OS.get_environment("CS_SPREAD_ASSAULT")), settle)
 	elif not OS.get_environment("CS_SPREAD_SUSPICION").is_empty():
 		_suspicion_then_capture(int(OS.get_environment("CS_SPREAD_SUSPICION")), settle)
+	elif not OS.get_environment("CS_SPREAD_CHRONICLE").is_empty():
+		_chronicle_then_capture(int(OS.get_environment("CS_SPREAD_CHRONICLE")), settle)
 	elif OS.get_environment("CS_SPREAD_LOUD") == "1":
 		_pressure_then_capture()
 	else:
@@ -1403,6 +1478,81 @@ func _suspicion_then_capture(mode: int, settle: float) -> void:
 		get_tree().quit(0)
 		return
 	_settle_then_capture(settle if settle > 0.0 else 0.4)
+
+
+## CS_SPREAD_CHRONICLE=1: the ledger (T-UI-08) over a FEW real hands —
+## three policy-driven runs end through the REAL verbs (win / loss /
+## abort), the new hand is dealt, and the chronicle opens from the header
+## chip's verb; capture at CS_SPREAD_SHOT (the newest page, the live-hand
+## strip, the seals). =2: the ring after MANY hands — 50 real runs with
+## varied durations and all three outcomes, captured at the newest page
+## AND the ring's far end (.old.png) with the page chips' states.
+func _chronicle_then_capture(mode: int, settle: float) -> void:
+	# The drive ends runs; the spread would mount the loss reveal on each
+	# ending (its documented role) — disabled for the drive (sibling-suite
+	# pattern), restored after: the capture shows the LEDGER, not paper
+	# stacking on paper.
+	var intro_was_enabled := intro_enabled
+	intro_enabled = false
+	if _intro != null and _intro.is_open():
+		_intro.unfold()
+		for i in 300:
+			await get_tree().process_frame
+			if not _intro.is_open():
+				break
+	var hands := 3 if mode == 1 else 50
+	for i in hands:
+		var hours := 14.0 + float((i * 7) % 23)
+		var waited := 0.0
+		while waited < hours and host.is_run_running():
+			host.fast_forward(SimEngine.TICKS_PER_SIM_HOUR)
+			if demo_policy != null and demo_policy.on_ticks(SimEngine.TICKS_PER_SIM_HOUR):
+				demo_policy.apply(host)
+			waited += 1.0
+		match i % 3:
+			0:
+				# The early hand aborts (short, no army yet — honest), the
+				# later hands lose and win with the army the policy built.
+				host.submit(&"run_abort")
+			1:
+				# -1 = the LIVE army power (the real failure paths' shape —
+				# a forced 0 would print "power 0" beside a real roster).
+				host.submit(&"resolve_victory", &"loss", -1)
+			_:
+				host.submit(&"resolve_victory", &"win", host.units().army_power())
+		host.fast_forward(2)
+		if not host.is_run_running():
+			host.restart_run()
+			host.advance_ticks(1)
+	intro_enabled = intro_was_enabled
+	# The live hand plays on a few hours (a 0h live strip reads as a
+	# placeholder; the real check-in is mid-hand).
+	host.fast_forward(3 * SimEngine.TICKS_PER_SIM_HOUR)
+	refresh_from_state()
+	var chronicle := host.meta.chronicle
+	var last: Dictionary = chronicle[chronicle.size() - 1] if not chronicle.is_empty() else {}
+	_chronicle.open(host, get_router())
+	print("[spread] chronicle capture mode %d: %d hands recorded, bank %d, per-page %d, last hand %s (%s)"
+		% [mode, host.meta.runs_recorded, host.meta.legacy_points, int(_chronicle.view()["per_page"]),
+			String(last.get("leader", "-")), String(last.get("outcome", "-"))])
+	for entry: Dictionary in _chronicle.view()["entries"]:
+		print("[spread]   hand %d %s — %s %s, %s, %s"
+			% [int(entry["run"]), String(entry["leader"]), String(entry["seal"]["mark"]),
+				String(entry["duration_line"]), String(entry["army_line"]),
+				"banked %d" % int(entry["score"])])
+	for i in maxi(3, int(settle * 60.0)):
+		await get_tree().process_frame
+	_capture_now("chronicle newest page")
+	if mode == 2:
+		while _chronicle.page + 1 < int(_chronicle.view()["page_count"]):
+			_chronicle.turn_page(1)
+		for i in 20:
+			await get_tree().process_frame
+		print("[spread] chronicle capture: oldest page %d/%d, entries %d"
+			% [_chronicle.page + 1, int(_chronicle.view()["page_count"]),
+				(_chronicle.view()["entries"] as Array).size()])
+		_capture_now("chronicle oldest page", ".old")
+	get_tree().quit(0)
 
 
 ## CS_SPREAD_ASSAULT=1: the odds table's honest capture — the demo is

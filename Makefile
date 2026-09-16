@@ -72,6 +72,8 @@ run-responsive:
 #   CS_SPREAD_SHOT=/p.png CS_SPREAD_SUSPICION=1 make run-game  # the telegraph CHOICE CARD (T-UI-06)
 #   CS_SPREAD_SHOT=/p.png CS_SPREAD_SUSPICION=2 make run-game  # the landed-crackdown BLOCKQUOTE
 #   CS_SPREAD_SHOT=/p.png CS_SPREAD_SUSPICION=3 make run-game  # the CRUSHED beat over the swept table
+#   CS_SPREAD_SHOT=/p.png CS_SPREAD_CHRONICLE=1 make run-game  # the ledger over three real hands (T-UI-08)
+#   CS_SPREAD_SHOT=/p.png CS_SPREAD_CHRONICLE=2 make run-game  # the 50-hand ring, newest + oldest (.old.png) pages
 run-game:
 	$(GODOT_BIN) --path . res://ui/screens/spread/spread_screen.tscn
 
