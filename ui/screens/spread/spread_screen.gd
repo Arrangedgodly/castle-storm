@@ -32,16 +32,24 @@
 ## in both slots (the router restores place across swaps); every
 ## interactive card keeps the 48-unit grip. `debug_fast_forward` cycles
 ## the demo's time scale (1x -> 60x -> 600x); `pause` freezes the world
-## through the host seam. Card interactions themselves are T-UI-04's;
-## this screen is the live table they will act on.
+## through the host seam. CARD INTERACTIONS (T-UI-04) live on this table:
+## pressing a focused card or tapping one fans its contextual actions
+## (CardActions -> ActionFan); the PROMOTE action's command, when it
+## lands, turns the trainee card over — CardFrame.play_promotion_flip,
+## the signature moment — and cards that join a live table deal in with
+## the slide-and-settle entrance (CardMotion).
 ##
 ## Dev inspection hook (not a game path): CS_SPREAD_SHOT=/path.png renders
 ## for a settling window and saves one capture, then quits; pair with
-## CS_SPREAD_LOUD=1 for the pressured state (see _capture_hook).
+## CS_SPREAD_LOUD=1 for the pressured state (see _capture_hook), with
+## CS_SPREAD_PROMOTE=1 to capture THE PROMOTE MOMENT mid-flip (or =2 for
+## the landed flip with its flourish), or with CS_SPREAD_FAN=1 to capture
+## an open action fan.
 extends ResponsiveScreen
 
 const RUN_HEADER_SCRIPT := preload("res://ui/screens/spread/run_header.gd")
 const WATCHFUL_EYE_SCRIPT := preload("res://ui/screens/spread/watchful_eye.gd")
+const ACTION_FAN_SCRIPT := preload("res://ui/screens/spread/action_fan.gd")
 
 ## Default demo seed (deterministic identity + arrival draw; override
 ## with CS_SEED).
@@ -65,10 +73,18 @@ var time_scale_index := 0
 var stats := {
 	&"view_builds": 0, &"card_rebinds": 0, &"card_list_renders": 0, &"pip_refreshes": 0,
 	&"eye_binds": 0, &"header_binds": 0, &"phase_binds": 0, &"chronicle_prints": 0,
+	&"fans_opened": 0, &"actions_submitted": 0, &"refusals_printed": 0,
+	&"flips_played": 0, &"flip_replays": 0, &"entrances": 0,
 }
 
 var _view := {}
 var _scale_chip: Label
+var _fan: ActionFan
+var _flip_queue := CardMotion.PromotionFlipQueue.new()
+## Entrance deals are armed only after the FIRST full bind — the boot deal
+## is the packet unfold's business (T-UI-05); cards JOINING a live table
+## (recruits arriving, offers becoming estate cards) slide-and-settle.
+var _entrances_armed := false
 
 
 func _ready() -> void:
@@ -78,9 +94,11 @@ func _ready() -> void:
 		host = build_demo_host()
 	super._ready()
 	_compose_slot_chrome()
+	_build_action_fan()
 	host.event_observed.connect(_on_event)
 	host.sim_advanced.connect(_on_ticks)
 	host.run_state_changed.connect(func(_running: bool) -> void: refresh_from_state())
+	host.catch_up_resolved.connect(_on_catch_up_resolved)
 	get_viewport().size_changed.connect(_on_layout_changed)
 	get_router().orientation_changed.connect(func(_o: int) -> void: _on_layout_changed())
 	_build_debug_chip()
@@ -136,6 +154,8 @@ func refresh_from_state() -> void:
 	_bind_header()
 	_bind_phase()
 	_bind_chronicle()
+	_entrances_armed = true
+	_validate_open_fan()
 
 
 ## Determinism oracle over one slot's RENDERED layout: card ids in order +
@@ -179,8 +199,17 @@ func _on_event(event: Dictionary) -> void:
 		presenter.push_row(row)
 		_bind_chronicle()
 	var targets := SpreadPresenter.refresh_targets_for(event["type"])
+	# THE SIGNATURE MOMENT (T-UI-04): an army promotion (knight/archer —
+	# a terminal combat rank) turns the card over. The flip owns the card
+	# rebind (plates swap at the 90-degree crossing), so the plain "card"
+	# target is consumed here; phase still re-binds (the ground deepens).
+	var flip_owns_card := false
+	if event["type"] == &"unit_promoted" and _is_army_def(event["subject"]):
+		flip_owns_card = _on_army_promoted(event)
 	var uid := int(event["value"])
 	for target: StringName in targets:
+		if flip_owns_card and target == &"card":
+			continue
 		match target:
 			&"full":
 				refresh_from_state()
@@ -210,7 +239,9 @@ func _on_event(event: Dictionary) -> void:
 ## silent too), and the demo policy cadence.
 func _on_ticks(ticks: int) -> void:
 	stats[&"pip_refreshes"] += 1
-	if _view.is_empty():
+	# has(), not is_empty(): an event can partially fill the view (the cards
+	# section) before the deferred first bind — pips wait for the real thing.
+	if not _view.has("resources"):
 		return
 	var view_resources: Array = _view["resources"]
 	for i in view_resources.size():
@@ -220,6 +251,186 @@ func _on_ticks(ticks: int) -> void:
 	_bind_phase()
 	if demo_policy != null and demo_policy.on_ticks(ticks):
 		demo_policy.apply(host)
+
+
+# --- card interactions (T-UI-04) -------------------------------------------------------
+
+
+## True for terminal combat ranks (knight/archer): the promotion into them
+## is THE flip. Gear-free hops (worker/militia/trainee) re-print their
+## plates through the ordinary card rebind — the flip stays special.
+func _is_army_def(def_id: StringName) -> bool:
+	for def: UnitDef in Inks.pack().units:
+		if def.id == def_id:
+			return def.combat_power > 0 and def.promotion_paths.is_empty()
+	return false
+
+
+## An army promotion landed. LIVE: the card turns now. OFFLINE (delivered
+## inside a foreground catch-up drain): queue a capped replay instead —
+## returning to a table of simultaneous card turns is noise. Returns true
+## when the flip path owns the card rebind.
+func _on_army_promoted(event: Dictionary) -> bool:
+	var uid := int(event["value"])
+	var card_id := "unit_%d" % uid
+	if host.delivering_catch_up:
+		_flip_queue.push(card_id)
+		return true
+	_play_promotion_flip(card_id, uid)
+	return true
+
+
+## Turn one card over: the ACTIVE slot's node plays the authored flip (the
+## hidden slot re-prints instantly — only the table the player sees turns),
+## and the view model's card entry updates with the fresh plates so later
+## targeted refreshes read the same state the paper shows.
+func _play_promotion_flip(card_id: String, uid: int) -> void:
+	var fresh := SpreadPresenter.unit_card_view(host, Inks.pack(), uid)
+	if fresh.is_empty():
+		return  # the unit is gone (casualties can outrun the event) — nothing to reveal
+	var view_card := _view_card(card_id)
+	if not view_card.is_empty():
+		for key in ["name", "role", "face_key", "edge_state"]:
+			view_card[key] = fresh[key]
+	stats[&"flips_played"] += 1
+	var active := get_active_slot() as OrientationSlot
+	var active_node: Control = null
+	for slot: OrientationSlot in [get_portrait_slot(), get_landscape_slot()]:
+		var node := _card_node_in(slot, card_id)
+		if node == null:
+			continue
+		if slot == active:
+			active_node = node
+		else:
+			SpreadCards.rebind_card(node, fresh)
+	if active_node == null:
+		return
+	var node_ref := active_node
+	var fresh_ref := fresh
+	node_ref.play_promotion_flip(func() -> void:
+		SpreadCards.rebind_card(node_ref, fresh_ref))
+
+
+## The foreground boundary resolved a catch-up window: replay the queued
+## offline flips, staggered (latest capped set — see PromotionFlipQueue).
+func _on_catch_up_resolved(_report: Dictionary) -> void:
+	var replay := _flip_queue.take_all()
+	for i in replay.size():
+		var card_id := replay[i]
+		var uid := int(card_id.trim_prefix("unit_"))
+		var do_flip := func() -> void:
+			stats[&"flip_replays"] += 1
+			_play_promotion_flip(card_id, uid)
+		get_tree().create_timer(0.25 * float(i)).timeout.connect(do_flip)
+
+
+## Build the one screen-level action fan (outside the slots: it is paper
+## laid over the table while open, and orientation swaps must not move it).
+func _build_action_fan() -> void:
+	_fan = ACTION_FAN_SCRIPT.new()
+	_fan.name = "ActionFan"
+	add_child(_fan)
+	_fan.action_chosen.connect(_on_action_chosen)
+	_fan.action_refused.connect(_on_action_refused)
+
+
+## Fan a card's contextual actions out at its edge.
+func open_fan_for_card(card: Control) -> void:
+	if _view.is_empty() or card == null or not is_instance_valid(card):
+		return
+	var view_card := _view_card(String(card.get_meta(&"spread_card_id", "")))
+	if view_card.is_empty():
+		return
+	var actions := CardActions.actions_for(host, view_card)
+	if actions.is_empty():
+		return  # state cards (training, army) carry no choices
+	stats[&"fans_opened"] += 1
+	_fan.open(String(view_card["id"]), actions)
+	_place_fan(card)
+
+
+## Fold the fan away; focus returns to the card that opened it.
+func close_fan() -> void:
+	if _fan == null or not _fan.is_open():
+		return
+	var card := _fan_card_node()
+	_fan.close()
+	if card != null and is_instance_valid(card):
+		card.grab_focus()
+
+
+## The fan's card node in the ACTIVE slot.
+func _fan_card_node() -> Control:
+	if _fan == null or _fan.card_id.is_empty():
+		return null
+	return _card_node_in(get_active_slot() as OrientationSlot, _fan.card_id)
+
+
+func _card_node_in(slot: OrientationSlot, card_id: String) -> Control:
+	if slot == null:
+		return null
+	for child in slot.get_spread().get_children():
+		if child is Control and String(child.get_meta(&"spread_card_id", "")) == card_id:
+			return child
+	return null
+
+
+## At the card's edge: to its right where the table has room, mirrored to
+## its left where it does not, always fully inside the screen (the fan is
+## paper ON the table — it never clips off it).
+func _place_fan(card: Control) -> void:
+	var fan_size: Vector2 = _fan.get_combined_minimum_size()
+	_fan.size = fan_size
+	var bounds := get_global_rect()
+	var card_rect := card.get_global_rect()
+	var x := card_rect.end.x + 10.0
+	if x + fan_size.x > bounds.end.x - 8.0:
+		x = card_rect.position.x - fan_size.x - 10.0
+	x = clampf(x, 8.0, bounds.end.x - fan_size.x - 8.0)
+	var y := clampf(card_rect.get_center().y - fan_size.y * 0.5,
+		8.0, bounds.end.y - fan_size.y - 8.0)
+	_fan.global_position = Vector2(x, y)
+
+
+## A whole-state re-render can retire the fanned card (restart, scatter):
+## fold the fan rather than fan a card that is no longer on the table.
+func _validate_open_fan() -> void:
+	if _fan == null or not _fan.is_open():
+		return
+	if _fan_card_node() == null:
+		_fan.close()
+
+
+## One chosen action: one real command down the host's write path, then
+## the fan folds and focus returns to the card (the promote command's
+## landing — the flip — arrives later, as the event it is).
+func _on_action_chosen(action: Dictionary) -> void:
+	stats[&"actions_submitted"] += 1
+	CardActions.submit(host, action)
+	close_fan()
+
+
+## A refused action prints its hint in the chronicle (never popup chrome).
+func _on_action_refused(action: Dictionary) -> void:
+	stats[&"refusals_printed"] += 1
+	presenter.push_row({
+		"class": Inks.LineClass.WARN,
+		"text": "The clerk strikes it through: %s." % String(action["reason"]),
+	})
+	_bind_chronicle()
+
+
+## Touch path: a tap on a card focuses it and fans its actions.
+func _on_card_gui_input(event: InputEvent, card: Control) -> void:
+	var tapped := false
+	if event is InputEventMouseButton and event.pressed \
+			and (event as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT:
+		tapped = true
+	elif event is InputEventScreenTouch and event.pressed:
+		tapped = true
+	if tapped and is_instance_valid(card):
+		card.grab_focus()
+		open_fan_for_card(card)
 
 
 # --- section binds ---------------------------------------------------------------------
@@ -237,6 +448,9 @@ func _bind_cards_list(count_render := true) -> void:
 	var columns := SpreadCards.adaptive_columns(cards.size(), _portrait_spread_height())
 	for slot: OrientationSlot in [get_portrait_slot(), get_landscape_slot()]:
 		var spread := slot.get_spread() as Container
+		# The table is about to re-deal: any entrance slides still in flight
+		# land on their seats NOW (a re-sort must never strand a card short).
+		CardMotion.snap_all(spread)
 		var by_id := {}
 		for child in spread.get_children():
 			if child is Control:
@@ -253,7 +467,14 @@ func _bind_cards_list(count_render := true) -> void:
 		for card: Dictionary in cards:
 			var id := String(card["id"])
 			if not by_id.has(id):
-				slot.add_card(SpreadCards.conspirator_card(card))
+				var node := SpreadCards.conspirator_card(card)
+				slot.add_card(node)
+				node.gui_input.connect(_on_card_gui_input.bind(node))
+				if _entrances_armed:
+					# Cards JOINING a live table deal in (slide-and-settle,
+					# deferred so the container's sort sets the seat first).
+					stats[&"entrances"] += 1
+					CardMotion.settle_in.call_deferred(node)
 			else:
 				var node: Control = by_id[id]
 				SpreadCards.rebind_card(node, card)
@@ -263,6 +484,7 @@ func _bind_cards_list(count_render := true) -> void:
 		spread.set("columns", columns)
 		spread.queue_sort()
 		_sync_focus_ids(slot)
+	_validate_open_fan()
 
 
 ## One card's plates re-print in place (both slots) — the targeted path.
@@ -359,6 +581,13 @@ func _place_eye(slot: OrientationSlot, node: Control, metrics: Dictionary) -> vo
 
 
 ## The header strip (leader + regime ink + clock) in both slots.
+## SCREENSHOT-INSPECTION FIND (T-UI-04's promote capture): the slot lays
+## its topology out once at its own deferred _ready — BEFORE this bind
+## adds the header, so the landscape chronicle printed ON the header
+## strip's rect (identical rects, pre-existing since T-UI-03's
+## composition; the quiet-state captures never crowded the strip enough
+## to read as a collision). Re-running the pure topology after the bind
+## places the strip and shifts everything below it, both orientations.
 func _bind_header() -> void:
 	stats[&"header_binds"] += 1
 	for slot: OrientationSlot in [get_portrait_slot(), get_landscape_slot()]:
@@ -370,6 +599,7 @@ func _bind_header() -> void:
 			header = RUN_HEADER_SCRIPT.new()
 			header.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			strip.add_child(header)
+			slot.layout_topology()
 		header.bind(_view["leader"], _view["sim_hours"], _view["army_power"],
 			Inks.ground_for(_view["leader"]["regime_id"], _view["phase"]))
 
@@ -424,6 +654,7 @@ func _on_layout_changed() -> void:
 
 ## The adaptive column ladder, re-derived from the CURRENT spread height
 ## and applied to both slots' spreads (a re-sort costs one sort pass).
+## A column change re-lays the table — entrance slides land first.
 func _apply_columns() -> void:
 	if _view.is_empty():
 		return
@@ -432,6 +663,7 @@ func _apply_columns() -> void:
 	for slot: OrientationSlot in [get_portrait_slot(), get_landscape_slot()]:
 		var spread := slot.get_spread() as Container
 		if spread != null:
+			CardMotion.snap_all(spread)
 			spread.set("columns", columns)
 			spread.queue_sort()
 
@@ -514,7 +746,27 @@ func _refresh_chip() -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	## Project actions only (never ui_* — focus owns those): the demo's
-	## time-scale toggle and the world-freeze pause seam.
+	## time-scale toggle, the world-freeze pause seam, and T-UI-04's card
+	## interaction verbs (back folds the fan; primary on a focused card
+	## fans its actions — the pad/keyboard mirror of the touch tap.
+	## Positional presses are EXCLUDED: touch/mouse act through the card's
+	## own gui_input, so a tap on bare table never fans the focused card).
+	if event.is_action_pressed(&"back"):
+		if _fan != null and _fan.is_open():
+			close_fan()
+			get_viewport().set_input_as_handled()
+		return
+	if event.is_action_pressed(&"primary") and not (event is InputEventMouseButton) \
+			and not (event is InputEventScreenTouch):
+		if _fan != null and _fan.is_open():
+			_fan.activate_focused()
+			get_viewport().set_input_as_handled()
+			return
+		var focus := get_viewport().gui_get_focus_owner()
+		if focus != null and focus.has_meta(&"spread_card_id"):
+			open_fan_for_card(focus)
+			get_viewport().set_input_as_handled()
+		return
 	if event.is_action_pressed(&"debug_fast_forward"):
 		time_scale_index = (time_scale_index + 1) % TIME_SCALES.size()
 		host.time_scale = TIME_SCALES[time_scale_index]
@@ -542,11 +794,21 @@ func _capture_hook() -> void:
 	var shot := OS.get_environment("CS_SPREAD_SHOT")
 	if shot.is_empty():
 		return
+	# Let the DEFERRED first bind land before any capture drive: the drives
+	# fast-forward the host, whose events would otherwise rebind sections
+	# against a not-yet-built view (the capture hook runs inside _ready).
+	await get_tree().process_frame
+	await get_tree().process_frame
 	host.time_scale = TIME_SCALES[TIME_SCALES.size() - 1]
 	time_scale_index = TIME_SCALES.size() - 1
 	var settle := OS.get_environment("CS_SPREAD_SETTLE_SECONDS").to_float()
 	settle = settle if settle > 0.0 else 2.5
-	if OS.get_environment("CS_SPREAD_LOUD") == "1":
+	var promote_mode := OS.get_environment("CS_SPREAD_PROMOTE")
+	if promote_mode == "1" or promote_mode == "2":
+		_promote_then_capture()
+	elif OS.get_environment("CS_SPREAD_FAN") == "1":
+		_fan_then_capture(settle)
+	elif OS.get_environment("CS_SPREAD_LOUD") == "1":
 		_pressure_then_capture()
 	else:
 		_settle_then_capture(settle)
@@ -581,3 +843,121 @@ func _settle_then_capture(settle: float) -> void:
 
 func _capture_path() -> String:
 	return OS.get_environment("CS_SPREAD_SHOT")
+
+
+## CS_SPREAD_PROMOTE=1: the SIGNATURE MOMENT's honest capture. Phase 1
+## drives the demo (the screen's own per-batch policy cadence) until a
+## trainee is HELD awaiting gear the pool could not yet pay for. Phase 2
+## finishes the kit by hand (cheapest tier per missing slot, only what
+## the pool pays, hours of production between attempts — the held policy
+## would otherwise promote them itself). Then the REAL promote command
+## goes down the host's write path, and the capture waits for the card to
+## be PAST its 90-degree crossing and readable (scale.x settled into its
+## reveal sweep) — the knight face half-turned: what the flip actually
+## looks like, not a pose.
+func _promote_then_capture() -> void:
+	var waited_hours := 0.0
+	while host.units().awaiting_promotion_ids().is_empty() and waited_hours < 90.0:
+		host.fast_forward(SimEngine.TICKS_PER_SIM_HOUR)  # _on_ticks applies the policy
+		waited_hours += 1.0
+	while _promotion_candidate() == 0 and waited_hours < 150.0:
+		host.fast_forward(SimEngine.TICKS_PER_SIM_HOUR)
+		waited_hours += 1.0
+		_equip_missing_cheapest()
+	refresh_from_state()
+	var candidate := _promotion_candidate()
+	if candidate == 0:
+		print("[spread] promote capture: no fully-geared trainee reached in %.0fh — capturing state as-is" % waited_hours)
+		_settle_then_capture(0.5)
+		return
+	host.time_scale = 60.0  # the command drains within a frame; the flip itself is real-time
+	host.submit(&"promote", &"", candidate)
+	var landed := OS.get_environment("CS_SPREAD_PROMOTE") == "2"
+	var revealed := 0.0
+	for i in 240:
+		await get_tree().process_frame
+		var mid := _mid_flip_node()
+		if mid != null:
+			revealed = mid.scale.x
+			if revealed > 0.25 and not landed:
+				break
+		elif landed and revealed > 0.0:
+			break  # the flip finished; the flourish is fresh off the press
+	print("[spread] promote capture: uid %d, %s at scale.x %.2f, after %.0fh of demo" % [
+		candidate, "landed" if landed else "caught past the crossing", revealed, waited_hours])
+	_settle_then_capture(0.0)
+
+
+## CS_SPREAD_FAN=1: capture an open action fan (the in-world affordance)
+## on the first card that has choices.
+func _fan_then_capture(settle: float) -> void:
+	for i in maxi(2, int(settle * 60.0)):
+		await get_tree().process_frame
+	var active := get_active_slot() as OrientationSlot
+	for i in active.get_spread().get_child_count():
+		var card := active.get_spread().get_child(i) as Control
+		if card == null:
+			continue
+		card.grab_focus()
+		open_fan_for_card(card)
+		if _fan.is_open():
+			break
+	print("[spread] fan capture: card '%s', %d chips" % [_fan.card_id, _fan.chips().size()])
+	for i in 20:
+		await get_tree().process_frame
+	var image := get_viewport().get_texture().get_image()
+	var err := image.save_png(_capture_path())
+	print("[spread] screenshot %s (%s) — fan state" % [
+		_capture_path(), "ok" if err == OK else "FAILED %d" % err])
+	get_tree().quit(0)
+
+
+## A fully-geared trainee awaiting the promote command (the capture
+## candidate), 0 when none stands by.
+func _promotion_candidate() -> int:
+	var units := host.units()
+	for uid in units.awaiting_promotion_ids():
+		if units.missing_gear_slots(uid).is_empty() and _is_army_def(units.training_target(uid)):
+			return uid
+	return 0
+
+
+## The capture drive's kit-finisher: cheapest affordable tier per missing
+## slot for every held trainee, through the real command (returns whether
+## anything was submitted — production accrues between attempts).
+func _equip_missing_cheapest() -> bool:
+	var units := host.units()
+	var submitted := false
+	for uid in units.awaiting_promotion_ids():
+		for slot in units.missing_gear_slots(uid):
+			for gear_id in units.gear_ids_for_slot(slot):
+				var affordable := true
+				var gear: GearDef = null
+				for candidate: GearDef in Inks.pack().gear:
+					if candidate.id == gear_id:
+						gear = candidate
+						break
+				if gear == null:
+					continue
+				for resource in gear.recipe:
+					if host.engine.get_resource(resource) < int(gear.recipe[resource]):
+						affordable = false
+						break
+				if affordable:
+					host.submit(&"equip_gear", gear_id, uid)
+					submitted = true
+					break
+	return submitted
+
+
+## The active slot's card currently caught PAST its 90-degree crossing
+## (the new face revealing), or null — the capture hook's mid-turn probe.
+func _mid_flip_node() -> Control:
+	var active := get_active_slot() as OrientationSlot
+	if active == null:
+		return null
+	for child in active.get_spread().get_children():
+		var card := child as Control
+		if card != null and card.flip_crossed() and card.is_flipping():
+			return card
+	return null

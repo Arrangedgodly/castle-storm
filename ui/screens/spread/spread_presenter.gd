@@ -239,6 +239,7 @@ static func _building_card(production: ProductionSystem, building: BuildingDef, 
 		"id": "bld_%s" % String(building.id),
 		"uid": 0,
 		"kind": &"building",
+		"building_id": String(building.id),
 		"name": building.display_name,
 		"role": "level %d · %d/%d workers" % [
 			level, production.assigned_workers(building.id), production.worker_slots(building.id)],

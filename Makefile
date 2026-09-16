@@ -52,11 +52,17 @@ run-responsive:
 # engine host (canonical composition, seeded demo run, live pips/cards/
 # chronicle/Watchful Eye). Debug accel: F (or pad R5, the
 # debug_fast_forward action) cycles the time scale 1x -> 60x -> 600x; P
-# freezes the world. CS_DEMO_RESET=0 continues the previous session
-# (default: each run starts the same seeded fresh demo); CS_SEED=<int>
-# overrides the seed. Screenshot hooks (windowed):
+# freezes the world. Card interactions (T-UI-04): press a focused card
+# (enter / pad A) or tap one to fan its contextual actions; esc / pad B
+# folds the fan; the PROMOTE action's landing turns the trainee card
+# over (the signature moment). CS_DEMO_RESET=0 continues the previous
+# session (default: each run starts the same seeded fresh demo);
+# CS_SEED=<int> overrides the seed. Screenshot hooks (windowed):
 #   CS_SPREAD_SHOT=/path.png make run-game                # quiet state
 #   CS_SPREAD_SHOT=/p.png CS_SPREAD_LOUD=1 make run-game  # pressured (telegraph)
+#   CS_SPREAD_SHOT=/p.png CS_SPREAD_PROMOTE=1 make run-game  # promote, mid-flip
+#   CS_SPREAD_SHOT=/p.png CS_SPREAD_PROMOTE=2 make run-game  # promote, landed (flourish)
+#   CS_SPREAD_SHOT=/p.png CS_SPREAD_FAN=1 make run-game      # an open action fan
 run-game:
 	$(GODOT_BIN) --path . res://ui/screens/spread/spread_screen.tscn
 

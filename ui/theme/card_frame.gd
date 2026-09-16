@@ -18,10 +18,13 @@
 ## registration, readable without hover and without color dependence (the
 ## offset form itself is the focus mark).
 ##
-## FLIP SEAM (T-UI-04, the promotion flip): flip_to()/set_face_up()/
+## FLIP SEAM (the promotion flip): flip_to()/set_face_up()/
 ## is_face_up() + flip_started/flip_completed — the explicit contract the
 ## card-turn animation mounts on (pivot = center; the back face is the
-## paper stock itself). Full contract documented at flip_to().
+## paper stock itself). Full contract documented at flip_to(). T-UI-04's
+## AUTHORED turn lives here too: play_promotion_flip() — the scale-x
+## squeeze about the center pivot, the content swap at the 90-degree
+## crossing, and the landing flourish (see play_promotion_flip).
 ##
 ## Content (CardFace et al.) is composed as children; the frame reserves
 ## FRAME_INSET + edge width around the rect for the print. Minimum size
@@ -128,6 +131,130 @@ func is_face_up() -> bool:
 	return _face_up
 
 
+# --- the authored promotion flip (T-UI-04 — the signature interaction) --------
+
+## Transient landing flourish 0..1: a printed DOUBLE rule in revolution
+## red inside the regime hairline, fading like a press impression lifting
+## (driven by _stamp_flourish after a promotion flip lands — the world's
+## grammar, never particle sparkle).
+var flourish := 0.0:
+	set(value):
+		var clamped := clampf(value, 0.0, 1.0)
+		if flourish != clamped:
+			flourish = clamped
+			queue_redraw()
+
+var _flip_tween: Tween
+var _flip_pending_swap := Callable()
+var _flip_swapped := false
+var _flip_crossed := false
+
+
+## THE PROMOTION FLIP — the authored card turn on the T-UI-01 seam (design
+## brief §3: "turning a trainee card over to reveal its Knight face ... the
+## one the game is remembered by").
+##
+## The turn is authored as a 3D-ish scale-x squeeze about the center pivot
+## (the T-UI-01 contract's documented turn axis), in contract order:
+##   1. flip_started(true) fires;
+##   2. scale.x sweeps 1 -> 0 (QUAD in: the card tips away);
+##   3. at the 90-degree crossing (scale.x == 0, where neither side shows)
+##      the frame goes to its BACK via the silent set_face_up(false) and
+##      `swap` re-prints the hidden plates EXACTLY ONCE (trainee out,
+##      knight in);
+##   4. the return sweep 0 -> 1 (BACK out: one registration overshoot —
+##      the card settles past true and comes back, the misprint character
+##      in motion) reveals the new face via set_face_up(true);
+##   5. the landing stamps the flourish and flip_completed(true) fires.
+##
+## Reduced motion (MotionProfile): near-instant — same signals, same swap
+## order, same end state; the flip still reads as a turn, never a hard cut.
+## A flip already in flight is SNAP-FINISHED first, in contract order (its
+## swap runs, its flip_completed fires) — one flip at a time on a card, and
+## every started flip completes exactly once.
+func play_promotion_flip(swap: Callable) -> void:
+	flip_started.emit(true)
+	_snap_finish_flip()
+	_flip_pending_swap = swap
+	_flip_swapped = false
+	_flip_crossed = false
+	var duration := MotionProfile.duration(MotionProfile.FLIP_SECONDS)
+	if duration <= 0.05:
+		_run_crossing()
+		_land_flip()
+		return
+	pivot_offset = size * 0.5
+	var away := duration * 0.42
+	_flip_tween = create_tween()
+	_flip_tween.tween_property(self, "scale:x", 0.0, away) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	_flip_tween.tween_callback(_run_crossing)
+	_flip_tween.tween_callback(func() -> void:
+		set_face_up(true))  # coming off the crossing: the new face reveals
+	_flip_tween.tween_property(self, "scale:x", 1.0, duration - away) \
+		.set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_flip_tween.tween_callback(_land_flip)
+
+
+## The 90-degree crossing: neither side shows — back face, then the ONE
+## content swap between flip_started and the reveal.
+func _run_crossing() -> void:
+	set_face_up(false)
+	_flip_crossed = true
+	if not _flip_swapped:
+		_flip_swapped = true
+		_flip_pending_swap.call()
+
+
+## The landing: reveal, stamp the flourish, complete the contract.
+func _land_flip() -> void:
+	scale = Vector2.ONE
+	set_face_up(true)
+	_flip_pending_swap = Callable()
+	_stamp_flourish()
+	flip_completed.emit(true)
+
+
+## Finish an in-flight flip synchronously (a new flip or tree exit demands
+## a settled card): run the crossing if it had not happened, then land.
+func _snap_finish_flip() -> void:
+	if _flip_tween != null and _flip_tween.is_valid() and _flip_tween.is_running():
+		_flip_tween.kill()
+		if not _flip_swapped:
+			_run_crossing()
+		_land_flip()
+	elif not _flip_swapped and _flip_pending_swap.is_valid():
+		# Reduced-mode flip interrupted between start and crossing.
+		_run_crossing()
+		_land_flip()
+	scale = Vector2.ONE
+
+
+## True while an authored flip is mid-turn (the squeeze is in flight).
+func is_flipping() -> bool:
+	return _flip_tween != null and _flip_tween.is_valid() and _flip_tween.is_running()
+
+
+## True once the in-flight flip has crossed its 90-degree point (the new
+## face is being revealed) — the capture hook's mid-reveal probe.
+func flip_crossed() -> bool:
+	return _flip_crossed
+
+
+## The landing's ink burst: a fresh press impression in revolution red,
+## fading over the flourish window. Reduced motion prints nothing (the
+## flourish is pure celebration; the reveal already landed).
+func _stamp_flourish() -> void:
+	var duration := MotionProfile.duration(MotionProfile.FLOURISH_SECONDS)
+	if duration <= 0.05:
+		flourish = 0.0
+		return
+	flourish = 1.0
+	var tween := create_tween()
+	tween.tween_property(self, "flourish", 0.0, duration) \
+		.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+
+
 func _get_minimum_size() -> Vector2:
 	## The touch grip floor: a card can never shrink below 2x grip
 	## (96x96 design units) even before its parent slots give it aspect.
@@ -157,6 +284,21 @@ func _draw() -> void:
 	# Inner hairline — the regime's second ink (data-driven recolor).
 	var secondary := Inks.regime_secondary(regime_id) if regime_id != &"" else Inks.INK_SOFT
 	draw_polyline(inner, secondary, 1.5, true)
+
+	# The promotion flourish — the flip's landing ink: a DOUBLE rule in
+	# revolution red inside the hairline (the chronicle's own victory
+	# flourish, reprinted on the card), fading like a press impression
+	# lifting. A second ink pass, never particles.
+	if flourish > 0.01:
+		var burst := Color(Inks.RED, flourish)
+		var rule := PackedVector2Array()
+		rule.resize(inner.size())
+		for i in inner.size():
+			rule[i] = inner[i] + Vector2(0.0, -4.5)
+		_draw_closed_path(rule, burst, 2.0)
+		for i in inner.size():
+			rule[i] = inner[i] + Vector2(0.0, 4.5)
+		_draw_closed_path(rule, burst, 2.0)
 
 	# The state edge — LINE FORM carries state, never hue. Always the ink.
 	match edge_form:

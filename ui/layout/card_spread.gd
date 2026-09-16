@@ -220,6 +220,12 @@ func _notification(what: int) -> void:
 
 
 func _apply_layout(bounds: Vector2) -> void:
+	# T-UI-03 verifier nit (a), folded in at T-UI-04: a sort firing with
+	# children present but degenerate bounds (observed in headless quit
+	# teardown) printed out-of-bounds errors — a zero-size table simply
+	# has no rects to hand out; the next real sort lays the cards.
+	if bounds.x <= 0.5 or bounds.y <= 0.5:
+		return
 	var controls: Array[Control] = _card_children()
 	if mode == Mode.STACKED:
 		var rects := stacked_layout(controls.size(), bounds, columns, space)

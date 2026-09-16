@@ -12,6 +12,14 @@ run/main_scene="res://ui/main.tscn"
 config/features=PackedStringArray("4.7.2", "GL Compatibility")
 config/icon="res://icon.svg"
 
+[castle_storm]
+
+; T-UI-04 motion seam: shorten the promotion flip and entrance slides to
+; near-instant (the reveal stays — same signals, same end state). The
+; future settings screen writes this via MotionProfile.forced; until then
+; it is the project-level default.
+motion/reduced_motion=false
+
 [display]
 
 window/size/viewport_width=720

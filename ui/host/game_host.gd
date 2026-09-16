@@ -83,6 +83,14 @@ var driving: bool = true:
 	set(value):
 		driving = value
 
+## True while event_observed is draining a FOREGROUND CATCH-UP window (the
+## offline batch): T-UI-04's queued promotion-flip replay keys on it — an
+## army promotion that lands inside an away window replays as a capped,
+## staggered flip on the foreground boundary, never as a table of cards
+## all turning at once. Read-only for consumers; only foreground()
+## toggles it.
+var delivering_catch_up := false
+
 var _accum_seconds := 0.0
 var _consumed_seq := 0
 var _ticks_since_autosave := 0
@@ -171,12 +179,15 @@ func has_saved_run() -> bool:
 
 ## Foreground boundary (T-PERF-01's call): resolves one away window
 ## through the real engine, delivers the gap's events through the unified
-## feed, and re-enables driving.
+## feed (flagged as the offline batch — see delivering_catch_up), and
+## re-enables driving.
 func foreground(p_now_epoch: int) -> Dictionary:
 	driving = true
+	delivering_catch_up = true
 	var report := catch_up.apply(engine, meta, p_now_epoch)
 	var applied := int(report.get("applied_ticks", 0))
 	_drain_events()
+	delivering_catch_up = false
 	if applied > 0:
 		_emit_advanced(applied)
 		catch_up_resolved.emit(report)
