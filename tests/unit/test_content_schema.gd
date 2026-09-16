@@ -217,6 +217,29 @@ func test_art_source_path_existence_enforced_and_pending_escapes() -> void:
 	assert_int(_count(errors, "does not exist")).is_equal(0)
 
 
+func test_malformed_atlas_region_fails_loudly() -> void:
+	# T-UI-01 round-2: the atlas crop is content data driving FaceSlot's
+	# texture — a negative origin or half-degenerate size must fail at the
+	# load gate, not silently crop garbage out of the sheet.
+	var pack := _scratch_pack()
+	var asset := pack.art.assets[0] as ArtAssetDef
+	asset.atlas_region = Rect2(-8, 0, 96, 128)
+	var errors := ContentValidator.validate_pack(pack)
+	assert_str(_first(errors, "atlas_region origin")).is_equal(
+		"art-asset 'face_peasant': atlas_region origin must be >= (0, 0) (got (-8.0, 0.0))")
+	asset.atlas_region = Rect2(0, 0, 96, 0)
+	errors = ContentValidator.validate_pack(pack)
+	assert_str(_first(errors, "atlas_region size")).is_equal(
+		"art-asset 'face_peasant': atlas_region size must be positive in BOTH axes (got (96.0, 0.0))")
+	# Well-formed (or absent — the additive default) stays clean.
+	asset.atlas_region = Rect2(0, 0, 96, 128)
+	errors = ContentValidator.validate_pack(pack)
+	assert_int(_count(errors, "atlas_region")).is_equal(0)
+	asset.atlas_region = Rect2()
+	errors = ContentValidator.validate_pack(pack)
+	assert_int(_count(errors, "atlas_region")).is_equal(0)
+
+
 func test_undeclared_gear_slot_fails() -> void:
 	var pack := _scratch_pack()
 	(pack.gear[0] as GearDef).slot = &"hat"

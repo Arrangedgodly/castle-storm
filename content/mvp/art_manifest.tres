@@ -8,12 +8,14 @@ script = ExtResource("1_g")
 id = &"face_peasant"
 source_path = "res://assets/vendor/kenney/toon-characters/male-person/vector/character_malePerson.svg"
 license = "CC0"
+atlas_region = Rect2(0, 0, 96, 128)
 
 [sub_resource type="Resource" id="ArtAssetDef_2"]
 script = ExtResource("1_g")
 id = &"face_worker"
 source_path = "res://assets/vendor/kenney/toon-characters/female-person/vector/character_femalePerson.svg"
 license = "CC0"
+atlas_region = Rect2(0, 0, 96, 128)
 
 [sub_resource type="Resource" id="ArtAssetDef_3"]
 script = ExtResource("1_g")
@@ -27,6 +29,7 @@ script = ExtResource("1_g")
 id = &"face_trainee"
 source_path = "res://assets/vendor/kenney/toon-characters/male-adventurer/vector/character_maleAdventurer.svg"
 license = "CC0"
+atlas_region = Rect2(0, 0, 96, 128)
 
 [sub_resource type="Resource" id="ArtAssetDef_5"]
 script = ExtResource("1_g")

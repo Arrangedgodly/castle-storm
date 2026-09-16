@@ -78,16 +78,26 @@ carries an **asset key**:
 - `ArtAssetDef` (`content/schema/art_asset_def.gd`) is the **only** place
   a vendor path appears: `id`, `source_path`
   (`assets/vendor/<pack>/...`), `license` (`CC0`, `CC-BY-3.0`,
-  `commercial`, ...), `attribution`, `pending`. **CC-BY-family licenses
+  `commercial`, ...), `attribution`, `pending`, `atlas_region`. **CC-BY-family licenses
   require a non-empty attribution** — the validator enforces R6's license
   hygiene (game-icons.net credits).
 - **Path existence is validated** (T-ARCH-04): every non-pending entry's
-  `source_path` must exist at validation time — staged bytes come from the
-  vendor pipeline (`make vendor-assets`; the authoritative pipeline doc is
+  `source_path` must exist at validation time — staged bytes come from
+  the vendor pipeline (`make vendor-assets`; the authoritative pipeline doc is
   docs/vendor-assets.md) and are sha256-pinned by
   `assets/vendor/manifest.json`. `pending = true` is the explicit hatch for
   packs not yet vendored so art can land incrementally without red CI;
   every pending entry MUST flip to a real staged file before ship.
+- `atlas_region` (T-UI-01 round-2, additive-optional): sub-rectangle of
+  the RENDERED `@2x` PNG that is the whole asset, for multi-pose source
+  sheets — the UI composes an `AtlasTexture` over exactly this region so
+  one staged sheet serves many faces and the crop is content data. The
+  validator checks well-formedness when declared (origin >= 0, size
+  positive on both axes). Grid math of record for the Kenney Toon
+  Character sheets: 864x640 px = a uniform 9x5 grid of 96x128 cells; cell
+  (0,0) is the neutral front-facing standing pose on all three staged
+  sheets, so the MVP faces declare `Rect2(0, 0, 96, 128)` (pixel-probe
+  verified 2026-09-15; pinned by test_theme_grammar's tiling assertion).
 - `RegimeDef` carries the two ink colors (`ink_ground`,
   `ink_secondary`, must differ) that T-UI-01's theme applies to authored
   frames and recolored pack art; the crest key resolves through the same

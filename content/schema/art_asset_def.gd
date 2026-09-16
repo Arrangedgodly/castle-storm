@@ -26,3 +26,20 @@ extends Resource
 ## faces without red CI) — every entry MUST flip to pending=false (real
 ## staged file) before ship; the acceptance sweep greps for strays.
 @export var pending: bool = false
+
+## Sub-rectangle of the RENDERED @2x PNG (pixels, y-down) that is the whole
+## asset — the atlas crop for multi-pose source sheets (T-UI-01 round-2 fix).
+## Zero-size (default) = the rendered texture is already a single asset and
+## is used whole (icons, crests, single-pose faces). For a sheet, the UI
+## composes an AtlasTexture with exactly this region, so ONE staged file can
+## serve many faces and the crop is content data, never UI hardcoding.
+##
+## GRID MATH OF RECORD (Kenney Toon Characters, verified by pixel probe
+## 2026-09-15): every sheet is 864x640 px = a uniform 9-col x 5-row grid of
+## 96x128 cells (9*96 = 864, 5*128 = 640); cell (0,0) — the top-left — is
+## the neutral front-facing standing pose on all three staged sheets
+## (male-person, female-person, male-adventurer), so landed faces declare
+## Rect2(0, 0, 96, 128). The validator checks well-formedness (positive
+## size, non-negative origin); tests pin that the region tiles the real
+## sheet exactly (tests/unit/test_theme_grammar.gd).
+@export var atlas_region: Rect2 = Rect2()

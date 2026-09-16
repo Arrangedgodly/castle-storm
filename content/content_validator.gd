@@ -150,6 +150,14 @@ static func _check_art_manifest(manifest: ArtManifest, errors: Array[String]) ->
 			_err(errors, "art-asset '%s': license must not be empty (R6 license hygiene)" % asset.id)
 		elif asset.license.to_upper().contains("BY") and asset.attribution.is_empty():
 			_err(errors, "art-asset '%s': license '%s' requires attribution (CC-BY family)" % [asset.id, asset.license])
+		# T-UI-01 round-2: an atlas crop must be well-formed when declared —
+		# a negative origin or half-degenerate size would silently crop
+		# garbage out of the sheet (data-driven faces must fail loudly too).
+		if asset.atlas_region != Rect2():
+			if asset.atlas_region.position.x < 0.0 or asset.atlas_region.position.y < 0.0:
+				_err(errors, "art-asset '%s': atlas_region origin must be >= (0, 0) (got %s)" % [asset.id, asset.atlas_region.position])
+			if asset.atlas_region.size.x <= 0.0 or asset.atlas_region.size.y <= 0.0:
+				_err(errors, "art-asset '%s': atlas_region size must be positive in BOTH axes (got %s)" % [asset.id, asset.atlas_region.size])
 
 
 ## Membership scan against the manifest; a missing manifest is already

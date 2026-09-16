@@ -17,12 +17,6 @@ const FACE_SCENE := preload("res://ui/theme/card_face.tscn")
 const PIP_SCENE := preload("res://ui/theme/pip_mark.tscn")
 const CHRONICLE_SCENE := preload("res://ui/theme/chronicle_line.tscn")
 
-const FACE_TEXTURES: Dictionary = {
-	&"peasant": "res://assets/vendor/kenney/toon-characters/male-person/vector/character_malePerson@2x.png",
-	&"worker": "res://assets/vendor/kenney/toon-characters/female-person/vector/character_femalePerson@2x.png",
-	&"trainee": "res://assets/vendor/kenney/toon-characters/male-adventurer/vector/character_maleAdventurer@2x.png",
-}
-
 var _column: VBoxContainer
 
 
@@ -203,9 +197,9 @@ func _section_edge_states() -> void:
 	row.add_theme_constant_override("separation", 14)
 	_column.add_child(row)
 	var states := [
-		[Inks.EdgeForm.SOLID, "Ready", &"peasant"],
-		[Inks.EdgeForm.DASHED, "In progress", &"trainee"],
-		[Inks.EdgeForm.STRUCK, "Lost", &"worker"],
+		[Inks.EdgeForm.SOLID, "Ready", &"face_peasant"],
+		[Inks.EdgeForm.DASHED, "In progress", &"face_trainee"],
+		[Inks.EdgeForm.STRUCK, "Lost", &"face_worker"],
 	]
 	for i in states.size():
 		var entry: Array = states[i]
@@ -242,12 +236,12 @@ func _section_chronicle() -> void:
 
 func _section_cards() -> void:
 	_section_header_label("Card Types x Orientations")
-	_caption("Portrait 5:7 and landscape 7:5 from one CardFace (aspect reflow); knight/archer faces print the authored placeholder until the art manifest lands them.")
+	_caption("Portrait 5:7 and landscape 7:5 from one CardFace (aspect reflow). Landed faces are single-pose atlas crops printed two-ink (crop + print from the art manifest); knight/archer print the authored placeholder until their pack lands.")
 	var portrait := HBoxContainer.new()
 	portrait.add_theme_constant_override("separation", 14)
 	_column.add_child(portrait)
-	portrait.add_child(_sample_card(168, 252, Inks.EdgeForm.SOLID, &"peasant", "Brann", "Peasant — at the gate", 21))
-	portrait.add_child(_sample_card(168, 252, Inks.EdgeForm.DASHED, &"trainee", "Wilmot", "Trainee — drilling", 22))
+	portrait.add_child(_sample_card(168, 252, Inks.EdgeForm.SOLID, &"face_peasant", "Brann", "Peasant — at the gate", 21))
+	portrait.add_child(_sample_card(168, 252, Inks.EdgeForm.DASHED, &"face_trainee", "Wilmot", "Trainee — drilling", 22))
 	var knight := _sample_card(168, 252, Inks.EdgeForm.SOLID, &"", "Ser Adela", "Knight — awaiting face art", 23)
 	knight.set("regime_id", &"velvet_fist")
 	portrait.add_child(knight)
@@ -256,7 +250,7 @@ func _section_cards() -> void:
 	var landscape := HBoxContainer.new()
 	landscape.add_theme_constant_override("separation", 14)
 	_column.add_child(landscape)
-	landscape.add_child(_sample_card(252, 168, Inks.EdgeForm.SOLID, &"worker", "Marga", "Worker — farm detail", 31))
+	landscape.add_child(_sample_card(252, 168, Inks.EdgeForm.SOLID, &"face_worker", "Marga", "Worker — farm detail", 31))
 	var regime_card := _sample_card(252, 168, Inks.EdgeForm.SOLID, &"", "The Gilded Crown", "Regime — crest pending", 32)
 	regime_card.set("regime_id", &"gilded_crown")
 	landscape.add_child(regime_card)
@@ -316,7 +310,7 @@ func _section_focus() -> void:
 	row.add_theme_constant_override("separation", 14)
 	_column.add_child(row)
 	for i in 3:
-		var frame := _sample_card(120, 168, Inks.EdgeForm.SOLID, &"peasant", "Focus %d" % (i + 1), "grip >= 48", 40 + i)
+		var frame := _sample_card(120, 168, Inks.EdgeForm.SOLID, &"face_peasant", "Focus %d" % (i + 1), "grip >= 48", 40 + i)
 		row.add_child(frame)
 	var chip := Button.new()
 	chip.text = "A Printed Chip"
@@ -329,7 +323,9 @@ func _section_focus() -> void:
 
 func _sample_card(w: float, h: float, form: int, face: StringName, card_name: String, role: String, seed: int) -> Control:
 	## A composed specimen: CardFrame + inset CardFace. Frame focusable
-	## (controller nav parity); misprint seeded for stable review.
+	## (controller nav parity); misprint seeded for stable review. `face`
+	## is an art-manifest key resolved by FaceArt into a single-pose
+	## two-ink print ("" = the authored placeholder).
 	var frame := FRAME_SCENE.instantiate() as Control
 	frame.custom_minimum_size = Vector2(w, h)
 	frame.set("edge_form", form)
@@ -346,8 +342,7 @@ func _sample_card(w: float, h: float, form: int, face: StringName, card_name: St
 	face_plate.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	face_plate.set("card_name", card_name)
 	face_plate.set("role_line", role)
-	if FACE_TEXTURES.has(face):
-		face_plate.set("face_texture", load(FACE_TEXTURES[face]))
+	face_plate.set("face_key", face)
 	margin.add_child(face_plate)
 	frame.add_child(margin)
 	return frame

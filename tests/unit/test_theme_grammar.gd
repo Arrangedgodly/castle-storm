@@ -20,6 +20,12 @@
 ##      present in the generated ATTRIBUTIONS.md.
 ##   9. GALLERY — the demo scene instantiates headless, error-free,
 ##      with every section's components present.
+##  10. FACE PLATES — landed faces are SINGLE-CELL AtlasTexture crops per
+##      the manifest's atlas_region (the round-1 verifier FAIL's regression
+##      guard: never the whole pose sheet), printed through the two-ink
+##      pass; pending/unknown keys keep the honest placeholder.
+##  11. FLIP SEAM — CardFrame's explicit promotion-flip contract for
+##      T-UI-04 (signals + state + back-side content hiding).
 extends GdUnitTestSuite
 
 const THEME_PATH := "res://ui/theme/spread_theme.tres"
@@ -398,3 +404,154 @@ func _count_script(node: Node, script_path: String) -> int:
 	for child in node.get_children():
 		total += _count_script(child, script_path)
 	return total
+
+
+# --- 10. Face plates: single-cell atlas prints (round-1 verifier fix) ---------------
+
+
+const LANDED_FACE_KEYS: Array[StringName] = [&"face_peasant", &"face_worker", &"face_trainee"]
+
+
+func _face_asset(key: StringName) -> ArtAssetDef:
+	var pack := ContentValidator.load_pack("res://content/mvp/pack.tres")
+	if pack == null or pack.art == null:
+		return null
+	for asset: ArtAssetDef in pack.art.assets:
+		if asset != null and asset.id == key:
+			return asset
+	return null
+
+
+func test_face_slot_texture_is_single_cell_atlas_per_manifest() -> void:
+	## THE round-1 regression guard: FaceSlot's final texture for every
+	## landed face is an AtlasTexture whose region is exactly the ONE cell
+	## the manifest declares — never the whole 45-pose sheet.
+	for key: StringName in LANDED_FACE_KEYS:
+		var asset := _face_asset(key)
+		assert_that(asset).is_not_null()
+		if asset == null:
+			continue
+		var slot := (load("res://ui/theme/face_slot.tscn") as PackedScene).instantiate() as TextureRect
+		auto_free(slot)
+		slot.set("face_key", key)
+		var face: Texture2D = slot.texture
+		assert_bool(face is AtlasTexture).is_true()
+		if not (face is AtlasTexture):
+			continue
+		var at := face as AtlasTexture
+		# The crop is the manifest's data, verbatim (data-driven, not UI math).
+		assert_bool(at.region == asset.atlas_region).is_true()
+		assert_bool(at.region.has_area()).is_true()
+		# The region is ONE CELL, not the sheet (the round-1 defect shape).
+		var sheet := Vector2(at.atlas.get_width(), at.atlas.get_height())
+		assert_bool(at.region.size == sheet).is_false()
+		assert_bool(Rect2(Vector2.ZERO, sheet).encloses(at.region)).is_true()
+		# The documented grid math (art_asset_def.gd) tiles the real sheet
+		# EXACTLY: 9 cols x 5 rows of this cell = 864x640.
+		assert_int(int(sheet.x)).is_equal(9 * int(at.region.size.x))
+		assert_int(int(sheet.y)).is_equal(5 * int(at.region.size.y))
+		# Two-ink print pass mounted (no raw colored sprite on the paper).
+		assert_bool(slot.material is ShaderMaterial).is_true()
+
+
+func test_face_slot_caches_one_atlas_per_key() -> void:
+	## Many cards share one spread: the resolver hands out the same cached
+	## AtlasTexture per key (one sheet, one crop object, no churn).
+	var first := FaceArt.face_texture(&"face_peasant")
+	var second := FaceArt.face_texture(&"face_peasant")
+	assert_that(first).is_not_null()
+	assert_bool(first == second).is_true()
+
+
+func test_pending_and_unknown_face_keys_print_the_placeholder() -> void:
+	## The honest-state contract: pending (tzunghaor not vendored) and
+	## unknown keys resolve to NO texture — the authored placeholder draws
+	## (FaceSlot._draw), never a guess. The unknown key is loud (push_error).
+	var pending_slot := (load("res://ui/theme/face_slot.tscn") as PackedScene).instantiate()
+	auto_free(pending_slot)
+	pending_slot.face_key = &"face_knight"
+	assert_that(pending_slot.texture).is_null()
+	assert_that(pending_slot.material).is_null()
+	var unknown_slot := (load("res://ui/theme/face_slot.tscn") as PackedScene).instantiate()
+	auto_free(unknown_slot)
+	unknown_slot.face_key = &"face_nope"
+	assert_that(unknown_slot.texture).is_null()
+	assert_that(unknown_slot.material).is_null()
+
+
+func test_card_face_wires_its_key_into_the_slot() -> void:
+	## CardFace is the composing seam T-UI-03 mounts: its face_key export
+	## must reach the inner FaceSlot as the resolved single-cell atlas.
+	var plate := (load("res://ui/theme/card_face.tscn") as PackedScene).instantiate() as Control
+	auto_free(plate)
+	plate.face_key = &"face_worker"
+	add_child(plate)
+	await get_tree().process_frame
+	var slot := _find_script(plate, "res://ui/theme/face_slot.gd")
+	assert_that(slot).is_not_null()
+	if slot is TextureRect:
+		assert_bool((slot as TextureRect).texture is AtlasTexture).is_true()
+	remove_child(plate)
+
+
+func _find_script(node: Node, script_path: String) -> Node:
+	if node.get_script() != null and String(node.get_script().resource_path) == script_path:
+		return node
+	for child in node.get_children():
+		var found := _find_script(child, script_path)
+		if found != null:
+			return found
+	return null
+
+
+# --- 11. The flip seam (T-UI-04's promotion flip mounts here) -----------------------
+
+
+func test_card_frame_flip_seam_signals_state_and_noop() -> void:
+	var frame := (load("res://ui/theme/card_frame.tscn") as PackedScene).instantiate() as Control
+	auto_free(frame)
+	add_child(frame)
+	assert_bool(frame.is_face_up()).is_true()
+	var events: Array = []
+	frame.flip_started.connect(func(up: bool) -> void: events.append(["started", up])
+	)
+	frame.flip_completed.connect(func(up: bool) -> void: events.append(["completed", up])
+	)
+	frame.flip_to(false)
+	assert_bool(frame.is_face_up()).is_false()
+	assert_int(events.size()).is_equal(2)
+	assert_bool(events[0] == ["started", false]).is_true()
+	assert_bool(events[1] == ["completed", false]).is_true()
+	# Same-side request is a silent no-op; the silent swap helper emits nothing.
+	frame.flip_to(false)
+	assert_int(events.size()).is_equal(2)
+	frame.set_face_up(true)
+	assert_bool(frame.is_face_up()).is_true()
+	assert_int(events.size()).is_equal(2)
+	frame.flip_to(true)
+	assert_int(events.size()).is_equal(2)
+	remove_child(frame)
+
+
+func test_card_frame_back_side_hides_content_and_restores_it() -> void:
+	## The base instant flip genuinely shows the BACK (bare paper stock):
+	## content children hide on flip down and come back (with their prior
+	## visibility) on flip up — the contract T-UI-04 animates around.
+	var frame := (load("res://ui/theme/card_frame.tscn") as PackedScene).instantiate() as Control
+	auto_free(frame)
+	add_child(frame)
+	var shown := ColorRect.new()
+	auto_free(shown)
+	frame.add_child(shown)
+	var hidden := ColorRect.new()
+	auto_free(hidden)
+	hidden.visible = false
+	frame.add_child(hidden)
+	assert_bool(shown.visible).is_true()
+	frame.flip_to(false)
+	assert_bool(shown.visible).is_false()
+	assert_bool(hidden.visible).is_false()  # never resurrected by the frame
+	frame.flip_to(true)
+	assert_bool(shown.visible).is_true()
+	assert_bool(hidden.visible).is_false()  # prior-visibility respected
+	remove_child(frame)

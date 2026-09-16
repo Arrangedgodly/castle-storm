@@ -18,6 +18,11 @@
 ## registration, readable without hover and without color dependence (the
 ## offset form itself is the focus mark).
 ##
+## FLIP SEAM (T-UI-04, the promotion flip): flip_to()/set_face_up()/
+## is_face_up() + flip_started/flip_completed — the explicit contract the
+## card-turn animation mounts on (pivot = center; the back face is the
+## paper stock itself). Full contract documented at flip_to().
+##
 ## Content (CardFace et al.) is composed as children; the frame reserves
 ## FRAME_INSET + edge width around the rect for the print. Minimum size
 ## honors the touch grip (>= 48 design units, PRODUCT.md accessibility).
@@ -54,6 +59,73 @@ extends Control
 		if show_seal != value:
 			show_seal = value
 			queue_redraw()
+
+# --- the flip seam (the promotion flip — the design brief's signature
+# --- interaction; T-UI-04 owns the animation, this is the contract) ---------------
+
+## Emitted when a flip STARTS; carries the side the card will land on.
+signal flip_started(face_up: bool)
+## Emitted when the flip COMPLETES; the card now shows that side.
+signal flip_completed(face_up: bool)
+
+## True while the card shows its FACE (content children); false = the BACK
+## (the paper stock itself: same quad, state edge and seal — a cheap deck's
+## unprinted side needs no second scene).
+@export var face_up: bool = true:
+	set(value):
+		set_face_up(value)
+	get:
+		return _face_up
+
+## Content children this frame hid for the back side (restored on return).
+var _hidden_by_flip: Array[CanvasItem] = []
+var _face_up := true
+
+
+## THE FLIP SEAM for T-UI-04. Contract every consumer may rely on:
+##   - flip_to(up) on the other side fires flip_started(up), swaps the
+##     shown side, then fires flip_completed(up) — exactly once per flip;
+##     a request for the side already shown is a silent no-op;
+##   - the BASE grammar performs the flip INSTANTLY (a print laid on the
+##     table does not animate) and hides the frame's content children on
+##     the back, restoring them (with their prior visibility) on return —
+##     so after flip_completed the card genuinely shows the requested side;
+##   - T-UI-04's promotion-flip animation interposes on this seam: turn
+##     THIS node (pivot_offset = size * 0.5 is the turn axis; rotation or
+##     an x-scale squeeze both read as a card turn), call set_face_up() at
+##     the 90-degree crossing (where neither side shows — the silent swap
+##     helper), swap/rebuild the content between flip_started and the
+##     crossing (trainee plates out, knight plates in), and emit the same
+##     two signals around the tween. One contract, one grammar.
+func flip_to(up: bool) -> void:
+	if up == _face_up:
+		return
+	flip_started.emit(up)
+	set_face_up(up)
+	flip_completed.emit(up)
+
+
+## Instant, SILENT side swap — the 90-degree-crossing helper an animation
+## calls mid-turn. Use flip_to() for the announced contract.
+func set_face_up(up: bool) -> void:
+	if up == _face_up:
+		return
+	_face_up = up
+	if up:
+		for child in _hidden_by_flip:
+			if is_instance_valid(child):
+				child.visible = true
+		_hidden_by_flip.clear()
+	else:
+		for child in get_children():
+			if child is CanvasItem and child.visible:
+				_hidden_by_flip.append(child)
+				child.visible = false
+	queue_redraw()
+
+
+func is_face_up() -> bool:
+	return _face_up
 
 
 func _get_minimum_size() -> Vector2:

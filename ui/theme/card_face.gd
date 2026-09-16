@@ -14,13 +14,16 @@ extends BoxContainer
 
 const RULE_SCENE := preload("res://ui/theme/rule_mark.tscn")
 
-## Face art (vendored @2x face from the art manifest); null prints the
-## authored placeholder mark (FaceSlot).
-@export var face_texture: Texture2D = null:
+## Face art key in the pack's art manifest (e.g. &"face_peasant"). Empty
+## or pending keys print FaceSlot's authored placeholder mark. Data-driven
+## end to end: the manifest's atlas_region + FaceArt own the single-pose
+## crop and two-ink print, so landing or re-posing face art is a content
+## edit, never a UI code change (R6: no vendor paths in UI code).
+@export var face_key: StringName = &"":
 	set(value):
-		face_texture = value
+		face_key = value
 		if _slot != null:
-			_slot.texture = value
+			_slot.face_key = value
 
 ## The card's name (name plate, display face).
 @export var card_name: String = "":
@@ -54,7 +57,7 @@ func _ready() -> void:
 	_slot.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_slot.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_slot.custom_minimum_size = Vector2.ONE * Inks.TOUCH_GRIP_MIN
-	_slot.texture = face_texture
+	_slot.face_key = face_key
 	add_child(_slot)
 	_name_label = Label.new()
 	_name_label.theme_type_variation = &"CardTitle"

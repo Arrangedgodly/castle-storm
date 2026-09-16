@@ -104,6 +104,8 @@ human-spelled name tests and credits key on). Pairing rationale lives in
 - **tzunghaor Cartoon Vector Characters** (CC0, OpenGameArt) — opengameart.org
   was unreachable from the build machine and the pack ships as .7z (no
   extractor present). The three `face_*` keys referencing it are `pending`.
+  NOTE: these are SINGLE-pose SVGs — when landed, their art-manifest
+  entries need NO `atlas_region` (whole-asset renders, see below).
 - **Armorial – Procedural Heraldry** (commercial, $12, itch.io) — requires a
   human purchase. The four `crest_*` keys referencing it are `pending`.
   After purchase: stage crests under `assets/vendor/armorial/`, add the
@@ -112,3 +114,21 @@ human-spelled name tests and credits key on). Pairing rationale lives in
 Landing either pack: add files to its manifest entry (sha256s via
 `shasum -a 256`), run `make vendor-assets FETCH=1`, flip the art-manifest
 entries' `pending`, run `make test`.
+
+## Pose sheets and the game-side atlas crop (T-UI-01 round-2, 2026-09-15)
+
+The staged Kenney Toon Character SVGs are multi-pose SHEETS, not single
+portraits: each renders to an 864x640 `@2x` PNG holding a uniform 9x5
+grid of 96x128 poses (45 total) on a fully transparent ground
+(pixel-probe verified — corners alpha 0, ~50% of pixels transparent).
+Rendering such a sheet whole puts a tiny-sprite grid inside a card (the
+round-1 verifier FAIL). The pipeline deliberately KEEPS staging the
+sheets as-is (one checksummed file per character, ~45 poses available to
+future animations); the crop is game-side content data: each face's
+`ArtAssetDef.atlas_region` names one cell (grid math of record in
+`content/schema/art_asset_def.gd` — cell (0,0) is the neutral
+front-facing standing pose on all three sheets), and
+`ui/theme/face_art.gd` composes the `AtlasTexture` + applies the two-ink
+print pass (`ui/theme/face_print.gdshader`: source luminance → ink
+coverage, alpha preserved). Single-pose sources (icons, crests,
+tzunghaor characters) simply omit `atlas_region` and render whole.
