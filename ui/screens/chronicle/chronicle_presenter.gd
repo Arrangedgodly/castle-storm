@@ -29,13 +29,15 @@
 ## word-wrap at a character budget the sheet owns) — the sheet's labels
 ## then wrap onto bounded rows instead of clipping.
 ##
-## Copy is placeholder clerk voice (Prof X's T-COPY-01 deepens it); every
-## NAME, SEAL, DURATION, ARMY COUNT and BANKED number is the meta
-## domain's own record.
+## Copy is the clerk's voice through CopyDeck (T-COPY-01: the pack's
+## CopyTable owns the variants; every NAME, SEAL, DURATION, ARMY COUNT and
+## BANKED number is the meta domain's own record).
 class_name ChroniclePresenter
 extends RefCounted
 
-## The empty chronicle's required line (first run: no dream has yet dared).
+## The empty chronicle's required line (first run: no dream has yet dared)
+## — the code-side twin of the copy table's `chronicle_empty_1` variant 0
+## (an empty chronicle means run 0: the rotor is always 0 here).
 const EMPTY_LINE := "the chronicle is blank — no dream has yet dared"
 
 ## Secondary empty-state print (the table below still lives).
@@ -95,8 +97,10 @@ static func view(host: GameHost, page: int, per_page: int) -> Dictionary:
 		"title": TITLE,
 		"empty": total == 0,
 		"empty_lines": [
-			{"class": Inks.LineClass.PLAIN, "text": EMPTY_LINE},
-			{"class": Inks.LineClass.PLAIN, "text": EMPTY_LINE_2},
+			{"class": Inks.LineClass.PLAIN,
+				"text": CopyDeck.line(Inks.pack().copy, &"chronicle_empty_1", 0)},
+			{"class": Inks.LineClass.PLAIN,
+				"text": CopyDeck.line(Inks.pack().copy, &"chronicle_empty_2", 0)},
 		],
 		"entries": entries,
 		"page": page,
@@ -219,7 +223,10 @@ static func shaped_name(first: String, epithet: String) -> Array[String]:
 
 
 ## The role plate: personality tags + trait (the entry's own words),
-## wrapped at the role budget to at most two rows.
+## wrapped at the role budget to at most two rows. The wrap prefers the
+## " · " SEPARATOR (tags row, trait row) so a multi-word trait never
+## splits mid-phrase — the record's own words stay whole (T-COPY-01's
+## longer content traits exposed the greedy wrap).
 static func shaped_role(entry: Dictionary) -> String:
 	var tags: Array = entry.get("tags", [])
 	var parts: Array[String] = []
@@ -229,6 +236,11 @@ static func shaped_role(entry: Dictionary) -> String:
 	var trait_text := String(entry.get("trait", ""))
 	if not trait_text.is_empty():
 		role = "%s · %s" % [role, trait_text] if not role.is_empty() else trait_text
+	if role.length() <= ROLE_BUDGET:
+		return role
+	var sep := role.find(" · ")
+	if sep > 0 and role.length() - sep - 3 <= ROLE_BUDGET:
+		return "%s\n%s" % [role.substr(0, sep), role.substr(sep + 3)]
 	return _wrap(role, ROLE_BUDGET, 2)
 
 

@@ -817,12 +817,15 @@ func _on_suspicion_choice(action: Dictionary) -> void:
 			host.submit(command, &"", int(uid))
 		presenter.push_row({
 			"class": Inks.LineClass.WARN,
-			"text": "The gate thins: %d sent home with kind words and no bread." % (action.get("subjects", []) as Array).size(),
+			"text": CopyDeck.line(Inks.pack().copy, &"gate_thinned",
+				int(stats.get(&"choices_made", 1)),
+				{"count": (action.get("subjects", []) as Array).size()}),
 		})
 	elif String(action["id"]) == "keep_close":
 		presenter.push_row({
 			"class": Inks.LineClass.WARN,
-			"text": "The conspirators keep the cards close and the lamps low.",
+			"text": CopyDeck.line(Inks.pack().copy, &"cards_kept_close",
+				int(stats.get(&"choices_made", 1))),
 		})
 	_bind_chronicle()
 	_suspicion.fold_choice()

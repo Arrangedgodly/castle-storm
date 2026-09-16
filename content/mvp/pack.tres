@@ -1,6 +1,7 @@
 [gd_resource type="Resource" script_class="ContentPack" format=3]
 
 [ext_resource type="Resource" path="res://content/mvp/art_manifest.tres" id="1_mvp"]
+[ext_resource type="Resource" path="res://content/mvp/copy_table.tres" id="29_mvp"]
 [ext_resource type="Script" path="res://content/schema/building_def.gd" id="2_mvp"]
 [ext_resource type="Resource" path="res://content/mvp/buildings/farm.tres" id="3_mvp"]
 [ext_resource type="Resource" path="res://content/mvp/buildings/lumber_camp.tres" id="4_mvp"]
@@ -42,6 +43,7 @@ regimes = Array[ExtResource("15_mvp")]([ExtResource("16_mvp"), ExtResource("17_m
 identity = ExtResource("14_mvp")
 tunables = ExtResource("21_mvp")
 art = ExtResource("1_mvp")
+copy = ExtResource("29_mvp")
 starting_grants = Dictionary[StringName, int]({
 &"food": 50,
 &"timber": 80

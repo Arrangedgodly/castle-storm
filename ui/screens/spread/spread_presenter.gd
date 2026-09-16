@@ -386,7 +386,11 @@ static func refresh_targets_for(event_type: StringName) -> Array[StringName]:
 
 ## Render query: the printed line for an event, or null to stay silent
 ## (plumbing noise: quarter-marks, hour bells, worker moves, vignette
-## beats — T-UI-07 owns the beat stream's own rendering).
+## beats — T-UI-07 owns the beat stream's own rendering). T-COPY-01: the
+## strip's copy reads the pack's CopyTable through CopyDeck, variant
+## rotated by the event's seq (repeats vary, replay is identical); the
+## suspicion vocabulary delegates to the system's own voice (same table,
+## its own copy seam).
 func chronicle_line_for(event: Dictionary, host: GameHost) -> Variant:
 	var kind: StringName = event["type"]
 	var pack := Inks.pack()
@@ -395,52 +399,69 @@ func chronicle_line_for(event: Dictionary, host: GameHost) -> Variant:
 	var line := suspicion.chronicle_line(_as_sim_event(event))
 	if not line.is_empty():
 		return {"class": Inks.line_class_for_event(kind), "text": line}
+	var table: CopyTable = pack.copy
+	var rotor := int(event["seq"])
 	var name := recruit_name(pack, int(event["value"]))
 	match kind:
 		&"recruit_arrived":
-			return _row(kind, "%s arrives at the gate, hat in hand." % name)
+			return _row(kind, CopyDeck.line(table, &"recruit_arrived", rotor, {"name": name}))
 		&"recruit_accepted":
-			return _row(kind, "%s joins the conspiracy." % name)
+			return _row(kind, CopyDeck.line(table, &"recruit_accepted", rotor, {"name": name}))
 		&"recruit_dismissed":
-			return _row(kind, "%s is sent home with kind words and no bread." % name)
+			return _row(kind, CopyDeck.line(table, &"recruit_dismissed", rotor, {"name": name}))
 		&"training_started":
-			return _row(kind, "%s begins training as %s." % [name, _display_name(pack, event["subject"])])
+			return _row(kind, CopyDeck.line(table, &"training_started", rotor,
+				{"name": name, "rank": _display_name(pack, event["subject"])}))
 		&"training_complete":
-			return _row(kind, "%s finishes the %s drills." % [name, _display_name(pack, event["subject"])])
+			return _row(kind, CopyDeck.line(table, &"training_complete", rotor,
+				{"name": name, "rank": _display_name(pack, event["subject"])}))
 		&"unit_promoted":
-			return _row(kind, "%s is struck off the rolls as %s — %s of them now." % [
-				name, _display_name(pack, event["subject"]), event["value2"]])
+			return _row(kind, CopyDeck.line(table, &"unit_promoted", rotor,
+				{"name": name, "rank": _display_name(pack, event["subject"]),
+					"count": int(event["value2"])}))
 		&"gear_equipped":
-			return _row(kind, "%s takes up the %s." % [name, _gear_name(pack, event["subject"])])
+			return _row(kind, CopyDeck.line(table, &"gear_equipped", rotor,
+				{"name": name, "gear": _gear_name(pack, event["subject"])}))
 		&"building_built":
-			return _row(kind, "The %s rises — level 1." % _building_name(pack, event["subject"]))
+			return _row(kind, CopyDeck.line(table, &"building_built", rotor,
+				{"building": _building_name(pack, event["subject"])}))
 		&"building_upgraded":
-			return _row(kind, "The %s grows to level %d." % [_building_name(pack, event["subject"]), event["value"]])
+			return _row(kind, CopyDeck.line(table, &"building_upgraded", rotor,
+				{"building": _building_name(pack, event["subject"]), "level": int(event["value"])}))
 		&"building_milestone":
-			return _row(kind, "The %s hits a milestone — the rates double." % _building_name(pack, event["subject"]))
+			return _row(kind, CopyDeck.line(table, &"building_milestone", rotor,
+				{"building": _building_name(pack, event["subject"])}))
 		&"resources_granted":
-			return _row(kind, "The stipend arrives: %d %s." % [event["value"], String(event["subject"])])
+			return _row(kind, CopyDeck.line(table, &"resources_granted", rotor,
+				{"count": int(event["value"]), "resource": String(event["subject"])}))
 		&"run_started":
-			return _row(kind, "%s raises the standard under the %s." % [
-				host.run().leader_name(), Inks.regime_name(host.run().regime_id())])
+			return _row(kind, CopyDeck.line(table, &"run_started", rotor, {
+				"first": host.run().leader_first_name(),
+				"regime": Inks.regime_name(host.run().regime_id())}))
 		&"run_restarted":
-			return _row(kind, "A new hand is dealt: %s under the %s." % [
-				host.run().leader_name(), Inks.regime_name(host.run().regime_id())])
+			return _row(kind, CopyDeck.line(table, &"run_restarted", rotor, {
+				"first": host.run().leader_first_name(),
+				"regime": Inks.regime_name(host.run().regime_id())}))
 		&"run_won":
-			return _row(kind, "The castle falls. %d legacy points banked for the next leader." % event["value"])
+			return _row(kind, CopyDeck.line(table, &"run_won", rotor,
+				{"points": int(event["value"])}))
 		&"run_lost":
-			return _row(kind, "The run collapses under its own theatre. The bank remembers: %d points." % event["value"])
+			return _row(kind, CopyDeck.line(table, &"run_lost", rotor,
+				{"points": int(event["value"])}))
 		&"run_aborted":
-			return _row(kind, "The standard is folded up and buried. %d points banked all the same." % event["value"])
+			return _row(kind, CopyDeck.line(table, &"run_aborted", rotor,
+				{"points": int(event["value"])}))
 		&"assault_casualties":
-			return _row(kind, "%d of the vanguard fall at the walls." % event["value"])
+			return _row(kind, CopyDeck.line(table, &"assault_casualties", rotor,
+				{"count": int(event["value"])}))
 		&"assault_lost":
 			# The spread's rolling record (the vignette owns the moment; the
 			# chronicle owns the history — both in-world, never chrome).
-			return _row(kind, "The assault breaks against the walls of the %s." % (
-				Inks.regime_name(event["subject"]) if event["subject"] != &"" else "Crown"))
+			return _row(kind, CopyDeck.line(table, &"assault_lost", rotor,
+				{"regime": Inks.regime_name(event["subject"]) if event["subject"] != &"" else "the Crown"}))
 		&"assault_denied":
-			return _row(kind, "The assault is refused — the army is not yet an army (power %d)." % event["value2"])
+			return _row(kind, CopyDeck.line(table, &"assault_denied", rotor,
+				{"power": int(event["value2"])}))
 		&"catch_up_applied":
 			# One voice source for the window's headline: the strip row, the
 			# blockquote's lead and the check-in reveal's away line all read
@@ -448,11 +469,13 @@ func chronicle_line_for(event: Dictionary, host: GameHost) -> Variant:
 			# actually applied.
 			return _row(kind, CatchUpPrint.headline_text(int(event["value2"])))
 		&"catch_up_clock_rewound":
-			return _row(kind, "The castle clock was found wound backwards. Nothing was said.")
+			return _row(kind, CopyDeck.line(table, &"catch_up_clock_rewound", rotor))
 		&"upgrade_denied", &"lifecycle_denied", &"run_denied":
-			return _row(kind, "The clerk refuses the paperwork (reason %d)." % event["value"])
+			return _row(kind, CopyDeck.line(table, &"clerk_denied", rotor,
+				{"reason": int(event["value"])}))
 		&"command_rejected":
-			return _row(kind, "A command falls on deaf ears: %s." % String(event["subject"]))
+			return _row(kind, CopyDeck.line(table, &"command_rejected", rotor,
+				{"command": String(event["subject"])}))
 		_:
 			return null
 

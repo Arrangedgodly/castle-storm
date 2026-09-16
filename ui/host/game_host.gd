@@ -126,7 +126,7 @@ func build_engine() -> SimEngine:
 	engine.register_system(UnitLifecycleSystem.new(pack.units, pack.gear, pack.tunables))
 	engine.register_system(ProductionSystem.new(pack.buildings, pack.tunables, null))
 	engine.register_system(AssaultResolver.new(pack.tunables))
-	engine.register_system(SuspicionSystem.new(pack.tunables, pack.units))
+	engine.register_system(SuspicionSystem.new(pack.tunables, pack.units, pack.copy))
 	return engine
 
 

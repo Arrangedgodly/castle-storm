@@ -210,9 +210,12 @@ func mark_seen(meta: RunMeta, now_epoch: int) -> void:
 		meta.last_seen_epoch = now_epoch
 
 
-## Prof X placeholder voice (the chronicle_line render-query pattern,
-## T-COPY-01 deepens): pure report → String, no engine access. Empty string
-## for nothing-worthy-happened (zero-accrual foregrounds stay silent).
+## The service's own summary voice (T-COPY-01 audited against
+## docs/voice-bible.md: the ironic-clerk register, the wry clock lines —
+## kept as the log-side twin of CatchUpPrint's table-side rows; the UI's
+## one-voice rule routes the visible prints through CatchUpPrint): pure
+## report → String, no engine access. Empty string for
+## nothing-worthy-happened (zero-accrual foregrounds stay silent).
 static func chronicle_line(report: Dictionary) -> String:
 	if bool(report.get("rewound", false)):
 		return (

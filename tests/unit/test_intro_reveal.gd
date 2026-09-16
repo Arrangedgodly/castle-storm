@@ -224,20 +224,22 @@ func test_win_restart_swap_beat_reads_the_actual_chronicle() -> void:
 	assert_str(String(view["regime"]["id"])).is_equal(String(host.run().regime_id()))
 	assert_str(String(view["leader"]["name"])).is_equal(host.run().leader_name())
 	var lines: Array = view["lines"]
-	# The regime-swap beat: VICTORY class, both inks named (yours over
-	# theirs — or the banner-never-left form when the redraw held).
+	# The regime-swap beat: VICTORY class, the NEW ink named (T-COPY-01: one
+	# regime name fits the packet band — two never do; the previous regime
+	# lives in the chronicle entry the reveal also reads).
 	var swap := String(lines[0]["text"])
 	assert_int(int(lines[0]["class"])).is_equal(Inks.LineClass.VICTORY)
-	assert_bool(swap.contains(Inks.regime_name(previous_regime)) \
-		or previous_regime == host.run().regime_id()).is_true()
+	if previous_regime != host.run().regime_id():
+		assert_bool(swap.contains(Inks.regime_name(previous_regime)) \
+			or swap.contains(String(view["regime"]["name"]))).is_true()
 	assert_bool(swap.contains(String(view["regime"]["name"]))).is_true()
 	# The banked-legacy line: the ACTUAL bank after the win banked.
 	var bank_line := String(lines[1]["text"])
 	assert_bool(bank_line.contains("%d" % host.meta.legacy_points)).is_true()
 	# The chronicle context: the PREVIOUS leader's line (who they were,
-	# how long they held the standard).
+	# how long they held the standard — the clerk's first-name shorthand).
 	var context := String(lines[2]["text"])
-	assert_bool(context.contains(previous_leader)).is_true()
+	assert_bool(context.contains(previous_leader.split(" ")[0])).is_true()
 	var previous: Dictionary = view["previous"]
 	assert_str(String(previous["leader"])).is_equal(previous_leader)
 	assert_str(String(previous["outcome"])).is_equal("victory")

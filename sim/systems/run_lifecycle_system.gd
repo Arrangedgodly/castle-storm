@@ -66,9 +66,10 @@ const REASON_STIPEND_PAID := 5  # grant_resources: this run already took its sti
 ## Documented placeholder — T-SIM-08's balance pass owns the real formula.
 const WIN_BONUS := 100
 
-## Leader trait stub labels — code-side placeholders for T-COPY-01's trait
-## design; a generated leader carries the INDEX (drawn, serialized, hashed)
-## and this table renders it. Additive data can replace it later.
+## Leader trait stub labels — the code-side floor for the trait slot
+## (T-COPY-01: the pack's IdentityPools.leader_traits replaces them when
+## declared; a generated leader carries the INDEX — drawn, serialized,
+## hashed — and the EFFECTIVE pool renders it, one draw either way).
 const TRAIT_STUB_LABELS: Array[String] = [
 	"Iron-fisted",
 	"Silver-tongued",
@@ -192,13 +193,22 @@ func leader_tags() -> Array[StringName]:
 	return _leader_tags.duplicate()
 
 
-## Index into TRAIT_STUB_LABELS (the T-COPY-01 trait stub).
+## Index into the effective trait pool (the T-COPY-01 trait slot).
 func leader_trait_stub() -> int:
 	return _trait_stub
 
 
 func leader_trait_label() -> String:
-	return TRAIT_STUB_LABELS[_trait_stub]
+	var pool := _trait_labels()
+	return pool[_trait_stub % pool.size()]
+
+
+## The effective trait pool: the pack's leader_traits when declared, the
+## code-side stub labels otherwise (T-COPY-01's additive content seam).
+func _trait_labels() -> Array[String]:
+	if _identity != null and not _identity.leader_traits.is_empty():
+		return _identity.leader_traits
+	return TRAIT_STUB_LABELS
 
 
 ## The run's RegimeDef — combat modifier + economy quirk for later systems
@@ -395,7 +405,7 @@ func _fold_new_run(engine: SimEngine, draw_regime: bool) -> void:
 		if pool[second] == _leader_tags[0]:
 			second += 1
 		_leader_tags.append(pool[second])
-	_trait_stub = engine.rng.randi_range(0, TRAIT_STUB_LABELS.size() - 1)
+	_trait_stub = engine.rng.randi_range(0, _trait_labels().size() - 1)
 	if draw_regime:
 		_regime = _regimes[engine.rng.randi_range(0, _regimes.size() - 1)]
 	status = STATUS_RUNNING

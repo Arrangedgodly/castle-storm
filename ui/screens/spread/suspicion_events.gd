@@ -127,11 +127,15 @@ func _ready() -> void:
 ## The choice card for a warn/telegraph event, as data. Pure reads of the
 ## host's query surfaces; every command on every chip is a REAL sim verb
 ## (or the acknowledge chip, which submits nothing — see the class header
-## for the lay-low finding).
+## for the lay-low finding). T-COPY-01: the card's lines are the CARD
+## BUDGET forms (the ~232px label — the full beat line stays in the strip,
+## where the wide chronicle carries it), variants rotated by the event's
+## seq through the pack's CopyTable.
 static func choice_card_for(host: GameHost, event: Dictionary) -> Dictionary:
 	var suspicion := host.suspicion()
-	var line := suspicion.chronicle_line(_as_sim_event(event))
 	var tunables: EconomyTunables = Inks.pack().tunables
+	var table: CopyTable = Inks.pack().copy
+	var rotor := int(event["seq"])
 	var offers: int = host.units().pending_offers()
 	var telegraph: bool = event["type"] == &"suspicion_telegraph"
 	var chips: Array[Dictionary] = []
@@ -141,7 +145,7 @@ static func choice_card_for(host: GameHost, event: Dictionary) -> Dictionary:
 			uids.append(uid)
 		chips.append({
 			"id": "thin_the_gate",
-			"label": "Send the %d loiterers home" % offers,
+			"label": CopyDeck.line(table, &"chip_dismiss", rotor, {"count": offers}),
 			"multi_command": &"dismiss_offer",
 			"subjects": uids,
 			"enabled": true,
@@ -150,19 +154,22 @@ static func choice_card_for(host: GameHost, event: Dictionary) -> Dictionary:
 		})
 	chips.append({
 		"id": "keep_close",
-		"label": "Keep the cards close",
+		"label": CopyDeck.line(table, &"chip_keep", rotor),
 		"command": &"",
 		"enabled": true,
 		"reason": "",
 		"signature": false,
 	})
 	var lines: Array[Dictionary] = []
-	if not line.is_empty():
-		lines.append({"class": Inks.line_class_for_event(event["type"]), "text": line})
+	lines.append({
+		"class": Inks.line_class_for_event(event["type"]),
+		"text": CopyDeck.line(table,
+			&"card_telegraph_line" if telegraph else &"card_warn_line", rotor),
+	})
 	lines.append({
 		"class": Inks.LineClass.WARN,
-		"text": ("Disband the crowd and let the ink dry — the ledger is patient."
-			if telegraph else "Quiet hands and a thin gate keep the press running."),
+		"text": CopyDeck.line(table,
+			&"telegraph_context" if telegraph else &"warn_context", rotor),
 	})
 	var hours := -1
 	if telegraph:
@@ -213,50 +220,63 @@ static func scatter_names(pre_cards: Array, scattered: int, offers_left: int) ->
 	}
 
 
-## The scatter row for the blockquote (placeholder clerk voice; the NAMES
-## are the pre-crackdown gate crowd). Pure.
-static func scatter_line(pre_cards: Array, event: Dictionary) -> Dictionary:
+## The scatter rows for the blockquote (T-COPY-01: the NAMES are the
+## pre-crackdown gate crowd, offers-first per the sim's scatter rule; the
+## row is shaped to the quote label's 476px budget — the old 527px tail
+## clipped at the label edge, the deferred T-UI-06 content matter). Two
+## rows when peasants followed the offers out; one otherwise. Pure.
+static func scatter_line(pre_cards: Array, event: Dictionary) -> Array[Dictionary]:
+	var table: CopyTable = Inks.pack().copy
+	var rotor := int(event.get("seq", 0))
 	var info := scatter_names(pre_cards, int(event["value"]), int(event["value2"]))
 	var names: Array = info["names"]
 	var scattered := int(event["value"])
 	if scattered <= 0:
-		return {"class": Inks.LineClass.STRIKE,
-			"text": "The gate was already thin; the riders find only mud."}
-	var named_count := mini(3, names.size())
+		return [{"class": Inks.LineClass.STRIKE,
+			"text": CopyDeck.line(table, &"scatter_none", rotor)}]
+	# At most two NAMES lead the row (the blockquote's label is single-line:
+	# the tail counts the rest — the sim's own scatter rule, offers first).
+	var named_count := mini(2, names.size())
 	var who := ", ".join(names.slice(0, named_count))
-	var others := names.size() - named_count
-	if who.is_empty():
-		who = "%d recruits" % scattered
-	elif others > 0:
-		who = "%s, and %d more" % [who, others]
-	var peasants := int(info["peasants"])
-	var tail := " board carts out of the shire."
-	if peasants > 0:
-		tail += " %d of the loitering peasants follow them." % peasants
-	return {"class": Inks.LineClass.STRIKE, "text": "The gate empties — %s%s" % [who, tail]}
+	var more := maxi(0, scattered - named_count)
+	var rows: Array[Dictionary] = [{
+		"class": Inks.LineClass.STRIKE,
+		"text": CopyDeck.line(table, &"scatter_row", rotor,
+			{"who": who, "count": more}),
+	}]
+	if int(info["peasants"]) > 0:
+		rows.append({
+			"class": Inks.LineClass.STRIKE,
+			"text": CopyDeck.line(table, &"scatter_peasants", rotor,
+				{"count": int(info["peasants"])}),
+		})
+	return rows
 
 
-## The crushing blockquote's lines (regime voice placeholder; the banked
-## number is the REAL meta bank, read after the loss resolved). LINE
-## BUDGET: the blockquote panel is QUOTE_WIDTH wide and its chronicle
-## rows CLIP past the label edge (the row grammar) — the round-2 capture
-## find: the first placeholder lines ran ~700px of text against a ~476px
-## label and cut off mid-sentence, so every line now fits the panel in
-## the REAL font metrics (worst regime name measured ~380px; the mounted
-## placement tests pin the no-clip guarantee); T-COPY-01 deepens the
-## voice inside the same budget. Pure.
+## The crushing blockquote's lines (T-COPY-01 failure-feel pass): the
+## regime's SMUGNESS stings first, the chronicle's record second, the
+## concrete banked number banks the hope — a number you keep, read from
+## the REAL meta bank after the loss resolved. The same-crest revenge
+## line prints moments later in the intro's loss-restart reveal (the beat
+## ends, the reveal names the crest that did it). LINE BUDGET: the
+## blockquote panel is QUOTE_WIDTH wide and its chronicle rows CLIP past
+## the label edge (the row grammar) — every line fits the panel in the
+## REAL font metrics (docs/voice-bible.md §4; the mounted placement tests
+## pin the no-clip guarantee). Variants rotate by the RUN number. Pure.
 static func crush_lines(host: GameHost) -> Array[Dictionary]:
 	var regime_name := Inks.regime_name(host.run().regime_id())
 	if regime_name.is_empty():
 		regime_name = "The Crown"
-	var article := regime_name if regime_name.begins_with("The ") else "the " + regime_name
+	var table: CopyTable = Inks.pack().copy
+	var rotor := host.meta.runs_recorded
 	return [
 		{"class": Inks.LineClass.STRIKE,
-			"text": "%s closes its hand. The barns burn." % article},
+			"text": CopyDeck.line(table, &"crush_regime", rotor, {"regime": regime_name})},
 		{"class": Inks.LineClass.STRIKE,
-			"text": "The revolution is crushed. The chronicle remembers."},
+			"text": CopyDeck.line(table, &"crush_chronicle", rotor)},
 		{"class": Inks.LineClass.PLAIN,
-			"text": "The bank keeps what the fire could not: %d legacy points." % host.meta.legacy_points},
+			"text": CopyDeck.line(table, &"crush_bank", rotor,
+				{"points": host.meta.legacy_points})},
 	]
 
 
@@ -410,9 +430,10 @@ func append_quote_row(row: Dictionary) -> void:
 		_place_quote(_quote_bounds, _quote_floor_y)
 
 
-## The scatter row, composed with names, appended to the open quote.
+## The scatter rows, composed with names, appended to the open quote.
 func append_scatter_row(pre_cards: Array, event: Dictionary) -> void:
-	append_quote_row(scatter_line(pre_cards, event))
+	for row: Dictionary in scatter_line(pre_cards, event):
+		append_quote_row(row)
 
 
 ## Re-place an open quote after a layout change.

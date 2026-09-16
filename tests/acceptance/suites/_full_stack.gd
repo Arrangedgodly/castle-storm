@@ -62,7 +62,7 @@ static func game_stack(run_seed: int, meta: RunMeta, stipend: Dictionary = {}, p
 	engine.register_system(UnitLifecycleSystem.new(pack.units, pack.gear, tunables))
 	engine.register_system(ProductionSystem.new(pack.buildings, tunables, null))
 	engine.register_system(AssaultResolver.new(tunables))
-	engine.register_system(SuspicionSystem.new(tunables, pack.units))
+	engine.register_system(SuspicionSystem.new(tunables, pack.units, pack.copy))
 	return engine
 
 

@@ -26,6 +26,8 @@ const MIN_LEADER_FIRST_NAMES := 6
 const MIN_LEADER_EPITHETS := 6
 const MIN_PERSONALITY_TAGS := 4
 const MIN_RECRUIT_NAMES := 8
+## T-COPY-01 additive trait pool floor (only when the pool is declared).
+const MIN_LEADER_TRAITS := 4
 
 ## R4-derived policy floors (research/r4-idle-balance-references.md).
 const OFFLINE_CAP_MIN_HOURS := 4.0
@@ -68,6 +70,7 @@ static func validate_pack(pack: ContentPack) -> Array[String]:
 	_check_gear(pack, errors)
 	_check_regimes(pack, errors)
 	_check_identity_pools(pack.identity, errors)
+	_check_copy_table(pack.copy, errors)
 	_check_tunables(pack.tunables, errors)
 	return errors
 
@@ -376,6 +379,72 @@ static func _check_identity_pools(pools: IdentityPools, errors: Array[String]) -
 	_check_name_pool(errors, "leader_epithets", pools.leader_epithets, MIN_LEADER_EPITHETS)
 	_check_name_pool(errors, "personality_tags", pools.personality_tags, MIN_PERSONALITY_TAGS)
 	_check_name_pool(errors, "recruit_names", pools.recruit_names, MIN_RECRUIT_NAMES)
+	# T-COPY-01 additive-optional trait pool: no floor when absent (the
+	# code-side stub labels carry the run lifecycle), but a PRESENT pool must
+	# be clean and non-trivial — a 1-trait pack ships a broken slot machine.
+	if not pools.leader_traits.is_empty():
+		_check_name_pool(errors, "leader_traits", pools.leader_traits, MIN_LEADER_TRAITS)
+
+
+# --- copy table (T-COPY-01) ---------------------------------------------------
+
+## The voice gate: every template key must be a surface the code reads, every
+## variant within 1..MAX_VARIANTS (no unbounded growth), every `{token}` from
+## the key's vocabulary (content cannot reference data a surface never
+## passes), repeated-beat keys carry >= 2 variants (variety where the sim
+## repeats), and the banned-list register scan runs on every shipped line.
+static func _check_copy_table(table: CopyTable, errors: Array[String]) -> void:
+	if table == null:
+		return
+	for key in table.templates.keys():
+		if not CopyTable.KEY_TOKENS.has(key):
+			_err(errors, "copy: unknown template key '%s' — no surface reads it (see CopyTable.KEY_TOKENS)" % key)
+			continue
+		var variants: PackedStringArray = table.templates[key]
+		if variants.is_empty():
+			_err(errors, "copy '%s': template needs at least 1 variant" % key)
+			continue
+		if variants.size() > CopyTable.MAX_VARIANTS:
+			_err(errors, "copy '%s': %d variants exceeds the cap of %d (variety, not sprawl)" % [
+				key, variants.size(), CopyTable.MAX_VARIANTS])
+		if CopyTable.ROTATING_KEYS.has(key) and variants.size() < 2:
+			_err(errors, "copy '%s': a repeated beat needs >= 2 variants (got 1) — repeats must vary" % key)
+		var allowed: Array = CopyTable.KEY_TOKENS[key]
+		for variant in variants:
+			if String(variant).is_empty():
+				_err(errors, "copy '%s': variant must not be empty" % key)
+				continue
+			_scan_banned(errors, "copy '%s'" % key, String(variant))
+			var open := String(variant).find("{")
+			while open >= 0:
+				var close := String(variant).find("}", open + 1)
+				if close < 0:
+					_err(errors, "copy '%s': unbalanced '{' in '%s'" % [key, variant])
+					break
+				var token := String(variant).substr(open + 1, close - open - 1)
+				if not allowed.has(StringName(token)):
+					_err(errors, "copy '%s': token '{%s}' is not in this key's vocabulary %s" % [
+						key, token, allowed])
+				open = String(variant).find("{", close + 1)
+
+
+## Register scan (the automated subset of docs/voice-bible.md §3's banned
+## list): case-insensitive WORD-BOUNDARY match — "hey" never trips "they",
+## "xp" never trips "expires" (the raw-substring probe's false positives,
+## caught the moment the shipped table first ran the gate).
+static var _banned_rx: RegEx
+
+
+static func _scan_banned(errors: Array[String], label: String, text: String) -> void:
+	if _banned_rx == null:
+		var parts: Array[String] = []
+		for fragment in CopyTable.BANNED_FRAGMENTS:
+			parts.append("\\b%s\\b" % String(fragment).strip_edges())
+		_banned_rx = RegEx.create_from_string("(?i)(%s)" % "|".join(parts))
+	var hit := _banned_rx.search(text)
+	if hit != null:
+		_err(errors, "%s: banned-register fragment '%s' in '%s' — see docs/voice-bible.md §3" % [
+			label, hit.get_string(), text])
 
 
 static func _check_name_pool(errors: Array[String], label: String, pool: Array, min_count: int) -> void:

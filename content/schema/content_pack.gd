@@ -54,3 +54,9 @@ extends Resource
 ## pack's building costs and recipes (a balance decision of the content, like
 ## base_cost — tunables carry rate/curve/policy vocabulary instead).
 @export var starting_grants: Dictionary[StringName, int] = {}
+
+## Event-copy template table (T-COPY-01, additive-optional): keyed variants
+## for every repeating printed line, read by the surfaces through CopyDeck
+## with seeded rotation (docs/voice-bible.md). Absent/null = every surface
+## falls back to CopyDeck.DEFAULTS — one voice, no format bump.
+@export var copy: CopyTable

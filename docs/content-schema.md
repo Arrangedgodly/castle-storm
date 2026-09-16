@@ -60,6 +60,7 @@ through `ContentValidator.load_pack(path)`.
 | `tunables` | `EconomyTunables` | set, valid | R4 vocabulary as data (§4) | T-SIM-05/07/08 |
 | `art` | `ArtManifest` | set, valid; covers every referenced key | Asset keys → vendored sources + licenses (§3) | T-ARCH-04, T-UI-01 |
 | `starting_grants` | `Dictionary[StringName, int]` | keys ⊆ `resources`; values > 0 (additive, T-DATA-02) | Run-start stipend paid by the `grant_resources` command (M1 finding F1); empty = no stipend, the verb is refused | T-DATA-02, T-SIM-04, T-UI-05 |
+| `copy` | `CopyTable` | set, valid (additive-optional, T-COPY-01) | Event-copy template table — keyed variants for every repeating printed line, read through `CopyDeck` with seeded rotation (docs/voice-bible.md); absent = the code-side floor | T-COPY-01, all printing surfaces |
 
 Cross-refs between defs use **`StringName` ids, never file paths or
 ExtResource chains**: `peasant.promotion_paths = [&"worker", &"militia"]`,
@@ -183,6 +184,20 @@ garrison ×1.2 (archers on the walls) + timber ×0.85 (timber tax).
 | `leader_epithets: Array[String]` | ≥ 6, unique, non-empty |
 | `personality_tags: Array[StringName]` | ≥ 4, unique, non-empty |
 | `recruit_names: Array[String]` | ≥ 8, unique, non-empty |
+| `leader_traits: Array[String]` | additive-optional (T-COPY-01); when non-empty: ≥ 4, unique, non-empty — the run lifecycle's trait draw uses it (one draw, same slot; `TRAIT_STUB_LABELS` is the code-side floor when absent) |
+
+### CopyTable (`content/schema/copy_table.gd`) — T-COPY-01 (docs/voice-bible.md)
+
+| Field | Constraint |
+|---|---|
+| `templates: Dictionary[StringName, PackedStringArray]` | every key in `CopyTable.KEY_TOKENS` (87 — content cannot invent keys no surface reads); 1..`MAX_VARIANTS` (4) variants per key; every `{token}` from the key's vocabulary; keys in `ROTATING_KEYS` (repeated beats) need ≥ 2 variants; every variant passes the banned-register word scan (word-boundary, case-insensitive — `BANNED_FRAGMENTS`) |
+
+The renderer (`sim/copy_deck.gd`, `CopyDeck`) picks variants by a rotor
+derived from view data (event seq / run number / report ticks / the beat
+script's hash — never RNG: rendering is pure and replay-deterministic);
+`CopyDeck.DEFAULTS` is the code-side one-variant floor so no-table
+environments read the same voice. Line budgets are enforced by test in
+real font metrics (docs/voice-bible.md §4).
 
 ### EconomyTunables (`content/schema/economy_tunables.gd`) — the R4 vocabulary, T-SIM-08 tuned
 
@@ -361,9 +376,14 @@ truth — no suite carries its own content copy):
   timber costs ×0.75) — distinct combat modifiers and all four economy
   quirk shapes (per-resource prod, prod-all, cost-all, per-resource
   cost), with inks, crests and satirical flavor text.
-- **Identity pools** (the breadth substrate for T-COPY-01): 26 leader
-  first names × 26 epithets (676 full-name permutations), 12 personality
-  tags, 40 recruit names — medieval-farce voice, no modern anachronisms.
+- **Identity pools** (T-COPY-01's expanded breadth): 46 leader first
+  names × 52 epithets (2,392 full-name permutations — thousands), 20
+  personality tags, 72 recruit names, 10 leader trait labels — medieval
+  farce, no anachronisms (banned-register scanned by test).
+- **Copy table** (T-COPY-01, additive): 87 template keys × 1–4 variants
+  each — the shipped voice for every repeating printed line, sized to
+  the 476px/22px line-budget standard with seeded variant rotation
+  (docs/voice-bible.md).
 - **starting_grants**: `{food 50, timber 80}` — affords building all four
   buildings at identity costs with a thin spare buffer; paid once per run
   by the `grant_resources` command (docs/sim-engine.md §12, F1).

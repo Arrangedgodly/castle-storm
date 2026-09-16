@@ -16,3 +16,10 @@ extends Resource
 
 ## Given names for arriving recruits (peasant cards joining the spread).
 @export var recruit_names: Array[String] = []
+
+## Leader trait card labels (T-COPY-01, additive-optional): when set, the
+## run lifecycle draws its trait from HERE (one draw, same slot — the trait
+## index stays serialized + hashed exactly as before); TRAIT_STUB_LABELS is
+## the code-side floor when empty. Pair with the personality tags on the
+## role plate: tags are WHO they are, traits are what the press calls them.
+@export var leader_traits: Array[String] = []

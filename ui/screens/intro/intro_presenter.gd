@@ -108,7 +108,8 @@ static func reveal_view(host: GameHost, p_resumed := false,
 		"previous": previous,
 		"bank": host.meta.legacy_points,
 		"lines": reveal_lines(variant, leader, regime, previous, host.meta.legacy_points,
-			host.is_run_running(), p_catch_up, host.engine.sim_hours()),
+			host.is_run_running(), p_catch_up, host.engine.sim_hours(),
+			host.meta.runs_recorded),
 		"chip": CHIP_LABEL,
 	}
 
@@ -129,14 +130,21 @@ static func variant_for(host: GameHost) -> StringName:
 
 
 ## The reveal's printed lines, in order (class + text). Pure copy builder
-## — testable without a host; every %s is caller-supplied ACTUAL data. The
-## CHECK-IN variant's away line is CatchUpPrint's (one voice source for
-## the window's facts; the blockquote carries the detail after the sweep).
+## — testable without a host; every {token} is caller-supplied ACTUAL data.
+## T-COPY-01: the copy reads the pack's CopyTable through CopyDeck,
+## variants rotated by the RUN number (a returning player's next deal
+## reads differently; the same reveal is always identical). The CHECK-IN
+## variant's away line is CatchUpPrint's (one voice source for the
+## window's facts; the blockquote carries the detail after the sweep).
+## LINE BUDGET: the packet's lines band (504px at the 720 design) — every
+## variant shaped to it at the worst pool names (docs/voice-bible.md §4).
 static func reveal_lines(variant: StringName, leader: Dictionary, regime: Dictionary,
 		previous: Dictionary, bank: int, run_alive := true,
-		p_catch_up := {}, p_sim_hours := 0) -> Array[Dictionary]:
+		p_catch_up := {}, p_sim_hours := 0, p_rotor := 0) -> Array[Dictionary]:
 	var lines: Array[Dictionary] = []
 	var regime_name := String(regime["name"])
+	var table: CopyTable = Inks.pack().copy
+	var first := String(leader["name"]).split(" ")[0]
 	match variant:
 		VARIANT_RESUMED:
 			# The returning hand: the leader's FIRST name (the loss-restart
@@ -144,62 +152,69 @@ static func reveal_lines(variant: StringName, leader: Dictionary, regime: Dictio
 			# the away line from the REAL report, then the table beneath.
 			if run_alive:
 				lines.append(_row(Inks.LineClass.PLAIN,
-					"%s keeps the standard — hour %d of the hand."
-					% [String(leader["name"]).split(" ")[0], p_sim_hours]))
+					CopyDeck.line(table, &"intro_resumed_hold", p_rotor,
+						{"first": first, "hours": p_sim_hours})))
 				lines.append(_row(Inks.LineClass.PLAIN, CatchUpPrint.away_line(p_catch_up)))
 				lines.append(_row(Inks.LineClass.PLAIN,
-					"The spread waits beneath — the chronicle has the rest."))
+					CopyDeck.line(table, &"intro_resumed_tail", p_rotor)))
 			else:
 				lines.append(_row(Inks.LineClass.STRIKE,
-					"The hand ended while you were away."))
+					CopyDeck.line(table, &"intro_resumed_ended", p_rotor)))
 				lines.append(_row(Inks.LineClass.PLAIN, CatchUpPrint.away_line(p_catch_up)))
-				lines.append(_row(Inks.LineClass.PLAIN, "The next hand waits beneath."))
+				lines.append(_row(Inks.LineClass.PLAIN,
+					CopyDeck.line(table, &"intro_resumed_next", p_rotor)))
 			return lines
 	match variant:
 		VARIANT_FIRST_RUN:
 			lines.append(_row(Inks.LineClass.PLAIN,
-				"A blank chronicle, a warm press. One peasant steps forward."))
+				CopyDeck.line(table, &"intro_first_line1", p_rotor)))
 			lines.append(_row(Inks.LineClass.PLAIN,
-				"Marked by the press: %s." % _tags_phrase(leader)))
+				CopyDeck.line(table, &"intro_first_marks", p_rotor,
+					{"tags": _tags_phrase(leader)})))
 			lines.append(_row(Inks.LineClass.PLAIN,
-				"You serve %s, as every peasant does. For now." % _article(regime_name)))
+				CopyDeck.line(table, &"intro_first_serve", p_rotor,
+					{"regime": regime_name})))
 		VARIANT_WIN_RESTART:
 			# The regime-swap beat — the winner's ink becomes the castle's.
+			# The line names the NEW ink (the old crest is struck from the
+			# doors, not re-quoted: two regime names never fit the band —
+			# the chronicle card beneath carries the full history).
 			var old_name := Inks.regime_name(StringName(String(previous.get("regime", ""))))
 			if old_name.is_empty():
-				old_name = "Crown"
+				old_name = "The Crown"
 			if old_name == regime_name:
 				lines.append(_row(Inks.LineClass.VICTORY,
-					"The banner never left: %s keeps the ink your army won it." % _article(regime_name)))
+					CopyDeck.line(table, &"intro_win_kept", p_rotor,
+						{"regime": regime_name})))
 			else:
 				lines.append(_row(Inks.LineClass.VICTORY,
-					"Your army's ink is the castle's ink now — %s struck from the doors, %s printed over it."
-					% [_article(old_name), _article(regime_name)]))
+					CopyDeck.line(table, &"intro_win_swap", p_rotor,
+						{"old": old_name, "new": regime_name})))
 			lines.append(_row(Inks.LineClass.PLAIN,
-				"The bank remembers: %d legacy points across %s."
-				% [bank, ("one hand" if int(previous.get("run", 1)) <= 1
-					else "%d hands" % int(previous.get("run", 1)))]))
+				CopyDeck.line(table, &"intro_win_bank", p_rotor,
+					{"points": bank, "hands": ("one hand" if int(previous.get("run", 1)) <= 1
+						else "%d hands" % int(previous.get("run", 1)))})))
 			lines.append(_row(Inks.LineClass.PLAIN,
-				"%s took the castle at %dh; you serve %s now. You were not at the feast."
-				% [String(previous.get("leader", "")), _duration_hours(previous), _article(regime_name)]))
+				CopyDeck.line(table, &"intro_win_context", p_rotor,
+					{"leader": String(previous.get("leader", "")).split(" ")[0],
+						"hours": _duration_hours(previous),
+						"regime": regime_name})))
 		VARIANT_LOSS_RESTART:
+			# The failure-feel beat (Prof X's contract): the same-crest
+			# REVENGE line first (the regime that crushed the dream deals
+			# your very next hand — settle it), the regime-remembers line
+			# with the CONCRETE banked number, then the serve line.
 			lines.append(_row(Inks.LineClass.STRIKE,
-				"%s crushed %s's dream: same crest, same walls."
-				% [_article(regime_name), String(previous.get("leader", "")).split(" ")[0]]))
+				CopyDeck.line(table, &"intro_loss_revenge", p_rotor,
+					{"regime": regime_name,
+						"first": String(previous.get("leader", "")).split(" ")[0]})))
 			lines.append(_row(Inks.LineClass.PLAIN,
-				"The regime remembers. The bank does too: %d legacy points kept safe." % bank))
+				CopyDeck.line(table, &"intro_loss_remembers", p_rotor,
+					{"points": bank})))
 			lines.append(_row(Inks.LineClass.PLAIN,
-				"You serve %s — the regime that crushed the last dream. Try to be quieter."
-				% _article(regime_name)))
+				CopyDeck.line(table, &"intro_loss_serve", p_rotor,
+					{"regime": regime_name})))
 	return lines
-
-
-## Regime display names carry their own article ("The Paper Crown") —
-## the clerk's lines read it as a proper name, never "the The Paper Crown".
-static func _article(regime_name: String) -> String:
-	if regime_name.begins_with("The "):
-		return regime_name
-	return "the " + regime_name
 
 
 ## The unfold duration under the current motion profile (full = authored

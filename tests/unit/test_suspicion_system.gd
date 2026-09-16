@@ -834,8 +834,11 @@ func test_chronicle_lines_render_for_every_beat() -> void:
 	event.tick = int(telegraph["tick"])
 	event.type = &"suspicion_telegraph"
 	event.value = int(telegraph["value"])
+	# T-COPY-01: the telegraph line reads CopyDeck's floor (this system was
+	# constructed without a copy table) with the event's seq as rotor —
+	# seq 0 selects variant 0 deterministically.
 	assert_str(heat.chronicle_line(event)).is_equal(
-		"The Watchful Eye turns: riders in livery count your barns. The crackdown lands in 4 hours."
+		"The Eye turns: riders count your barns. Crackdown in 4h."
 	)
 	event = SimEvent.new()
 	event.type = &"crackdown_cancelled"

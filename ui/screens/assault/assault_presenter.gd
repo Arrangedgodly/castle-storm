@@ -119,40 +119,53 @@ static func contribution_line(entry: Dictionary) -> String:
 ## motion they accompany the march; in reduced motion (near-instant beats)
 ## they ARE the vignette. `beat_index` is the beat's place in the chain;
 ## `roster` (optional, the commit-time odds view's roster) sharpens the
-## casualty counts — the lines work from events alone without it.
+## casualty counts — the lines work from events alone without it. T-COPY-01:
+## the copy reads the pack's CopyTable, the rotor the battle's own visual
+## sequence hash (same battle -> same lines; no two battles read alike).
 static func beat_summary(script: Dictionary, beat_index: int, roster: Array = []) -> String:
 	var beats: Array = script["beats"]
 	if beat_index < 0 or beat_index >= beats.size():
 		return ""
+	var table: CopyTable = Inks.pack().copy
+	var rotor := BeatScript.visual_sequence_hash(script) + beat_index
 	var beat: Dictionary = beats[beat_index]
 	var fallen := _fallen_units(script, beat_index, roster)
 	match beat["phase"]:
 		&"advance":
-			return "The army advances through the mud toward the walls."
+			return CopyDeck.line(table, &"beat_advance", rotor)
 		&"skirmish":
 			if fallen > 0:
-				return "Skirmish beneath the walls — %d of ours fall where they stand." % fallen
-			return "Skirmish beneath the walls; both ledgers bleed."
+				return CopyDeck.line(table, &"beat_skirmish_fallen", rotor, {"count": fallen})
+			return CopyDeck.line(table, &"beat_skirmish", rotor)
 		&"gate":
 			if fallen > 0:
-				return "The gate is reached. The ram does its arithmetic — %d more fall." % fallen
-			return "The gate is reached. The ram does its arithmetic."
+				return CopyDeck.line(table, &"beat_gate_fallen", rotor, {"count": fallen})
+			return CopyDeck.line(table, &"beat_gate", rotor)
 		&"throne":
-			return "The throne room is taken. The seal changes hands."
+			return CopyDeck.line(table, &"beat_throne", rotor)
 		&"rout":
-			return "The army breaks and runs for the tree line."
+			return CopyDeck.line(table, &"beat_rout", rotor)
 	return ""
 
 
 ## The outcome's printed block: the loss lands as a chronicle BLOCKQUOTE
 ## (struck rule, the wider print the strip never carries); the win lands as
 ## the victory double rule. Both stay on the table — never popup chrome.
+## T-COPY-01: composed from the outcome templates (the label AUTOWRAPS —
+## the block may run two sentences; the spine sentence carries the seal).
 static func outcome_block(script: Dictionary, regime_name: String, banked_points: int) -> String:
+	var table: CopyTable = Inks.pack().copy
+	var rotor := BeatScript.visual_sequence_hash(script)
 	if script["outcome"] == &"win":
-		var bank := (" %d legacy points pass to the next hand." % banked_points) if banked_points > 0 else ""
-		return "THE CASTLE FALLS.%s The %s is undone." % [bank, regime_name]
-	return "THE ASSAULT IS BROKEN under the %s. %d of the vanguard lie where they fell; the Crown's clerks take names. The plot survives — thinner, colder, wiser." % [
-		regime_name, int(script["casualties"])]
+		var head := CopyDeck.line(table, &"assault_win_block", rotor, {"regime": regime_name})
+		if banked_points <= 0:
+			return head
+		return "%s %s" % [head, CopyDeck.line(table, &"assault_win_bank", rotor,
+			{"points": banked_points})]
+	return "%s %s" % [
+		CopyDeck.line(table, &"assault_loss_block", rotor, {"regime": regime_name}),
+		CopyDeck.line(table, &"assault_loss_note", rotor,
+			{"count": int(script["casualties"])})]
 
 
 ## Units that fell AT a beat (roster-power share of the milli drop between

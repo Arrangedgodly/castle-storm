@@ -78,6 +78,10 @@ var rearm_until_tick := 0
 var decay_paused_until_tick := 0
 
 var _max_points := 0
+## The pack's copy table (T-COPY-01, additive-optional): the chronicle
+## render query reads its variants with the event's seq as rotor; null =
+## CopyDeck's code-side floor (bare sim tests read the same voice).
+var _copy: CopyTable = null
 var _warn_milli := 0
 var _crackdown_milli := 0
 var _decay_milli := 0
@@ -111,8 +115,10 @@ var _watch_levels: Dictionary = {}  # StringName building id -> int level
 var _watch_training: Dictionary = {}  # int uid -> true (set of running timers)
 
 
-func _init(p_tunables: EconomyTunables = null, p_units: Array[UnitDef] = []) -> void:
+func _init(p_tunables: EconomyTunables = null, p_units: Array[UnitDef] = [],
+		p_copy: CopyTable = null) -> void:
 	var tunables := p_tunables if p_tunables != null else EconomyTunables.new()
+	_copy = p_copy
 	_max_points = maxi(1, tunables.suspicion_max)
 	_warn_milli = tunables.suspicion_warn_threshold * SimFixed.MILLI
 	_crackdown_milli = tunables.suspicion_crackdown_threshold * SimFixed.MILLI
@@ -179,28 +185,35 @@ func is_in_relief(at_tick: int) -> bool:
 
 
 ## Human-readable chronicle line for a suspicion-stream event (Professor X
-## lane: satirical placeholders, deterministic pure render — T-COPY-01
-## deepens the voice; the event stream itself stays int-payload-only, the
-## same identity-is-a-query pattern as M1 finding F5). "" for other events.
+## lane: T-COPY-01 — the shipped copy lives in the pack's CopyTable with
+## per-event variants rotated by the event's SEQ (repeats vary; same replay
+## -> same lines), CopyDeck.DEFAULTS the code-side floor; the event stream
+## itself stays int-payload-only, the same identity-is-a-query pattern as M1
+## finding F5). "" for other events.
 func chronicle_line(event: SimEvent) -> String:
 	var hours := (event.value - event.tick) / SimEngine.TICKS_PER_SIM_HOUR
 	match event.type:
 		&"suspicion_warn":
-			return "Somewhere in the capital, a clerk underlines your name. Twice."
+			return CopyDeck.line(_copy, &"suspicion_warn", event.seq)
 		&"suspicion_telegraph":
-			return "The Watchful Eye turns: riders in livery count your barns. The crackdown lands in %d hours." % hours
+			return CopyDeck.line(_copy, &"suspicion_telegraph", event.seq,
+				{"hours": hours})
 		&"crackdown_cancelled":
-			return "The riders turn back. Whoever paid them lost their nerve — for now."
+			return CopyDeck.line(_copy, &"crackdown_cancelled", event.seq)
 		&"crackdown_struck":
-			return "THE CRACKDOWN (%d). Ledgers seized, the gate kicked over, and someone important pretends this never happened." % event.value
+			return CopyDeck.line(_copy, &"crackdown_struck", event.seq,
+				{"count": event.value})
 		&"crackdown_seized":
-			return "…%d %s marched off under royal seal." % [event.value, String(event.subject)]
+			return CopyDeck.line(_copy, &"crackdown_seized", event.seq,
+				{"count": event.value, "resource": String(event.subject)})
 		&"crackdown_scattered":
-			return "…%d recruits decide farming elsewhere is the wiser career." % event.value
+			return CopyDeck.line(_copy, &"crackdown_scattered", event.seq,
+				{"count": event.value})
 		&"run_crushed":
-			return "The revolution is crushed. Your name becomes a cautionary tale told to other people's children — but the chronicle remembers, and the next leader inherits the bank."
+			return CopyDeck.line(_copy, &"run_crushed", event.seq)
 		&"suspicion_rose":
-			return "The Crown's agents note +%d suspicion from %s." % [event.value, String(event.subject)]
+			return CopyDeck.line(_copy, &"suspicion_rose", event.seq,
+				{"points": event.value, "source": String(event.subject)})
 		_:
 			return ""
 

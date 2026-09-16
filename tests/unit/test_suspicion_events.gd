@@ -272,9 +272,11 @@ func test_scatter_names_follow_the_offers_first_rule() -> void:
 	info = SuspicionEventsScript.scatter_names(thin_cards, 3, 0)
 	assert_array(info["names"]).is_equal(["Osric", "Broom"])
 	assert_int(int(info["peasants"])).is_equal(1)
-	# Nobody swept: the mud line.
-	var row := SuspicionEventsScript.scatter_line(pre_cards, {"value": 0, "value2": 4})
-	assert_str(String(row["text"])).contains("mud")
+	# Nobody swept: the mud line (scatter_line returns ROWS since T-COPY-01
+	# — the peasants follow-up prints as its own quote row).
+	var rows := SuspicionEventsScript.scatter_line(pre_cards, {"value": 0, "value2": 4})
+	assert_int(rows.size()).is_equal(1)
+	assert_str(String(rows[0]["text"])).contains("mud")
 
 
 func test_crush_lines_read_the_regime_and_the_real_bank() -> void:
