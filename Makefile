@@ -80,6 +80,8 @@ run-responsive:
 #                                                               # RESUME: boots through the real save — the check-in
 #                                                               # unfold + the while-you-were-away print + the
 #                                                               # foreground->actionable wall measurement
+#   CS_SPREAD_SHOT=/p.png CS_SPREAD_CATCHUP=4 make run-game    # crackdown landing INSIDE the away window — the print's STRIKE
+#                                                               # row + the signed seizure losses, from a real resolved window
 run-game:
 	$(GODOT_BIN) --path . res://ui/screens/spread/spread_screen.tscn
 

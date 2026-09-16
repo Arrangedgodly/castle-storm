@@ -5,9 +5,11 @@
 ##   - THE PRINT (pure): every row derives from the REAL report payload —
 ##     capped/uncapped/zero/rewound windows, per-type resource movement
 ##     (signed), arrivals/completions/promotions, the suspicion delta,
-##     crackdowns-with-weight (STRIKE), run endings (STRIKE), the line
-##     budget (rows clip past the label edge — the T-UI-06 find), the
-##     single headline voice shared by strip/blockquote/reveal;
+##     crackdowns-with-weight (STRIKE), run endings (STRIKE), the
+##     FONT-METRIC no-clip line budget (every row variant measured in the
+##     theme's real face against the live mounted quote label — the
+##     round-1 re-dispatch fix; T-UI-06 standard), the single headline
+##     voice shared by strip/blockquote/reveal;
 ##   - THE CHECK-IN (screen): a resumed boot opens the SHORT unfold over
 ##     the SAME hand (no re-deal), auto-opening with ZERO gestures
 ##     (reduced motion: synchronous), one gesture beating the auto from
@@ -118,7 +120,7 @@ func test_rows_capped_window_prints_elapsed_cap_resources_people_suspicion() -> 
 	assert_bool(joined.contains("+18 timber")).is_true()
 	assert_bool(joined.contains("+0 iron")).is_false()  # silent types stay silent
 	assert_bool(joined.contains("3 came to the gate")).is_true()
-	assert_bool(joined.contains("2 finished their drills")).is_true()
+	assert_bool(joined.contains("2 finished drills")).is_true()
 	assert_bool(joined.contains("1 was promoted")).is_true()
 	assert_bool(joined.contains("The Crown's eye: 30 to 36")).is_true()
 	# Nothing moved with weight in this window: no STRIKE rows.
@@ -148,7 +150,7 @@ func test_rows_rewound_leads_with_the_wry_line_and_stops() -> void:
 	}))
 	assert_int(rows.size()).is_equal(1)
 	assert_bool(String(rows[0]["text"]).contains("wound backwards")).is_true()
-	assert_bool(String(rows[0]["text"]).contains("stores kept count")).is_true()
+	assert_bool(String(rows[0]["text"]).contains("Nothing was lost")).is_true()
 
 
 func test_rows_crackdown_and_run_ending_print_with_weight() -> void:
@@ -177,25 +179,134 @@ func test_rows_negative_resource_movement_prints_signed() -> void:
 	assert_bool(joined.contains("+9 timber")).is_true()
 
 
-func test_every_row_fits_the_line_budget() -> void:
-	## The maximal window: every field hot at once — no row may exceed the
-	## panel's label edge (rows CLIP; the T-UI-06 budget find).
-	var rows := CatchUpPrint.rows(_report({
-		"capped": true, "clamped_seconds": CAP_SECONDS,
-		"arrivals": 5, "training_completions": 4, "promotions": 3,
-		"resource_delta": {&"food": 1234, &"timber": 987, &"iron": 456},
-		"suspicion_before": 12, "suspicion_after": 34, "suspicion_delta": 22,
-		"crackdowns": 2, "run_endings": 1,
-	}))
-	assert_int(rows.size()).is_greater_equal(6)
-	for row: Dictionary in rows:
-		assert_int(String(row["text"]).length()) \
-			.is_less_equal(CatchUpPrint.ROW_CHAR_BUDGET)
-	# The away line (the reveal's plate) keeps the same budget.
-	for report in [_report(), _report({"capped": true, "clamped_seconds": CAP_SECONDS}),
-			_report({"rewound": true}), {}]:
-		assert_int(CatchUpPrint.away_line(report).length()) \
-			.is_less_equal(CatchUpPrint.ROW_CHAR_BUDGET)
+## The clip margin every row must clear BEYOND fitting: headroom for
+## glyph and wide-digit drift (the round-1 FAIL's caution — a row that
+## fits at EXACTLY the label width clips first when anything drifts).
+const CLIP_MARGIN := 30.0
+
+
+## THE FONT-METRIC NO-CLIP PIN (the round-1 verifier FAIL — the T-UI-06
+## standard for this exact panel): EVERY row variant the print can
+## compose is set through the REAL seam (`_deliver_catch_up`'s
+## `open_quote_rows`) onto a LIVE mounted EventQuote, and each printed
+## row's text is measured in the theme's own ChronicleLine face against
+## the label it must fit: assert <= live label width - CLIP_MARGIN. The
+## old <=66-character proxy PASSED while the crackdown STRIKE row
+## measured 505px on the 476px label and clipped mid-word — wide glyphs
+## make the char proxy leaky, so the metric is the pin and the character
+## count stays only as a secondary guard.
+func test_every_print_row_fits_the_label_in_real_font_metrics() -> void:
+	MotionProfile.forced = 1
+	var host := _host(20261122)
+	var screen: SpreadScreen = await _mounted(host, false)
+	# Every variant, at the widest shapes each template can carry: the
+	# maximal window (every field hot, 4-digit signed deltas, the
+	# steepest suspicion climb, BOTH strike rows), the plain uncapped
+	# window, the nothing-moved window, the sub-minute headline, the
+	# rewound wry line, the zero-tick quiet strip row.
+	var variants: Array[Array] = [
+		CatchUpPrint.rows(_report({
+			"capped": true, "clamped_seconds": CAP_SECONDS,
+			"arrivals": 5, "training_completions": 4, "promotions": 3,
+			"resource_delta": {&"food": -2345, &"timber": 1999, &"iron": 1777},
+			"suspicion_before": 5, "suspicion_after": 95, "suspicion_delta": 90,
+			"crackdowns": 2, "run_endings": 1,
+		})),
+		CatchUpPrint.rows(_report({
+			"arrivals": 1, "training_completions": 1, "promotions": 1,
+			"resource_delta": {&"food": -24, &"timber": 9},
+			"suspicion_before": 30, "suspicion_after": 36, "suspicion_delta": 6,
+		})),
+		CatchUpPrint.rows(_report()),
+		CatchUpPrint.rows(_report({"clamped_seconds": 30, "elapsed_seconds": 30,
+			"applied_ticks": 0})),
+		CatchUpPrint.rows(_report({"rewound": true, "elapsed_seconds": -3600,
+			"clamped_seconds": 0, "applied_ticks": 0})),
+		[CatchUpPrint.quiet_row()],
+	]
+	var bounds := screen._design_bounds().size
+	## The label budget itself, pinned against geometry drift: panel
+	## min(560, bounds.x - 12), less 2*14 panel margins, 2*8 row insets,
+	## the 30 rule and its 10 separation (the verifier's 476px at 720).
+	var want_label := minf(560.0, bounds.x - 12.0) - 84.0
+	## THE FONT-SIZE ITEM-NAME TRAP (found measuring this pin): a Label's
+	## size item is "font_size"; asking get_theme_font_size("font") finds
+	## NO item and falls back to the theme default (24) — while the RENDER
+	## resolves the declared ChronicleLine 22. Measuring at the "font"
+	## fallback is CONSERVATIVE (24 >= 22, same face, monotone in size),
+	## and this pins that it stays >= the declared render size.
+	var declared := (load("res://ui/theme/spread_theme.tres") as Theme) \
+		.get_font_size(&"font_size", &"ChronicleLine")
+	assert_int(declared).is_equal(22)
+	var texts: Array[String] = []
+	for rows: Array in variants:
+		var typed_rows: Array[Dictionary] = []
+		typed_rows.assign(rows)
+		screen._suspicion.open_quote_rows(typed_rows,
+			bounds, screen._quote_floor(), 0.0)
+		await get_tree().process_frame
+		await get_tree().process_frame
+		var quote_lines: Array = screen._suspicion._quote._lines
+		assert_int(quote_lines.size()).is_equal(rows.size())
+		for i in quote_lines.size():
+			var label := _chronicle_label_of(quote_lines[i])
+			assert_that(label).is_not_null()
+			if label == null:
+				continue
+			# The budget the rows are shaped against is the LIVE label.
+			assert_float(label.size.x).is_equal_approx(want_label, 0.5)
+			assert_int(label.get_theme_font_size("font")) \
+				.is_greater_equal(declared)  # conservative, never under-render
+			var width := label.get_theme_font("font").get_string_size(
+				String(label.text), HORIZONTAL_ALIGNMENT_LEFT, -1,
+				label.get_theme_font_size("font")).x
+			assert_float(width).is_less_equal(label.size.x - CLIP_MARGIN)
+			if not texts.has(String(label.text)):
+				texts.append(String(label.text))
+	# Every distinct row text was measured (the audit: maximal + plain +
+	# nothing-moved + sub-minute + rewound + quiet, strikes included).
+	assert_int(texts.size()).is_greater_equal(11)
+	# Secondary guard (leaky alone, kept cheap): the character count.
+	for text in texts:
+		assert_int(text.length()).is_less_equal(CatchUpPrint.ROW_CHAR_BUDGET)
+	screen.queue_free()
+
+
+## The away line prints on the reveal PACKET (its own surface — the
+## 560-wide lines band, WIDER than the quote label): every variant
+## measured on a live mounted packet bound through the real presenter.
+func test_every_away_line_fits_the_reveal_packet_in_real_font_metrics() -> void:
+	var host := _host(20261123)
+	var packet := IntroPacket.new()
+	get_tree().root.add_child(packet)
+	packet.size = Vector2(720, 720)
+	await get_tree().process_frame
+	for report in [{}, _report({"rewound": true}), _report(),
+			_report({"capped": true, "clamped_seconds": CAP_SECONDS}),
+			_report({"clamped_seconds": 30})]:
+		packet.bind(IntroPresenter.reveal_view(host, true, report))
+		await get_tree().process_frame
+		await get_tree().process_frame
+		for line: Control in packet._lines:
+			var label := _chronicle_label_of(line)
+			if label == null or String(label.text).is_empty():
+				continue
+			var width := label.get_theme_font("font").get_string_size(
+				String(label.text), HORIZONTAL_ALIGNMENT_LEFT, -1,
+				label.get_theme_font_size("font")).x
+			assert_float(width).is_less_equal(label.size.x - CLIP_MARGIN)
+	packet.queue_free()
+
+
+## The printed row's Label (ChronicleLine -> HBox -> [rule, label]) —
+## the T-UI-06 helper shape.
+func _chronicle_label_of(row: Control) -> Label:
+	for child in row.get_children():
+		if child is HBoxContainer:
+			for leaf in child.get_children():
+				if leaf is Label:
+					return leaf
+	return null
 
 
 func test_one_headline_voice_strip_quote_and_reveal_agree() -> void:

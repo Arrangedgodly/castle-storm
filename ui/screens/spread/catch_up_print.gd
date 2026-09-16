@@ -11,18 +11,24 @@
 ## re-derived or invented here.
 ##
 ## LINE BUDGET (the T-UI-06 find, honored here): ChronicleLine rows CLIP
-## past the label edge; the quote panel is 560 wide and the reveal's
-## packet rows are narrower still, so every builder keeps its rows inside
-## the budget (pinned by test at <= ROW_CHAR_BUDGET characters).
+## past the label edge; the quote panel is 560 wide and its printed label
+## is 476px (560 - 2*14 panel margins - 2*8 row insets - 30 rule - 10
+## separation, orientation-independent). The STANDARD is font-metric
+## no-clip: every row is shaped to fit the label measured in the theme's
+## real AlegreyaSans-Italic 22px face with >= 30px of margin (pinned by
+## test against a live mounted EventQuote — the round-1 re-dispatch; the
+## <= ROW_CHAR_BUDGET character count stays only as a secondary guard:
+## wide glyphs made the char proxy leaky).
 ##
 ## Pure statics only: a report Dictionary in, {class, text} rows out —
 ## same report => same print (testable without a host or scene tree).
 class_name CatchUpPrint
 extends RefCounted
 
-## The single-line budget every row must fit (the quote panel's label
-## edge; pinned by test — T-COPY-01 deepens the voice inside it).
-const ROW_CHAR_BUDGET := 66
+## Secondary character-count guard on the single-line budget (the PRIMARY
+## pin is the font-metric no-clip test — measure the real face, assert
+## <= label width - margin; T-COPY-01 deepens the voice inside it).
+const ROW_CHAR_BUDGET := 60
 
 
 ## A whole away window's seconds as the table's own phrase ("8h 37m",
@@ -64,19 +70,19 @@ static func quiet_row() -> Dictionary:
 ## noted when clamped), per-type resource movement, the arrivals/
 ## completions/promotions summary, the suspicion delta, crackdowns that
 ## landed while away (weight: STRIKE), and a run that ended inside the
-## window (weight: STRIKE). A rewound clock leads with the wry line (the
-## service's own voice) and prints nothing else — nothing else happened.
+## window (weight: STRIKE). A rewound clock leads with the wry line and
+## prints nothing else — nothing else happened, and nothing was taken.
 static func rows(report: Dictionary) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	if bool(report.get("rewound", false)):
 		out.append({"class": Inks.LineClass.PLAIN,
-			"text": "The castle clock was found wound backwards. The stores kept count."})
+			"text": "The clock was wound backwards. Nothing was lost."})
 		return out
 	out.append(headline_row(report))
 	var cap_seconds := int(report.get("cap_seconds", 0))
 	if bool(report.get("capped", false)) and cap_seconds > 0:
 		out.append({"class": Inks.LineClass.PLAIN,
-			"text": "The crown's clock stops at %d hours; the rest is not remembered."
+			"text": "The crown's clock stops at %d hours; the rest is lost."
 				% maxi(1, cap_seconds / 3600)})
 	out.append(_resources_row(report))
 	var people := _people_row(report)
@@ -87,7 +93,7 @@ static func rows(report: Dictionary) -> Array[Dictionary]:
 		out.append(suspicion)
 	if int(report.get("crackdowns", 0)) > 0:
 		out.append({"class": Inks.LineClass.STRIKE,
-			"text": "A crackdown landed while you were away — the riders were paid."})
+			"text": "A crackdown landed while you were away."})
 	if int(report.get("run_endings", 0)) > 0:
 		out.append({"class": Inks.LineClass.STRIKE,
 			"text": "The hand itself ended while you were away."})
@@ -115,7 +121,7 @@ static func _people_row(report: Dictionary) -> Dictionary:
 		parts.append("%d came to the gate" % arrivals)
 	var completions := int(report.get("training_completions", 0))
 	if completions > 0:
-		parts.append("%d finished their drills" % completions)
+		parts.append("%d finished drills" % completions)
 	var promotions := int(report.get("promotions", 0))
 	if promotions > 0:
 		parts.append("%d %s promoted" % [promotions, "was" if promotions == 1 else "were"])
@@ -150,11 +156,11 @@ static func away_line(report: Dictionary) -> String:
 	if report.is_empty():
 		return "The table kept its counsel while you were gone."
 	if bool(report.get("rewound", false)):
-		return "The clock was found wound backwards; the stores kept count."
+		return "The clock was wound backwards; nothing was lost."
 	var clamped := int(report.get("clamped_seconds", 0))
 	if clamped < 60:
 		return quiet_row()["text"]
 	if bool(report.get("capped", false)):
-		return "You were away %s — the crown's clock stops at %d hours." % [
+		return "You were away %s — the clock stops at %d hours." % [
 			duration_phrase(clamped), maxi(1, int(report.get("cap_seconds", 0)) / 3600)]
 	return "You were away %s; the press kept printing." % duration_phrase(clamped)

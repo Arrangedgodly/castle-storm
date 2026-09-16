@@ -71,11 +71,12 @@
 ## telegraph choice card / the landed-crackdown blockquote / the crushed
 ## beat's quote over the swept table), with CS_SPREAD_CHRONICLE=1/2 for
 ## the chronicle ledger (T-UI-08: three real hands / the 50-hand ring,
-## newest + oldest pages), or with CS_SPREAD_CATCHUP=1/2 for the check-in
-## beats (T-UI-09: a mid-session away window resolved on the live table /
-## a full process-restart resume through a real save — the short unfold +
-## the while-you-were-away print, with the foreground->actionable
-## measurement printed).
+## newest + oldest pages), or with CS_SPREAD_CATCHUP=1/2/4 for the
+## check-in beats (T-UI-09: a mid-session away window resolved on the
+## live table / a full process-restart resume through a real save — via
+## =2 then =3, the short unfold + the while-you-were-away print with the
+## foreground->actionable measurement printed / a crackdown landing
+## INSIDE the away window: the print's STRIKE row + signed seizures).
 extends ResponsiveScreen
 
 const RUN_HEADER_SCRIPT := preload("res://ui/screens/spread/run_header.gd")
@@ -1594,6 +1595,10 @@ func _suspicion_then_capture(mode: int, settle: float) -> void:
 ## save: the check-in unfold plays over the caught-up table, auto-opens,
 ## the print lands, and the capture reports the honest
 ## foreground->actionable-card wall time (the 3-second promise).
+## =4 (CRACKDOWN-IN-WINDOW, the round-1 re-dispatch): the meter seam at
+## 78 arms the telegraph before the app hides; the 4h land tick falls
+## inside the 5h away window, so the capture shows the print's STRIKE
+## row + the signed seizure losses from a REAL resolved window.
 ## Timestamps are injected constants; no OS clock is read by the game.
 func _catch_up_then_capture(mode: int, settle: float) -> void:
 	const T0 := 1_800_000_000  # synthetic platform epoch (printed for the =3 chaining)
@@ -1651,6 +1656,32 @@ func _catch_up_then_capture(mode: int, settle: float) -> void:
 			% [int(report["applied_ticks"]), str(report["capped"]),
 				_suspicion.quote_rows().size(), Time.get_ticks_msec() - started,
 				str(focus != null and focus.has_meta(&"spread_card_id"))])
+		for row: Dictionary in _suspicion.quote_rows():
+			print("[spread]   away: %s" % String(row["text"]))
+		_settle_then_capture(settle if settle > 0.0 else 0.4)
+		return
+	if mode == 4:
+		# CRACKDOWN-IN-WINDOW (the round-1 re-dispatch's capture): the
+		# documented meter seam at 78 arms the telegraph BEFORE the app
+		# hides — a player who left with the Crown's eye on them — and the
+		# 4h land tick falls INSIDE the 5h away window, so the STRIKE row
+		# and the signed seizures print from the REAL resolved window.
+		host.fast_forward(SimEngine.TICKS_PER_SIM_HOUR)
+		host.suspicion().set_suspicion(78)
+		host.fast_forward(2)
+		refresh_from_state()
+		var armed := host.suspicion().crackdown_land_tick != -1
+		host.background(T0)
+		var started := Time.get_ticks_msec()
+		var report := host.foreground(T0 + 5 * 3600)
+		for i in 300:
+			await get_tree().process_frame
+			if int(stats[&"catch_up_prints"]) > 0:
+				break
+		print("[spread] catch-up print (crackdown-in-window): telegraph armed %s, applied %d ticks, crackdowns %d, rows %d, printed %dms after foreground"
+			% [str(armed), int(report["applied_ticks"]),
+				int(report.get("crackdowns", 0)), _suspicion.quote_rows().size(),
+				Time.get_ticks_msec() - started])
 		for row: Dictionary in _suspicion.quote_rows():
 			print("[spread]   away: %s" % String(row["text"]))
 		_settle_then_capture(settle if settle > 0.0 else 0.4)

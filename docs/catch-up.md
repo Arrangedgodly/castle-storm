@@ -139,7 +139,11 @@ while-you-were-away chronicle BLOCKQUOTE on the table
 (`ui/screens/spread/catch_up_print.gd` — elapsed/capped clause, per-type
 resources, arrivals/completions/promotions, suspicion delta,
 crackdowns-with-weight; one quiet strip line for a nothing-happened
-window; the wry line leads a rewound one). A window resolved inside
+window; the wry line leads a rewound one). Every row is shaped to the
+panel's label budget in the REAL theme face with margin (the T-UI-06
+no-clip standard; font-metric pinned per variant in the test map below —
+the ≤-character count is only a secondary guard, wide glyphs made it
+leaky). A window resolved inside
 `boot()` fires its signal before any screen connects, so `GameHost.
 last_catch_up_report` is the boot seam the check-in reads. Never a
 "welcome back" modal — the quote dwells and folds itself, the table is
@@ -185,3 +189,4 @@ plus this bound keep gate-offer pressure manageable forever
 | twin parity (fast-forward == live ticks) | same file + `marathon_catch_up_gap` (resources per type, hash, arrivals, suspicion) |
 | compute budget (<100ms for capped 8h) | `marathon_catch_up_gap` (measured 7ms) |
 | the while-you-were-away print (capped/uncapped/zero/rewound/crackdown-while-away), the check-in unfold + focus landing, input parity ×3, reduced motion | `tests/unit/test_catch_up_ux.gd` (T-UI-09) |
+| every print row variant no-clip in REAL font metrics (live mounted quote label − 30px margin; the away lines on the live reveal packet — the round-1 re-dispatch pin) | `tests/unit/test_catch_up_ux.gd` `test_every_print_row_fits_the_label_in_real_font_metrics`, `test_every_away_line_fits_the_reveal_packet_in_real_font_metrics` |
