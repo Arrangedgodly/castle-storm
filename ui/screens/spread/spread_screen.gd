@@ -43,8 +43,10 @@
 ## for a settling window and saves one capture, then quits; pair with
 ## CS_SPREAD_LOUD=1 for the pressured state (see _capture_hook), with
 ## CS_SPREAD_PROMOTE=1 to capture THE PROMOTE MOMENT mid-flip (or =2 for
-## the landed flip with its flourish), or with CS_SPREAD_FAN=1 to capture
-## an open action fan.
+## the landed flip with its flourish), with CS_SPREAD_FAN=1 to capture
+## an open action fan, with CS_SPREAD_INTRO=1/2 for the leader intro at
+## reveal / mid-unfold (T-UI-05), or with CS_SPREAD_RESTART=win/loss for
+## a full restart session's reveal captures.
 extends ResponsiveScreen
 
 const RUN_HEADER_SCRIPT := preload("res://ui/screens/spread/run_header.gd")
@@ -52,6 +54,8 @@ const WATCHFUL_EYE_SCRIPT := preload("res://ui/screens/spread/watchful_eye.gd")
 const ACTION_FAN_SCRIPT := preload("res://ui/screens/spread/action_fan.gd")
 const AssaultScreenScript := preload("res://ui/screens/assault/assault_screen.gd")
 const ASSAULT_SCENE := preload("res://ui/screens/assault/assault_screen.tscn")
+const IntroScreenScript := preload("res://ui/screens/intro/intro_screen.gd")
+const INTRO_SCENE := preload("res://ui/screens/intro/intro_screen.tscn")
 
 ## Default demo seed (deterministic identity + arrival draw; override
 ## with CS_SEED).
@@ -78,13 +82,24 @@ var stats := {
 	&"fans_opened": 0, &"actions_submitted": 0, &"refusals_printed": 0,
 	&"flips_played": 0, &"flip_replays": 0, &"entrances": 0,
 	&"assaults_opened": 0, &"assaults_finished": 0,
+	&"intros_opened": 0, &"intros_unfolded": 0,
 }
+
+## The leader intro / restart reveal (T-UI-05): ON at boot, from the
+## assault's finished("win") seam, and off run_lost/run_aborted. Sibling
+## suites that pin THE TABLE set this false at mount — the intro's own
+## suite owns the opening flow both ways.
+var intro_enabled := true
 
 var _view := {}
 var _scale_chip: Label
 var _fan: ActionFan
 var _assault: AssaultScreenScript
+var _intro: IntroScreenScript
 var _pre_assault_focus: Control
+## A run ended WHILE the vignette was open (the edge crush): the intro
+## mounts after the vignette closes — paper never stacks on paper.
+var _intro_after_assault := false
 var _flip_queue := CardMotion.PromotionFlipQueue.new()
 ## Entrance deals are armed only after the FIRST full bind — the boot deal
 ## is the packet unfold's business (T-UI-05); cards JOINING a live table
@@ -101,6 +116,7 @@ func _ready() -> void:
 	_compose_slot_chrome()
 	_build_action_fan()
 	_build_assault_screen()
+	_build_intro_screen()
 	host.event_observed.connect(_on_event)
 	host.sim_advanced.connect(_on_ticks)
 	host.run_state_changed.connect(func(_running: bool) -> void: refresh_from_state())
@@ -113,8 +129,15 @@ func _ready() -> void:
 	# AFTER settled slot rects — column ladders and the Eye's perch read
 	# the real spread geometry, never the pre-layout zero (the exact
 	# stale-columns failure the layout-determinism test caught).
-	refresh_from_state.call_deferred()
+	_refresh_from_state_deferred()
 	_capture_hook()
+
+
+## The deferred first bind (see _ready), THEN the boot intro check — the
+## reveal papers over an already-bound table, never a blank one.
+func _refresh_from_state_deferred() -> void:
+	refresh_from_state.call_deferred()
+	_maybe_open_boot_intro.call_deferred()
 
 
 ## The seeded demo session: a real save-backed host. CS_DEMO_RESET=1 (the
@@ -204,6 +227,17 @@ func _on_event(event: Dictionary) -> void:
 	if row != null:
 		presenter.push_row(row)
 		_bind_chronicle()
+	# A run ENDED by failure (the suspicion crush; the thin abort): the
+	# leader intro mounts with the loss reveal — the new leader under the
+	# SAME regime + "the regime remembers". DEFERRED so the aftermath's
+	# full refresh (the "full" target below RETURNS) prints the crushing
+	# beat first — the chronicle keeps it, the reveal papers over after.
+	# Mid-vignette ends wait for the vignette's close (paper on paper).
+	if event["type"] == &"run_lost" or event["type"] == &"run_aborted":
+		if _assault != null and _assault.is_open():
+			_intro_after_assault = true
+		elif intro_enabled:
+			_open_intro.call_deferred()
 	var targets := SpreadPresenter.refresh_targets_for(event["type"])
 	# THE SIGNATURE MOMENT (T-UI-04): an army promotion (knight/archer —
 	# a terminal combat rank) turns the card over. The flip owns the card
@@ -271,6 +305,16 @@ func _build_assault_screen() -> void:
 	_assault.finished.connect(_on_assault_finished)
 
 
+## Build the intro screen ONCE, ABOVE the assault screen in z-order (a
+## run can end mid-vignette — the edge crush — and the reveal papers
+## over everything; the vignette finishes beneath, the intro owns input).
+func _build_intro_screen() -> void:
+	_intro = INTRO_SCENE.instantiate()
+	_intro.name = "IntroScreen"
+	add_child(_intro)
+	_intro.closed.connect(_on_intro_closed)
+
+
 ## Open the assault odds table (the army card's storm action, or the
 ## capture hook). Focus is remembered so closing returns the pad player
 ## to the card that raised the standard.
@@ -283,12 +327,25 @@ func open_assault() -> void:
 	_assault.open(host, get_router())
 
 
-## THE VICTORY-HANDOFF SEAM: T-UI-05's restart flow mounts here (the
-## win's "deal the next hand"). Today the spread simply takes focus back
-## and rebinds — the outcome events already drove every refresh, and the
-## loss blockquote stays printed in the chronicle's rolling record.
-func _on_assault_finished(_outcome: StringName, _script: Dictionary) -> void:
+## THE VICTORY-HANDOFF SEAM (T-UI-05 mounted it): the win's "deal the
+## next hand" — the leader intro opens over the aftermath with the
+## regime-swap beat, the banked-legacy line, and the NEW leader dealt
+## (the intro submits the real restart through the host's one write
+## path). A run that ended mid-vignette (the edge crush) mounts the
+## LOSS reveal here instead. Without the intro (sibling suites pinning
+## the bare table), the original behavior stands: focus returns and the
+## outcome events' refreshes (plus the loss blockquote in the rolling
+## chronicle) are already on the table.
+func _on_assault_finished(outcome: StringName, _script: Dictionary) -> void:
 	stats[&"assaults_finished"] += 1
+	if intro_enabled and _intro != null:
+		if String(outcome) == "win":
+			_open_intro()
+			return
+		if _intro_after_assault:
+			_intro_after_assault = false
+			_open_intro()
+			return
 	var restore := _pre_assault_focus
 	_pre_assault_focus = null
 	if restore != null and is_instance_valid(restore) and restore.is_visible_in_tree():
@@ -300,6 +357,52 @@ func _on_assault_finished(_outcome: StringName, _script: Dictionary) -> void:
 			if child is Control and child.has_meta(&"spread_card_id"):
 				child.grab_focus()
 				return
+
+
+# --- the leader intro / restart reveal (T-UI-05) ------------------------------------------
+
+
+## The BOOT reveal: a FRESH first run (no chronicle yet, zero sim time —
+## a resumed session is T-UI-09's check-in beat, never a re-deal). The
+## intro owns everything from here: identity reveal, the one-gesture
+## unfold, the spread live beneath the whole time.
+func _maybe_open_boot_intro() -> void:
+	if not intro_enabled or _intro == null or _intro.is_open():
+		return
+	if not host.is_run_running() or host.meta.runs_recorded != 0:
+		return
+	if host.engine.tick_count > 1:
+		return  # a resumed first run — the check-in owns its entry beat
+	stats[&"intros_opened"] += 1
+	_intro.open(host, get_router())
+
+
+## Mount the intro (deferred by the run-loss path so the aftermath's full
+## refresh lands first — the crushing beat prints, THEN the reveal papers
+## over it). `p_variant` is a hint; the presenter re-derives the truth
+## from the actual chronicle.
+func _open_intro(p_variant: StringName = &"") -> void:
+	if _intro == null or _intro.is_open():
+		return
+	stats[&"intros_opened"] += 1
+	_intro.open(host, get_router(), p_variant)
+
+
+## The reveal folded away (its one gesture landed): the table takes focus
+## back — first card, else the slot's first focusable (an empty first-run
+## table has no cards yet; a screen must seed itself, the router's rule).
+func _on_intro_closed(_variant: StringName) -> void:
+	stats[&"intros_unfolded"] += 1
+	var active := get_active_slot() as OrientationSlot
+	if active == null:
+		return
+	for child in active.get_spread().get_children():
+		if child is Control and child.has_meta(&"spread_card_id"):
+			child.grab_focus()
+			return
+	for focusable in active.focusables():
+		focusable.grab_focus()
+		return
 
 
 # --- card interactions (T-UI-04) -------------------------------------------------------
@@ -862,6 +965,10 @@ func _capture_hook() -> void:
 		_promote_then_capture()
 	elif OS.get_environment("CS_SPREAD_FAN") == "1":
 		_fan_then_capture(settle)
+	elif not OS.get_environment("CS_SPREAD_RESTART").is_empty():
+		_restart_then_capture(String(OS.get_environment("CS_SPREAD_RESTART")).to_lower())
+	elif not OS.get_environment("CS_SPREAD_INTRO").is_empty():
+		_intro_then_capture(int(OS.get_environment("CS_SPREAD_INTRO")))
 	elif not OS.get_environment("CS_SPREAD_ASSAULT").is_empty():
 		_assault_then_capture(int(OS.get_environment("CS_SPREAD_ASSAULT")), settle)
 	elif OS.get_environment("CS_SPREAD_LOUD") == "1":
@@ -912,6 +1019,155 @@ func _assault_then_capture(mode: int, settle: float) -> void:
 			print("[spread] assault capture: outcome '%s' (script %s)"
 				% [String(_assault._script.get("outcome", &"")), _assault.state])
 	_settle_then_capture(0.3)
+
+
+## CS_SPREAD_INTRO=1: the FIRST-HAND reveal as the player meets it (the
+## fresh demo boots straight into the intro) — capture at CS_SPREAD_SHOT.
+## =2: the reveal capture, then the one gesture goes down and a second
+## capture waits for the MID-SWEEP (progress past 0.2, the packet open,
+## the spread showing through the lifting veil) at <shot>.mid.png — the
+## unfold's honest look, not a pose.
+func _intro_then_capture(mode: int) -> void:
+	for i in 240:
+		await get_tree().process_frame
+		if _intro != null and _intro.is_open():
+			break
+	for i in 60:
+		await get_tree().process_frame
+	if _intro == null or not _intro.is_open():
+		print("[spread] intro capture: the intro never opened (fresh boot?) — capturing as-is")
+		_settle_then_capture(0.3)
+		return
+	print("[spread] intro capture: variant '%s', leader '%s' under '%s', %d lines"
+		% [String(_intro.view()["variant"]), String(_intro.view()["leader"]["name"]),
+			String(_intro.view()["regime"]["name"]), (_intro.view()["lines"] as Array).size()])
+	for line: Dictionary in _intro.view()["lines"]:
+		print("[spread]   print: %s" % String(line["text"]))
+	_capture_now("reveal")
+	if mode == 1:
+		get_tree().quit(0)
+		return
+	_intro.unfold()
+	var mid := 0.0
+	for i in 240:
+		await get_tree().process_frame
+		mid = _intro.unfold_progress()
+		if mid > 0.2:
+			break
+	print("[spread] intro capture: mid-unfold at %.2f (%.2fs pacing), interactions %d"
+		% [mid, _intro.last_unfold_seconds, _intro.interactions])
+	_capture_now("mid-unfold", ".mid")
+	for i in 240:
+		await get_tree().process_frame
+		if not _intro.is_open():
+			break
+	print("[spread] intro capture: closed after %d interaction(s), spread focused: %s"
+		% [_intro.interactions, get_viewport().gui_get_focus_owner() != null])
+	get_tree().quit(0)
+
+
+## CS_SPREAD_RESTART=win: the FULL victory restart through the real seams
+## at accel — the demo policy drives to the knight floor, COMMIT goes
+## down the write path (re-attempting if the die loses — the designed
+## variance), the vignette is skipped to its outcome, "Deal the next
+## hand" closes it, and the intro's WIN reveal (regime-swap beat + bank +
+## the new leader) is captured at reveal + mid-unfold.
+## CS_SPREAD_RESTART=loss: the greed policy until the CRUSH lands
+## (run_lost through the real suspicion rules), then the LOSS reveal
+## (same regime + "the regime remembers") captured the same way.
+func _restart_then_capture(kind: String) -> void:
+	host.time_scale = TIME_SCALES[TIME_SCALES.size() - 1]
+	time_scale_index = TIME_SCALES.size() - 1
+	# A player opens the game before they play it: unfold the boot deal
+	# first (the drive cannot commit under paper — the intro owns input).
+	if _intro != null and _intro.is_open():
+		_intro.unfold()
+		for i in 300:
+			await get_tree().process_frame
+			if not _intro.is_open():
+				break
+	if kind == "win":
+		var tries := 0
+		while tries < 5 and host.is_run_running():
+			tries += 1
+			var waited_hours := 0.0
+			while not host.assault().floor_met(host.engine) and waited_hours < 220.0:
+				host.fast_forward(SimEngine.TICKS_PER_SIM_HOUR)
+				if demo_policy != null and demo_policy.on_ticks(SimEngine.TICKS_PER_SIM_HOUR):
+					demo_policy.apply(host)
+				waited_hours += 1.0
+			refresh_from_state()
+			_assault.open(host, get_router())
+			await get_tree().process_frame
+			_assault.commit()
+			for i in 60:
+				await get_tree().process_frame
+				if _assault.state != AssaultScreenScript.State.ODDS:
+					break
+			if _assault.state == AssaultScreenScript.State.VIGNETTE:
+				_assault.skip()
+			for i in 1200:
+				await get_tree().process_frame
+				if _assault.state == AssaultScreenScript.State.OUTCOME:
+					break
+			print("[spread] restart drive: assault try %d after %.0fh — outcome '%s', run %s"
+				% [tries, waited_hours, String(_assault._script.get("outcome", &"")),
+					"ended" if not host.is_run_running() else "alive (the die lost)"])
+			if not host.is_run_running():
+				break  # the hand ended (win, or the edge spike's crush)
+			_assault.close()
+			for i in 20:
+				await get_tree().process_frame
+		_assault.close()
+	else:
+		demo_policy = DemoPolicy.new(24, 40, true)  # greed: never lay low
+		var greed_hours := 0.0
+		while host.is_run_running() and greed_hours < 120.0:
+			host.fast_forward(SimEngine.TICKS_PER_SIM_HOUR)
+			if demo_policy.on_ticks(SimEngine.TICKS_PER_SIM_HOUR):
+				demo_policy.apply(host)
+			greed_hours += 1.0
+		print("[spread] restart drive: after %.0fh the run is %s"
+			% [greed_hours, "alive (crush not reached)" if host.is_run_running() else "ended"])
+	for i in 240:
+		await get_tree().process_frame
+		if _intro != null and _intro.is_open():
+			break
+	if _intro == null or not _intro.is_open():
+		print("[spread] restart capture: the intro never mounted — capturing the table as-is")
+		_settle_then_capture(0.3)
+		return
+	var view := _intro.view()
+	print("[spread] restart capture: variant '%s', run %d, leader '%s' under '%s', bank %d"
+		% [String(view["variant"]), int(view["run_number"]), String(view["leader"]["name"]),
+			String(view["regime"]["name"]), int(view["bank"])])
+	for line: Dictionary in view["lines"]:
+		print("[spread]   print: %s" % String(line["text"]))
+	for i in 60:
+		await get_tree().process_frame
+	_capture_now("reveal")
+	_intro.unfold()
+	var mid := 0.0
+	for i in 240:
+		await get_tree().process_frame
+		mid = _intro.unfold_progress()
+		if mid > 0.2:
+			break
+	print("[spread] restart capture: mid-unfold at %.2f, interactions %d"
+		% [mid, _intro.interactions])
+	_capture_now("mid-unfold", ".mid")
+	get_tree().quit(0)
+
+
+## One capture, now (the capture hooks' shared save — no settle loop).
+func _capture_now(label: String, suffix := "") -> void:
+	var image := get_viewport().get_texture().get_image()
+	var path := _capture_path()
+	if not suffix.is_empty():
+		path = path.substr(0, path.length() - 4) + suffix + path.substr(path.length() - 4)
+	var err := image.save_png(path)
+	print("[spread] screenshot %s (%s) — %s" % [
+		path, "ok" if err == OK else "FAILED %d" % err, label])
 
 
 func _pressure_then_capture() -> void:

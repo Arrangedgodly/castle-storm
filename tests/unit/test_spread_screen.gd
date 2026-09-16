@@ -266,6 +266,7 @@ func _mounted_screen(host: GameHost) -> SpreadScreen:
 	var scene := load(SPREAD_SCENE) as PackedScene
 	var screen: SpreadScreen = scene.instantiate()
 	screen.host = host  # attach BEFORE the tree: the demo never builds its own
+	screen.intro_enabled = false  # these suites pin THE TABLE; the intro's suite owns the opening flow
 	get_tree().root.add_child(screen)
 	await get_tree().process_frame
 	await get_tree().process_frame

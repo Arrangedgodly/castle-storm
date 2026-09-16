@@ -65,6 +65,10 @@ run-responsive:
 #   CS_SPREAD_SHOT=/p.png CS_SPREAD_FAN=1 make run-game      # an open action fan
 #   CS_SPREAD_SHOT=/p.png CS_SPREAD_ASSAULT=1 make run-game  # assault odds table (T-UI-07)
 #   CS_SPREAD_SHOT=/p.png CS_SPREAD_ASSAULT=2 make run-game  # a beat mid-vignette (the storm)
+#   CS_SPREAD_SHOT=/p.png CS_SPREAD_INTRO=1 make run-game    # the first-hand reveal (T-UI-05)
+#   CS_SPREAD_SHOT=/p.png CS_SPREAD_INTRO=2 make run-game    # reveal + mid-unfold (.mid.png)
+#   CS_SPREAD_SHOT=/p.png CS_SPREAD_RESTART=win make run-game   # full win-restart session captures
+#   CS_SPREAD_SHOT=/p.png CS_SPREAD_RESTART=loss make run-game  # the crush -> loss-restart captures
 run-game:
 	$(GODOT_BIN) --path . res://ui/screens/spread/spread_screen.tscn
 

@@ -131,6 +131,7 @@ func _mounted_screen(host: GameHost) -> SpreadScreen:
 	var scene := load(SPREAD_SCENE) as PackedScene
 	var screen: SpreadScreen = scene.instantiate()
 	screen.host = host
+	screen.intro_enabled = false  # this suite pins the vignette; the intro's suite owns the restart seam
 	get_tree().root.add_child(screen)
 	await get_tree().process_frame
 	await get_tree().process_frame
