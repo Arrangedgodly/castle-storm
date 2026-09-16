@@ -58,6 +58,36 @@ or injected timestamps).
   treats the unsaved play window as away time. Bounded by the cap;
   acceptable by design (below).
 
+**T-PERF-01 (landed 2026-09-15): the wiring.** `ui/host/app_lifecycle.gd`
+(`AppLifecycle`) maps the engine's OS notifications onto the host seams,
+with every timestamp injected by the game screen's `_notification` (the
+one permitted clock read — the platform host):
+
+| Notification (Node) | Platforms | Action |
+|---|---|---|
+| `NOTIFICATION_APPLICATION_PAUSED` | Android/iOS/web | `host.background(now)` — pacing gate closes, away anchor taken, both save domains flushed. The OS then suspends the whole process (main loop AND rendering stop engine-side by themselves — the notification exists so the game can flush first), so the flush is the entire job. |
+| `NOTIFICATION_APPLICATION_RESUMED` | Android/iOS/web | `host.foreground(now)` — the away window resolves through the real engine (capped) and pacing resumes. |
+| `NOTIFICATION_WM_CLOSE_REQUEST` | desktop | the same background flush before the process dies (mobile never sends it — a suspended process is killed without further notice; PAUSED is the mobile flush moment). |
+| `NOTIFICATION_APPLICATION_FOCUS_OUT/_FOCUS_IN` | desktop + Android | **see the decision below.** |
+
+**Desktop focus decision of record:** losing window focus on desktop does
+NOT background the host. This is an idle game — the player expects the
+conspiracy to keep working while they tab away; the session never stopped,
+so no window is owed on return. The pacing accumulator consumes wall-clock
+deltas at 1× whatever the frame rate (a suspended-then-restored desktop
+process replays its gap as one live batch: measured 59.9 ms for a 3-day
+delta, `scripts/perf_probe.gd`), and the hourly autosave keeps the anchor
+fresh. The engine does keep submitting frames while the window is
+unfocused — accepted: the game layer costs +0.31 ms/frame idle (measured,
+T-PERF-01's probe; the compositor skips presenting an occluded window),
+and `low_processor_usage_mode` was rejected because it caps the whole
+game at ~20fps (T-PERF-02's 60fps target). Hosts that want focus-loss to
+count (kiosk/battery-strict builds) set
+`AppLifecycle.desktop_backgrounds_on_focus_loss = true`. Both edges are
+idempotent: a second PAUSED cannot stretch the window (the anchor never
+moves twice), a second RESUMED cannot resolve twice (no double
+fast-forward, no duplicate reports).
+
 ## 3. The anchor
 
 - Stored as `RunMeta.last_seen_epoch` — UTC epoch **seconds**, an int, in
@@ -189,4 +219,5 @@ plus this bound keep gate-offer pressure manageable forever
 | twin parity (fast-forward == live ticks) | same file + `marathon_catch_up_gap` (resources per type, hash, arrivals, suspicion) |
 | compute budget (<100ms for capped 8h) | `marathon_catch_up_gap` (measured 7ms) |
 | the while-you-were-away print (capped/uncapped/zero/rewound/crackdown-while-away), the check-in unfold + focus landing, input parity ×3, reduced motion | `tests/unit/test_catch_up_ux.gd` (T-UI-09) |
+| notification surfaces → host seams (PAUSED/RESUMED/CLOSE/focus, notification simulation with injected epochs), pacing gate, anchor ordering, window exactness across cycles, idempotent double cycles, desktop focus decision, frozen-engine boundary, lifecycle clock discipline | `tests/unit/test_app_lifecycle.gd` (T-PERF-01) |
 | every print row variant no-clip in REAL font metrics (live mounted quote label − 30px margin; the away lines on the live reveal packet — the round-1 re-dispatch pin) | `tests/unit/test_catch_up_ux.gd` `test_every_print_row_fits_the_label_in_real_font_metrics`, `test_every_away_line_fits_the_reveal_packet_in_real_font_metrics` |

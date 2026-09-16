@@ -111,6 +111,12 @@ var presenter := SpreadPresenter.new()
 var demo_policy: DemoPolicy
 var time_scale_index := 0
 
+## The platform boundary policy (T-PERF-01): OS lifecycle notifications
+## forwarded from `_notification` into the host's background/foreground
+## seams. Desktop focus loss keeps the world running — the decision of
+## record lives in ui/host/app_lifecycle.gd.
+var lifecycle: AppLifecycle
+
 ## The first-session onboarding layer (T-UI-10): guided-by-the-world
 ## nudges — printed strip cues + focus on the affordance card, once per
 ## install, never for a returning player. Inert unless this boot is the
@@ -185,6 +191,14 @@ func _ready() -> void:
 	# tree; the demo builds its own otherwise.
 	if host == null:
 		host = build_demo_host()
+	# THE PLATFORM BOUNDARY (T-PERF-01): this screen IS the platform host —
+	# `_notification` forwards the OS lifecycle moments (application
+	# paused/resumed, window close) into the AppLifecycle policy:
+	# background = pause pacing + take the away anchor + flush the autosave;
+	# foreground = the capped catch-up resolves through the real engine and
+	# pacing resumes.
+	lifecycle = AppLifecycle.new()
+	lifecycle.host = host
 	super._ready()
 	_compose_slot_chrome()
 	_build_action_fan()
@@ -1522,6 +1536,18 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event.is_action_pressed(&"pause"):
 		host.set_driving(not host.driving)
 		_refresh_chip()
+
+
+## The platform seam (T-PERF-01): OS lifecycle notifications forwarded
+## into the AppLifecycle policy with the platform's now — the ONE game-side
+## clock read (the platform host's privilege per the security-policy
+## inventory; every layer below this seam receives injected timestamps).
+## Headless tests never fire these; the unit suite drives the policy
+## directly with injected epochs (tests/unit/test_app_lifecycle.gd).
+func _notification(what: int) -> void:
+	if lifecycle == null or host == null:
+		return
+	lifecycle.handle_notification(what, int(Time.get_unix_time_from_system()))
 
 
 func _process(delta: float) -> void:

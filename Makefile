@@ -99,10 +99,10 @@ run-game:
 GODOT_BIN ?= tools/godot/godot
 
 .DEFAULT_GOAL := help
-.PHONY: help version import check run test save-debug balance-sweep vendor-assets run-gallery run-responsive run-game export export-windows export-macos export-linux
+.PHONY: help version import check run test save-debug perf-probe balance-sweep vendor-assets run-gallery run-responsive run-game export export-windows export-macos export-linux
 
 help:
-	@echo "Targets: version | import | check | run | run-game | run-gallery | run-responsive | test | save-debug | balance-sweep | vendor-assets | export | export-windows | export-macos | export-linux  (GODOT_BIN defaults to tools/godot/godot; exports need scripts/fetch_templates.sh once)"
+	@echo "Targets: version | import | check | run | run-game | run-gallery | run-responsive | test | save-debug | perf-probe | balance-sweep | vendor-assets | export | export-windows | export-macos | export-linux  (GODOT_BIN defaults to tools/godot/godot; exports need scripts/fetch_templates.sh once)"
 
 version:
 	@$(GODOT_BIN) --version
@@ -121,6 +121,15 @@ test:
 
 save-debug:
 	$(GODOT_BIN) --headless --path . -s res://scripts/save_debug.gd
+
+# Frame-cost micro-benchmark (T-PERF-01): the idle-loop evidence —
+# bare-frame baseline vs the real spread screen idle vs backgrounded
+# (pacing gate shut), the advance() pacing math, the 8h capped
+# foreground resolve on the live table, and the kept-running desktop
+# worst case (a 3-day delta in one advance). Numbers recorded in
+# docs/ultron/production-log.md (T-PERF-01 entry).
+perf-probe:
+	$(GODOT_BIN) --headless --path . -s res://scripts/perf_probe.gd
 
 balance-sweep:
 	$(GODOT_BIN) --headless --path . -s res://scripts/balance_sweep.gd

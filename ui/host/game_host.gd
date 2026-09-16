@@ -27,9 +27,11 @@
 ##   - COMMANDS: `submit()` is the one write path down (the UI-seam
 ##     contract); reads flow up through the systems' query surfaces.
 ##
-## T-PERF-01 SEAMS (deliberately unwired here): `background(now_epoch)` /
-## `foreground(now_epoch)` / the `driving` flag — the platform layer calls
-## them on focus/visibility changes; the host itself never polls focus.
+## T-PERF-01 SEAMS (WIRED via ui/host/app_lifecycle.gd — the platform
+## boundary policy the game screen's `_notification` feeds): `background
+## (now_epoch)` / `foreground(now_epoch)` / the `driving` flag. The host
+## itself never polls focus and never reads a clock — timestamps arrive
+## injected at these seams.
 ##
 ## Headless-testable by construction: RefCounted, no scene tree, injected
 ## time, injectable save root.
@@ -203,10 +205,14 @@ func foreground(p_now_epoch: int) -> Dictionary:
 
 
 ## Background/save boundary (T-PERF-01's call): stops driving and refreshes
-## the away-time anchor so the next foreground measures from here.
+## the away-time anchor so the next foreground measures from here. ORDER:
+## the anchor is taken BEFORE the world stops being driven — the away
+## window opens at exactly this platform moment — and the whole boundary is
+## synchronous, so no tick can land between the two. The save flush that
+## follows is the window's opening bookend on disk (docs/catch-up.md §6).
 func background(p_now_epoch: int) -> void:
-	driving = false
 	catch_up.mark_seen(meta, p_now_epoch)
+	driving = false
 	save_all()
 
 
