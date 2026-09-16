@@ -38,6 +38,16 @@ vendor-assets:
 run-gallery:
 	$(GODOT_BIN) --path . res://ui/theme/theme_gallery.tscn
 
+# Responsive lab (T-UI-02): windowed demo of the portrait/landscape
+# topology swap — same component scenes in both slots, LayoutRouter
+# hysteresis + focus restoration, debug panel to force orientation and
+# cycle the common test sizes (720x1280 / 1280x800 / 1920x1080 /
+# 800x1280). Screenshot hook: CS_RESPONSIVE_SHOT=/path.png writes
+# one capture per test size (<path>.<WxH>.png) and quits:
+#     make run-responsive
+run-responsive:
+	$(GODOT_BIN) --path . res://ui/layout/responsive_lab.tscn
+
 # Boundary validation (T-ARCH-01 acceptance):
 #     make version   # expect 4.7.2.stable.official.ed1daf0bf
 #     make import    # godot --headless --path . --import
@@ -47,10 +57,10 @@ run-gallery:
 GODOT_BIN ?= tools/godot/godot
 
 .DEFAULT_GOAL := help
-.PHONY: help version import check run test save-debug balance-sweep vendor-assets run-gallery export
+.PHONY: help version import check run test save-debug balance-sweep vendor-assets run-gallery run-responsive export
 
 help:
-	@echo "Targets: version | import | check | run | run-gallery | test | save-debug | balance-sweep | vendor-assets | export  (GODOT_BIN defaults to tools/godot/godot)"
+	@echo "Targets: version | import | check | run | run-gallery | run-responsive | test | save-debug | balance-sweep | vendor-assets | export  (GODOT_BIN defaults to tools/godot/godot)"
 
 version:
 	@$(GODOT_BIN) --version

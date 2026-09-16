@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://ui/layout/card_spread.gd" id="1_spread"]
+
+[node name="CardSpread" type="Container"]
+script = ExtResource("1_spread")
