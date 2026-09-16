@@ -9,3 +9,5 @@ reports/
 
 # Vendored tooling (tools/godot/godot engine binary — see docs/DEV_SETUP.md)
 tools/
+.impeccable/decision-payload.json
+.impeccable/questions/
