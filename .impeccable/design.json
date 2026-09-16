@@ -1,0 +1,151 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-16T23:53:17Z",
+  "title": "Design System: Castle Storm",
+  "extensions": {
+    "colorMeta": {
+      "cheap-paper": { "role": "neutral", "displayName": "Cheap Paper", "canonical": "#E7D9BD", "source": "ui/theme/inks.gd PAPER", "tonalRamp": ["#17130F", "#524C41", "#8E8473", "#C9BDA4", "#E9DDC4", "#EEE5D2", "#F3ECDF", "#F7F4ED"] },
+      "recessed-paper": { "role": "neutral", "displayName": "Recessed Paper", "canonical": "#D5C5A5", "source": "ui/theme/inks.gd PAPER_DIM", "tonalRamp": ["#17130F", "#4D463A", "#847965", "#BAAC90", "#DACCB0", "#E4D9C4", "#EEE6D9", "#F7F4ED"] },
+      "pressed-paper": { "role": "neutral", "displayName": "Pressed Paper", "canonical": "#C4B598", "source": "spread_theme.tres Button/pressed bg", "tonalRamp": ["#17130F", "#484136", "#7A705D", "#AB9E84", "#CBBEA4", "#DAD0BD", "#E9E2D5", "#F7F4ED"] },
+      "faded-paper": { "role": "neutral", "displayName": "Faded Paper", "canonical": "#CBBB9D", "source": "spread_theme.tres Button/disabled bg", "tonalRamp": ["#17130F", "#4A4338", "#7E7360", "#B1A389", "#D1C3A8", "#DED3BF", "#EBE3D6", "#F7F4ED"] },
+      "press-ink": { "role": "neutral", "displayName": "Press Ink", "canonical": "#1E1914", "source": "ui/theme/inks.gd INK", "tonalRamp": ["#17130F", "#191511", "#1B1612", "#1D1813", "#3D3833", "#7B7771", "#B9B5AF", "#F7F4ED"] },
+      "ink-running-low": { "role": "neutral", "displayName": "Ink Running Low", "canonical": "#544636", "source": "ui/theme/inks.gd INK_SOFT", "tonalRamp": ["#17130F", "#28221A", "#3A3025", "#4B3E31", "#6B5E50", "#9A9085", "#C9C2B9", "#F7F4ED"] },
+      "revolution-red": { "role": "primary", "displayName": "Revolution Red", "canonical": "#901E1E", "source": "ui/theme/inks.gd RED (4.5:1 on Cheap Paper)", "tonalRamp": ["#17130F", "#3A1614", "#5C1918", "#7F1D1C", "#9F3D3C", "#BC7A77", "#DAB7B2", "#F7F4ED"] },
+      "candle-lit-red": { "role": "primary", "displayName": "Candle-Lit Red", "canonical": "#E3785C", "source": "ui/theme/inks.gd RED_CANDLE (3:1 on dark grounds)", "tonalRamp": ["#17130F", "#513025", "#8C4D3B", "#C66951", "#E68A71", "#ECAD9A", "#F2D0C4", "#F7F4ED"] },
+      "pressed-deep-red": { "role": "primary", "displayName": "Pressed-Deep Red", "canonical": "#6B1414", "source": "ui/theme/inks.gd RED_DEEP (3:1 on the aftermath wash)", "tonalRamp": ["#17130F", "#2F1311", "#471412", "#5F1414", "#7F3433", "#A77471", "#CFB4AF", "#F7F4ED"] },
+      "cold-ash": { "role": "neutral", "displayName": "Cold Ash", "canonical": "#9EA8B8", "source": "ui/theme/inks.gd ASH", "tonalRamp": ["#17130F", "#3E3E3F", "#64686F", "#8B93A0", "#ABB3BF", "#C4C9CF", "#DEDEDE", "#F7F4ED"] },
+      "table-ground-neutral": { "role": "neutral", "displayName": "Table Ground (Recruiting)", "canonical": "#3C342B", "source": "ui/theme/inks.gd NEUTRAL_GROUND", "tonalRamp": ["#17130F", "#221D17", "#2C261F", "#372F27", "#574F46", "#8C867E", "#C2BDB6", "#F7F4ED"] },
+      "table-ground-training": { "role": "neutral", "displayName": "Table Ground (Training)", "canonical": "#342C24", "source": "Inks.ground_for depth 0.28", "tonalRamp": ["#17130F", "#1F1A15", "#27221B", "#2F2921", "#504941", "#87827A", "#BFBBB4", "#F7F4ED"] },
+      "table-ground-ready": { "role": "neutral", "displayName": "Table Ground (Ready-to-Storm)", "canonical": "#2C261F", "source": "Inks.ground_for depth 0.52", "tonalRamp": ["#17130F", "#1D1914", "#231E18", "#29231D", "#49433C", "#837E77", "#BDB9B2", "#F7F4ED"] },
+      "table-ground-aftermath": { "role": "neutral", "displayName": "Table Ground (Aftermath)", "canonical": "#868B94", "source": "Inks.ground_for wash 0.75 toward ASH", "tonalRamp": ["#17130F", "#373535", "#56585B", "#767A81", "#969AA1", "#B6B8BA", "#D7D6D4", "#F7F4ED"] },
+      "gilded-crown-ground": { "role": "secondary", "displayName": "Gilded Crown Ground", "canonical": "#3B2E1F", "source": "content/mvp/regimes/gilded_crown.tres ink_ground", "tonalRamp": ["#17130F", "#211B14", "#2B2218", "#362A1C", "#564A3C", "#8C8377", "#C1BBB2", "#F7F4ED"] },
+      "iron-rotunda-ground": { "role": "secondary", "displayName": "Iron Rotunda Ground", "canonical": "#262B30", "source": "content/mvp/regimes/iron_rotunda.tres ink_ground", "tonalRamp": ["#17130F", "#1B1A19", "#202122", "#24282C", "#44484B", "#808181", "#BCBAB7", "#F7F4ED"] },
+      "paper-crown-ground": { "role": "secondary", "displayName": "Paper Crown Ground", "canonical": "#4C4533", "source": "content/mvp/regimes/paper_crown.tres ink_ground", "tonalRamp": ["#17130F", "#26211A", "#363024", "#453E2E", "#655E4E", "#969083", "#C7C2B8", "#F7F4ED"] },
+      "velvet-fist-ground": { "role": "secondary", "displayName": "Velvet Fist Ground", "canonical": "#3B1F2E", "source": "content/mvp/regimes/velvet_fist.tres ink_ground", "tonalRamp": ["#17130F", "#211618", "#2B1A21", "#361D2A", "#563D49", "#8C7A80", "#C1B7B7", "#F7F4ED"] },
+      "gilded-crown-gilt": { "role": "secondary", "displayName": "Gilded Crown Gilt", "canonical": "#CCA34C", "source": "content/mvp/regimes/gilded_crown.tres ink_secondary", "tonalRamp": ["#17130F", "#4B3C21", "#7E6532", "#B28F44", "#D2AF63", "#DFC691", "#EBDDBF", "#F7F4ED"] },
+      "iron-rotunda-steel": { "role": "secondary", "displayName": "Iron Rotunda Steel", "canonical": "#8F9CA8", "source": "content/mvp/regimes/iron_rotunda.tres ink_secondary", "tonalRamp": ["#17130F", "#393A3B", "#5B6167", "#7E8892", "#9EA8B2", "#BCC1C6", "#D9DAD9", "#F7F4ED"] },
+      "paper-crown-ledger-blue": { "role": "secondary", "displayName": "Paper Crown Ledger-Blue", "canonical": "#405278", "source": "content/mvp/regimes/paper_crown.tres ink_secondary", "tonalRamp": ["#17130F", "#23252D", "#2E374B", "#3A4969", "#5A6989", "#8E97AA", "#C3C5CC", "#F7F4ED"] },
+      "velvet-fist-orchid": { "role": "secondary", "displayName": "Velvet Fist Orchid", "canonical": "#B86B99", "source": "content/mvp/regimes/velvet_fist.tres ink_secondary", "tonalRamp": ["#17130F", "#452C37", "#73455E", "#A15F85", "#C17FA5", "#D3A6BD", "#E5CDD5", "#F7F4ED"] }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Heading", "purpose": "Screen titles; IM Fell English SC (OFL, digitized c.1667 Fell types — the misprint baked into the letterforms)." },
+      "card-title": { "displayName": "Card Title", "purpose": "Card name plates and packet titles; letterhead name plate tuned to 28px." },
+      "body": { "displayName": "Body", "purpose": "Default reading size (theme default 24 covers untyped labels)." },
+      "button": { "displayName": "Chip Label", "purpose": "Action chips and verb labels." },
+      "chronicle-line": { "displayName": "Chronicle Line", "purpose": "Every printed event row — the clerk's italic hand; ink by the print rule." },
+      "numerals": { "displayName": "Numerals", "purpose": "Pip amounts and counts, abbreviated idle-scale (1234 -> 1.2K)." },
+      "role-line": { "displayName": "Role Line", "purpose": "Card role captions, countdowns, fan hints (soft ink)." },
+      "pip-label": { "displayName": "Pip Label", "purpose": "The textual resource channel (FOOD/TIMBER/IRON) and clock plates." }
+    },
+    "shadows": [],
+    "motion": [
+      { "name": "flip", "value": "0.65s; 42% QUAD-in away sweep, silent swap at the 90-degree crossing, BACK-out return", "purpose": "The promotion flip — the signature moment; scale-x squeeze about the center pivot." },
+      { "name": "flip-flourish", "value": "0.40s QUAD-out fade", "purpose": "The landing's double Revolution-Red rule, fading like a press impression lifting." },
+      { "name": "settle", "value": "0.28s BACK-out from offset (170, -110)", "purpose": "Cards joining a live table slide-and-settle with one overshoot." },
+      { "name": "unfold", "value": "1.7s (resumed check-in 1.0s + 0.75s auto-dwell)", "purpose": "The packet unfolding onto the live table — one gesture or auto inside the 3-second promise." },
+      { "name": "eye-strike", "value": "0.55s bell; peak 1.18x scale + 0.38 red wash", "purpose": "The Watchful Eye striking when a telegraph lands." },
+      { "name": "eye-retreat", "value": "0.45s bell; dip to 0.88x", "purpose": "The Eye flinching back to its perch on relief." },
+      { "name": "aftermath-flash", "value": "0.75s (35% out, 65% in)", "purpose": "Cold ash flash across the ground when a crackdown lands." },
+      { "name": "quote-dwell", "value": "2.6s (x2 for catch-up prints)", "purpose": "Blockquotes dwell then fold themselves." },
+      { "name": "assault-beat", "value": "1.5-2.5s per beat", "purpose": "Vignette beats replayed on the table; skippable with one input." },
+      { "name": "reduced-motion-factor", "value": "0.05 (near-instant; entrances skip; same signals, same end state)", "purpose": "MotionProfile reduced-motion seam: castle_storm/motion/reduced_motion or MotionProfile.forced." }
+    ],
+    "breakpoints": [
+      { "name": "design-base", "value": "720x720 (canvas_items + expand; short edge maps to 720 — 1 design unit = 1dp)" },
+      { "name": "portrait", "value": "aspect < 0.95 (pips top rail, stacked spread, chronicle bottom)" },
+      { "name": "deadband", "value": "aspect 0.95-1.05 never swaps" },
+      { "name": "landscape", "value": "aspect > 1.05 (chronicle top, panoramic spread, pips bottom edge)" },
+      { "name": "dwell", "value": "0.25s persistence before a topology swap lands" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Card Frame",
+      "kind": "custom",
+      "refersTo": "card-frame",
+      "description": "The system's atom: a chamfered print-block card; state by edge line form (dashed = in progress, struck = lost); focus = a misregistered red pass.",
+      "html": "<div class=\"ds-card-frame\">\n  <div class=\"ds-card-frame__inner\">\n    <div class=\"ds-card-frame__seal\"></div>\n    <div class=\"ds-card-frame__title\">Bartholomew</div>\n    <div class=\"ds-card-frame__role\">trainee · awaiting gear</div>\n  </div>\n</div>\n<br>\n<div class=\"ds-card-frame is-dashed\">\n  <div class=\"ds-card-frame__inner\">\n    <div class=\"ds-card-frame__seal\"></div>\n    <div class=\"ds-card-frame__title\">Wat</div>\n    <div class=\"ds-card-frame__role\">training</div>\n  </div>\n</div>",
+      "css": ".ds-card-frame { --ds-ink: #1E1914; --ds-paper: #E7D9BD; --ds-red: #901E1E; --ds-chamfer: 9px; width: 168px; min-height: 236px; clip-path: polygon(var(--ds-chamfer) 0, calc(100% - var(--ds-chamfer)) 0, 100% var(--ds-chamfer), 100% calc(100% - var(--ds-chamfer)), calc(100% - var(--ds-chamfer)) 100%, var(--ds-chamfer) 100%, 0 calc(100% - var(--ds-chamfer)), 0 var(--ds-chamfer)); background: var(--ds-ink); padding: 4px; transform: rotate(0.4deg) translate(1px, -1px); }\n.ds-card-frame__inner { clip-path: polygon(calc(var(--ds-chamfer) - 3px) 0, calc(100% - var(--ds-chamfer) + 3px) 0, 100% calc(var(--ds-chamfer) - 3px), 100% calc(100% - var(--ds-chamfer) + 3px), calc(100% - var(--ds-chamfer) + 3px) 100%, calc(var(--ds-chamfer) - 3px) 100%, 0 calc(100% - var(--ds-chamfer) + 3px), 0 calc(var(--ds-chamfer) - 3px)); background: var(--ds-paper); height: 100%; min-height: 226px; padding: 22px 16px; box-sizing: border-box; position: relative; }\n.ds-card-frame__seal { position: absolute; top: 10px; left: 12px; width: 8px; height: 8px; background: var(--ds-red); }\n.ds-card-frame__title { margin-top: 34px; font-family: \"IM Fell English SC\", Georgia, serif; font-size: 34px; font-weight: 400; color: var(--ds-ink); text-align: center; }\n.ds-card-frame__role { font-family: \"Alegreya Sans\", Verdana, sans-serif; font-size: 19px; font-weight: 500; color: #544636; text-align: center; border-top: 2px solid var(--ds-ink); padding-top: 6px; }\n.ds-card-frame:focus-visible { outline: 3px solid var(--ds-red); outline-offset: 4px; }\n.ds-card-frame.is-dashed { background: repeating-linear-gradient(90deg, var(--ds-ink) 0 10px, transparent 10px 17px), repeating-linear-gradient(0deg, var(--ds-ink) 0 10px, transparent 10px 17px); background-clip: content-box; }"
+    },
+    {
+      "name": "Action Chip",
+      "kind": "button",
+      "refersTo": "button-chip",
+      "description": "The print-styled verb chip fanned at a card's edge; struck form carries the refusal reason.",
+      "html": "<button class=\"ds-chip\">Promote to knight</button>\n<button class=\"ds-chip\" disabled>Storm the castle — the gate holds</button>",
+      "css": ".ds-chip { font-family: \"Alegreya Sans\", Verdana, sans-serif; font-size: 22px; color: #1E1914; background: #D5C5A5; border: 2px solid #1E1914; border-radius: 4px; padding: 9px 14px; min-height: 48px; cursor: pointer; display: block; margin-bottom: 6px; text-align: left; }\n.ds-chip:hover { background: #E7D9BD; }\n.ds-chip:active { background: #C4B598; border-color: #901E1E; }\n.ds-chip:focus-visible { outline: 3px solid #901E1E; outline-offset: 3px; }\n.ds-chip:disabled { background: #CBBB9D; border-color: #544636; color: #544636; text-decoration: line-through; text-decoration-thickness: 3px; }"
+    },
+    {
+      "name": "Chronicle Line",
+      "kind": "custom",
+      "refersTo": "chronicle-line",
+      "description": "An event printed onto the table: a rule prefix whose form is the event class (solid plain / dashed warn / struck crackdown / double victory) plus the clerk's italic hand.",
+      "html": "<div class=\"ds-chronicle\"><span class=\"ds-chronicle__rule\"></span><span>Wat arrives at the gate, hat in hand.</span></div>\n<div class=\"ds-chronicle is-warn\"><span class=\"ds-chronicle__rule\"></span><span>Somewhere in the capital, a clerk underlines your name. Twice.</span></div>\n<div class=\"ds-chronicle is-strike\"><span class=\"ds-chronicle__rule\"></span><span>CRACKDOWN #7. The paperwork was flawless.</span></div>\n<div class=\"ds-chronicle is-victory\"><span class=\"ds-chronicle__rule\"></span><span>The castle falls. The chronicle remembers.</span></div>",
+      "css": ".ds-chronicle { display: flex; align-items: center; gap: 10px; min-height: 48px; background: #3C342B; color: #E7D9BD; font-family: \"Alegreya Sans\", Verdana, sans-serif; font-style: italic; font-size: 22px; padding: 0 8px; white-space: nowrap; overflow: hidden; }\n.ds-chronicle__rule { flex: 0 0 30px; height: 3px; background: #E7D9BD; position: relative; }\n.ds-chronicle.is-warn .ds-chronicle__rule { background: repeating-linear-gradient(90deg, #E7D9BD 0 6px, transparent 6px 9px); }\n.ds-chronicle.is-strike .ds-chronicle__rule { background: rgba(231,217,189,0.6); }\n.ds-chronicle.is-strike .ds-chronicle__rule::after { content: \"\"; position: absolute; left: 8px; top: -4px; width: 14px; height: 3px; background: #E7D9BD; transform: rotate(-45deg); }\n.ds-chronicle.is-victory .ds-chronicle__rule { background: none; border-top: 2px solid rgba(231,217,189,0.7); border-bottom: 2px solid rgba(231,217,189,0.7); height: 6px; }"
+    },
+    {
+      "name": "Resource Pip",
+      "kind": "custom",
+      "refersTo": "pip-mark",
+      "description": "One resource's table-edge notation: shape-first container (circle food / square timber / hexagon iron) + glyph + abbreviated numeral + label — colorblind-safe triple encoding.",
+      "html": "<div class=\"ds-pip-row\">\n  <div class=\"ds-pip\">\n    <span class=\"ds-pip__glyph ds-pip__glyph--food\"><svg viewBox=\"0 0 24 24\" width=\"24\" height=\"24\"><path d=\"M12 20V6M9 8l-3-5M15 8l3-5\" stroke=\"#901E1E\" stroke-width=\"2.5\" fill=\"none\" stroke-linecap=\"round\"/></svg></span>\n    <span class=\"ds-pip__col\"><span class=\"ds-pip__amount\">15K</span><span class=\"ds-pip__label\">FOOD</span></span>\n  </div>\n  <div class=\"ds-pip\">\n    <span class=\"ds-pip__glyph ds-pip__glyph--timber\"><svg viewBox=\"0 0 24 24\" width=\"24\" height=\"24\"><path d=\"M5 8l5-5 5 5M5 17l5-5 5 5\" stroke=\"#901E1E\" stroke-width=\"3\" fill=\"none\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg></span>\n    <span class=\"ds-pip__col\"><span class=\"ds-pip__amount\">1.2K</span><span class=\"ds-pip__label\">TIMBER</span></span>\n  </div>\n  <div class=\"ds-pip\">\n    <span class=\"ds-pip__glyph ds-pip__glyph--iron\"><svg viewBox=\"0 0 24 24\" width=\"24\" height=\"24\"><path d=\"M4 8h13l3 3h-9v2h6v4H7l-3-4z\" fill=\"#901E1E\"/></svg></span>\n    <span class=\"ds-pip__col\"><span class=\"ds-pip__amount\">999</span><span class=\"ds-pip__label\">IRON</span></span>\n  </div>\n</div>",
+      "css": ".ds-pip-row { display: flex; gap: 18px; background: #3C342B; padding: 6px; }\n.ds-pip { display: flex; align-items: center; gap: 8px; min-width: 72px; min-height: 48px; }\n.ds-pip__glyph { width: 38px; height: 38px; display: inline-flex; align-items: center; justify-content: center; background: #E7D9BD; border: 3px solid #1E1914; box-sizing: border-box; }\n.ds-pip__glyph--food { border-radius: 50%; }\n.ds-pip__glyph--timber { border-radius: 0; }\n.ds-pip__glyph--iron { border-radius: 0; clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%); border: none; outline: 3px solid #1E1914; outline-offset: -6px; }\n.ds-pip__col { display: flex; flex-direction: column; }\n.ds-pip__amount { font-family: \"Alegreya Sans\", Verdana, sans-serif; font-size: 26px; font-weight: 700; color: #1E1914; line-height: 1.1; }\n.ds-pip__label { font-family: \"Alegreya Sans\", Verdana, sans-serif; font-size: 15px; font-weight: 500; color: #544636; letter-spacing: 0.04em; }"
+    },
+    {
+      "name": "Paper Panel",
+      "kind": "card",
+      "refersTo": "paper-panel",
+      "description": "The blockquote/event panel: bright paper with a 3-unit ink border, 5px corners — quotes, odds tables, ledgers are all this panel.",
+      "html": "<div class=\"ds-panel\">\n  <div class=\"ds-panel__title\">THE ODDS</div>\n  <div class=\"ds-panel__row\">Your army: 41 power</div>\n  <div class=\"ds-panel__row\">The garrison: 38 power</div>\n</div>",
+      "css": ".ds-panel { background: #E7D9BD; border: 3px solid #1E1914; border-radius: 5px; padding: 14px; max-width: 560px; font-family: \"Alegreya Sans\", Verdana, sans-serif; color: #1E1914; }\n.ds-panel__title { font-family: \"IM Fell English SC\", Georgia, serif; font-size: 34px; margin-bottom: 8px; }\n.ds-panel__row { font-size: 22px; font-style: italic; border-top: 3px solid #1E1914; padding: 6px 0; }"
+    },
+    {
+      "name": "Run Header",
+      "kind": "nav",
+      "refersTo": "button-chip",
+      "description": "The letterhead above the table: leader name (display face), a rule in the regime's second ink, uppercase regime name, clock plate — text ink by the print rule.",
+      "html": "<div class=\"ds-run-header\">\n  <span class=\"ds-run-header__name\">Bartholomew the Marginally Brave</span>\n  <span class=\"ds-run-header__rule\"></span>\n  <span class=\"ds-run-header__regime\">THE GILDED CROWN</span>\n  <span class=\"ds-run-header__clock\">212h · power 41</span>\n</div>",
+      "css": ".ds-run-header { display: flex; align-items: center; gap: 14px; background: #3B2E1F; padding: 6px 12px; min-height: 48px; }\n.ds-run-header__name { font-family: \"IM Fell English SC\", Georgia, serif; font-size: 28px; color: #E7D9BD; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }\n.ds-run-header__rule { width: 30px; height: 3px; background: #CCA34C; }\n.ds-run-header__regime { font-family: \"Alegreya Sans\", Verdana, sans-serif; font-size: 19px; font-weight: 500; color: #CCA34C; letter-spacing: 0.05em; }\n.ds-run-header__clock { font-family: \"Alegreya Sans\", Verdana, sans-serif; font-size: 15px; font-weight: 500; color: #E7D9BD; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Conspiracy's Spread",
+    "overview": "Castle Storm's UI is a cheap-print tarot and bestiary deck run off a revolutionary press, dealt on a candle-lit table in a barn loft. Every surface is the conspirators' card table: the home screen is a spread being laid out (each conspirator a face-up card in a position), resources are pip marks along the table edge, suspicion is the Watchful Eye card creeping in from the periphery, regimes are Major-Arcana-scale face cards, the assault is cards played against the castle, and past runs live in the chronicle ledger. Nothing is chrome. Events do not pop up — they print themselves onto the table as chronicle lines.\n\nThe material is two-color ink on cheap paper: flat, bright paper cards carrying near-black ink (and one red accent) over a dark table ground that deepens phase by phase, like the candle burning down toward the assault. Everything is drawn with CanvasItem vector primitives — texture-free and resolution-independent, with a seeded, deliberate misprint (max 0.9° rotation, max 2 design units offset, FNV-1a-deterministic per card) that makes every print look hand-cranked. Confirmed visual rejections: never luxe gold-trim tarot, never dark-fantasy parchment, never pastel softness, no gradients, no popup/modal chrome for in-world events.\n\nThe system is colorblind-safe and input-parity by construction: state is carried by LINE FORM (solid ready / dashed in progress / struck lost), never by hue; resources are encoded shape + glyph + label with color as a redundant tertiary channel; every interactive target keeps a 48-design-unit grip and a focus treatment (a misregistered second red pass) that reads without hover and without color.",
+    "keyCharacteristics": [
+      "The game IS the card table — screens are paper laid on the table, never modal chrome",
+      "Two-ink cheap print: paper stock + near-black ink + revolution red; regime second inks recolor by data",
+      "State by line form (solid / dashed / struck / double), never by hue",
+      "States print themselves: events land as chronicle lines and blockquotes",
+      "Phase-deepening ground: the table darkens recruiting -> training -> ready; aftermath washes cold and light",
+      "Deliberate seeded misprint on every card (rotation <= 0.9°, offset <= 2 units)",
+      "Flat vector print-block drawing; no textures, no gradients, no shadows",
+      "720x720 square design base; portrait stacked / landscape panoramic from one component set",
+      "Fonts: IM Fell English SC (display) + Alegreya Sans (workhorse), both OFL, vendored"
+    ],
+    "rules": [
+      { "name": "The Print Rule", "body": "Text ink is chosen per stock, exactly as a press chooses ink: Inks.ground_text_ink(ground) prints Cheap Paper on dark grounds and Press Ink on light grounds (aftermath), split at relative luminance 0.19. Both channels pass 4.5:1 on their own side — tested. Accent red follows the same rule: Candle-Lit on dark, Pressed-Deep on light.", "section": "colors" },
+      { "name": "The Line-Form Rule", "body": "Hue never carries state. Card edges, rules, and chronicle prefixes encode state by form — solid ready / dashed in progress / struck lost / double victory — colorblind-safe by construction and pinned by tests/unit/test_colorblind_audit.gd.", "section": "colors" },
+      { "name": "The Data-Driven Regime Rule", "body": "No regime color lives in UI code. The four ground and four secondary inks ship as content resources; the theme mirrors them and test_theme_grammar.gd proves the mirror equals the content — new flavors are a .tres edit.", "section": "colors" },
+      { "name": "The Clerk's Hand Rule", "body": "Events print in the italic workhorse; the display face is for titling only (headings, card names, letterheads). No surface sets body copy in IM Fell.", "section": "typography" },
+      { "name": "The No-Clip Rule", "body": "Every variant of every single-line template, substituted at worst-case parameters, must fit its surface's label in the theme's real face with >= 30px margin. New copy that clips fails test_copy_voice.gd; names and counts are substituted from sim data, never authored.", "section": "typography" },
+      { "name": "The Flat-Print Rule", "body": "Surfaces are flat at rest. No gradients, no shadows, no glow; emphasis is a second ink pass (the red ghost), an ink wash (the Eye's strike), or a flash of the ground itself (the crackdown's 0.75s aftermath flash).", "section": "elevation" }
+    ],
+    "dos": [
+      "Do carry state by line form (solid ready / dashed in progress / struck lost / double victory) — reuse Inks.EDGE_FORM_STATES / line_class_for_event; unknown vocabulary fails loudly in review (push_error), never silently.",
+      "Do choose text ink by the print rule (Inks.ground_text_ink) whenever anything prints on the ground — header, chronicle, quotes all do.",
+      "Do keep every interactive target at or above the 48-unit grip (cards 96x96 minimum; chronicle rows grip-height; chips grip-sized).",
+      "Do let content recolor: regime grounds/secondaries, faces, and copy are data — UI code reads them through Inks/the manifest, never hardcodes.",
+      "Do print events as chronicle lines/blockquotes on the table; dwell and self-fold paper rather than dismissing it for the player.",
+      "Do budget single-line copy against its surface (476px quote rows / 610px strip / 232px choice card / 504px packet band) in the real italic face with >= 30px margin.",
+      "Do route every motion through MotionProfile.duration() and scale-bump local font sizes with TypeScale.scaled()."
+    ],
+    "donts": [
+      "Don't add gold trim, gradients, rounded-luxe corners, shadows, glows, or pastel softness — the world refuses all of them (chamfer is cut paper; radius stops at 4-5px on small controls).",
+      "Don't encode state, resource identity, or focus by hue alone — color is always the redundant tertiary channel.",
+      "Don't open popup/modal chrome for in-world events (no Popup/Window nodes — pinned by test); paper goes on the table, over a veil at most.",
+      "Don't put body copy in the display face, or print Ink-on-dark / Paper-on-light (follow the print rule; the dark phases and the aftermath wash never cross the 0.19-luma band).",
+      "Don't invent UI-side regime colors, face art, or copy variants — each has a content schema and a validator that refuses unknown keys.",
+      "Don't exceed the misprint bounds (0.9° / 2 units) or the type-scale range (1.0-1.3); wobble is character, noise is a bug."
+    ]
+  }
+}
