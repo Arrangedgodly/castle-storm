@@ -49,7 +49,7 @@ func _ready() -> void:
 	_hint.theme_type_variation = &"RoleLine"
 	_hint.text = "choose — act — back"
 	_hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_hint.add_theme_font_size_override("font_size", 16)
+	_hint.add_theme_font_size_override("font_size", TypeScale.scaled(16))
 	_hint.add_theme_color_override("font_color", Inks.INK_SOFT)
 	add_child(_hint)
 
@@ -170,7 +170,7 @@ class ActionChip:
 			_label.offset_bottom = 24.0
 			_reason = Label.new()
 			_reason.theme_type_variation = &"RoleLine"
-			_reason.add_theme_font_size_override("font_size", 15)
+			_reason.add_theme_font_size_override("font_size", TypeScale.scaled(15))
 			_reason.add_theme_color_override("font_color", Inks.INK_SOFT)
 			_reason.text = String(action.get("reason", ""))
 			_reason.clip_text = true

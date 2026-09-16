@@ -284,7 +284,7 @@ static func crush_lines(host: GameHost) -> Array[Dictionary]:
 ## centered-low (paper set apart from the deck's head at top-right).
 ## Always fully inside the design bounds. Pure.
 static func choice_rect(bounds: Vector2, panel_size: Vector2) -> Rect2:
-	var panel := Vector2(minf(CHOICE_WIDTH, bounds.x - 12.0), panel_size.y)
+	var panel := Vector2(minf(CHOICE_WIDTH * TypeScale.factor(), bounds.x - 12.0), panel_size.y)
 	var y := clampf(bounds.y * 0.5 + 30.0, 8.0, maxf(8.0, bounds.y - panel.y - 8.0))
 	return Rect2(Vector2(10.0, y), panel)
 
@@ -298,7 +298,7 @@ static func choice_rect(bounds: Vector2, panel_size: Vector2) -> Rect2:
 ## table's floor parks it center-bottom, clear of the bottom pips rail).
 ## Always fully inside the design bounds. Pure.
 static func quote_rect(bounds: Vector2, panel_size: Vector2, floor_y: float) -> Rect2:
-	var panel := Vector2(minf(QUOTE_WIDTH, bounds.x - 12.0), panel_size.y)
+	var panel := Vector2(minf(QUOTE_WIDTH * TypeScale.factor(), bounds.x - 12.0), panel_size.y)
 	var y := clampf(floor_y - panel.y - 8.0, 8.0, maxf(8.0, bounds.y - panel.y - 8.0))
 	return Rect2(Vector2((bounds.x - panel.x) * 0.5, y), panel)
 
@@ -668,14 +668,14 @@ class ChoiceCard:
 
 		_title = Label.new()
 		_title.theme_type_variation = &"CardTitle"
-		_title.add_theme_font_size_override("font_size", 22)
+		_title.add_theme_font_size_override("font_size", TypeScale.scaled(22))
 		_title.clip_text = true
 		_title.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_content.add_child(_title)
 
 		_countdown = Label.new()
 		_countdown.theme_type_variation = &"RoleLine"
-		_countdown.add_theme_font_size_override("font_size", 17)
+		_countdown.add_theme_font_size_override("font_size", TypeScale.scaled(17))
 		_countdown.add_theme_color_override("font_color", Inks.RED)
 		_countdown.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_content.add_child(_countdown)

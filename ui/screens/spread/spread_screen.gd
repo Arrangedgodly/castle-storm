@@ -187,6 +187,9 @@ var _entrances_armed := false
 
 
 func _ready() -> void:
+	# The T-QA-05 type-scale seam FIRST: every label this screen (and the
+	# paper layers below) creates reads the scaled sizes at build time.
+	TypeScale.ensure_applied()
 	# Tests may attach a pre-driven host BEFORE adding the scene to the
 	# tree; the demo builds its own otherwise.
 	if host == null:
@@ -1470,8 +1473,10 @@ func _build_debug_chip() -> void:
 	_scale_chip = Label.new()
 	_scale_chip.theme_type_variation = &"PipLabel"
 	_scale_chip.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
-	_scale_chip.offset_left = -150.0
-	_scale_chip.offset_top = -34.0
+	# The plate grows with the type scale (T-QA-05: "running" clipped to
+	# "runn…" at 1.3x — the windowed spot-check's find).
+	_scale_chip.offset_left = -150.0 * TypeScale.factor()
+	_scale_chip.offset_top = -34.0 * TypeScale.factor()
 	_scale_chip.offset_right = -16.0
 	_scale_chip.offset_bottom = -10.0
 	_scale_chip.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
@@ -1505,6 +1510,24 @@ func _unhandled_input(event: InputEvent) -> void:
 		_suspicion.skip_beat()
 		get_viewport().set_input_as_handled()
 		return
+	# TOUCH PARITY (T-QA-05): a POSITIONAL press that reaches unhandled
+	# input landed on the bare table (cards and chips consume their own
+	# gui_input; the paper layers sit above and stop theirs) — for a touch
+	# player that press is the only "fold it without acting" gesture the
+	# mode has (keyboard has back, pad has B). Fold the open paper: the
+	# fan first, else a choice card — mirroring the back branch below.
+	if (event is InputEventMouseButton and event.pressed \
+			and (event as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT) \
+			or (event is InputEventScreenTouch and event.pressed):
+		if _fan != null and _fan.is_open():
+			close_fan()
+			get_viewport().set_input_as_handled()
+			return
+		if _suspicion != null and _suspicion.choice_is_open():
+			_suspicion.fold_choice()
+			_focus_first_card()
+			get_viewport().set_input_as_handled()
+			return
 	if event.is_action_pressed(&"back"):
 		if _fan != null and _fan.is_open():
 			close_fan()

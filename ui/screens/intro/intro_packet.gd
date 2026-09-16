@@ -94,7 +94,7 @@ func _compose() -> void:
 
 	_title_label = Label.new()
 	_title_label.theme_type_variation = &"CardTitle"
-	_title_label.add_theme_font_size_override("font_size", 34)
+	_title_label.add_theme_font_size_override("font_size", TypeScale.scaled(34))
 	_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_title_label.clip_text = true
 	_title_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -175,7 +175,7 @@ func _tune_plates(face: BoxContainer, title_size: int) -> void:
 		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		label.clip_text = false
 		if label.theme_type_variation == &"CardTitle":
-			label.add_theme_font_size_override("font_size", title_size)
+			label.add_theme_font_size_override("font_size", TypeScale.scaled(title_size))
 
 
 # --- binding (pure in the view model) ------------------------------------------------------

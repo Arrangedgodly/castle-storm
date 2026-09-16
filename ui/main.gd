@@ -9,4 +9,5 @@ extends Control
 
 
 func _ready() -> void:
+	TypeScale.ensure_applied()  # the T-QA-05 type-scale seam (boot-time)
 	print("[castle-storm] main scene ready")

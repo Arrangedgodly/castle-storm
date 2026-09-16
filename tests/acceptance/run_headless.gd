@@ -39,6 +39,7 @@ class Runner extends Node:
 	var _busy := false
 
 	func _ready() -> void:
+		TypeScale.ensure_applied()  # the T-QA-05 type-scale seam (boot-time)
 		var env_seed := OS.get_environment("CS_ACCEPTANCE_SEED")
 		if not env_seed.is_empty():
 			seed(env_seed.to_int())

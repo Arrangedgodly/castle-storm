@@ -244,6 +244,12 @@ func ranks() -> Array[RankCard]:
 
 func set_chips(chip_actions: Array[Dictionary]) -> void:
 	for chip in _chips.get_children():
+		# Detach BEFORE the free (the EventQuote._rebuild precedent): a
+		# queue_free'd chip stays in the tree until idle, so a RE-open's
+		# _focus_commit iterated the dying chips and deferred its grab on
+		# a freed instance — the odds table reopened with NO focus and a
+		# controller player was stranded (found by the T-QA-05 sweep).
+		_chips.remove_child(chip)
 		chip.queue_free()
 	for action: Dictionary in chip_actions:
 		var chip: Button = ActionFan.ActionChip.new()
@@ -837,7 +843,7 @@ class RankCard:
 		inset.add_child(column)
 		var name_label := Label.new()
 		name_label.theme_type_variation = &"RoleLine"
-		name_label.add_theme_font_size_override("font_size", 14)
+		name_label.add_theme_font_size_override("font_size", TypeScale.scaled(14))
 		name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		name_label.clip_text = true
 		name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -845,7 +851,7 @@ class RankCard:
 		column.add_child(name_label)
 		var role_label := Label.new()
 		role_label.theme_type_variation = &"PipLabel"
-		role_label.add_theme_font_size_override("font_size", 11)
+		role_label.add_theme_font_size_override("font_size", TypeScale.scaled(11))
 		role_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		role_label.clip_text = true
 		role_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -984,7 +990,7 @@ class SiegeCard:
 		# capture find), and a clipped name on the castle reads broken.
 		for plate in _face.get_children():
 			if plate is Label and (plate as Label).theme_type_variation == &"CardTitle":
-				(plate as Label).add_theme_font_size_override("font_size", 22)
+				(plate as Label).add_theme_font_size_override("font_size", TypeScale.scaled(22))
 
 
 	func bind(title: String, crest_key: StringName, p_role_line: String,

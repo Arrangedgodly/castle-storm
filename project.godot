@@ -19,6 +19,11 @@ config/icon="res://icon.svg"
 ; future settings screen writes this via MotionProfile.forced; until then
 ; it is the project-level default.
 motion/reduced_motion=false
+; T-QA-05 type-scale seam: multiplies every theme font size (and the text
+; panel budgets that grow with them) — supported range 1.0-1.3, applied at
+; boot by ui/theme/type_scale.gd (see docs/acceptance-sweep.md for the
+; range evidence).
+type/scale=1.0
 
 [display]
 

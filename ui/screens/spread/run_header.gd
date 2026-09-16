@@ -21,7 +21,7 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_name_label = Label.new()
 	_name_label.theme_type_variation = &"CardTitle"
-	_name_label.add_theme_font_size_override("font_size", 28)  # the letterhead fits long names at table width
+	_name_label.add_theme_font_size_override("font_size", TypeScale.scaled(28))  # the letterhead fits long names at table width
 	_name_label.clip_text = true  # the strip's minimum never exceeds the table
 	_name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_name_label.custom_minimum_size = Vector2(160, 0)
@@ -36,13 +36,16 @@ func _ready() -> void:
 	_regime_label = Label.new()
 	_regime_label.theme_type_variation = &"RoleLine"
 	_regime_label.clip_text = true
-	_regime_label.custom_minimum_size = Vector2(150, 0)
+	# The plates' budgets grow with the type (T-QA-05 type scale): at 1.3x
+	# the regime line measures ~170px on a 150px plate and clipped mid-word
+	# (the windowed 1.3x spot-check's find).
+	_regime_label.custom_minimum_size = Vector2(150.0 * TypeScale.factor(), 0)
 	_regime_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_regime_label)
 	_time_label = Label.new()
 	_time_label.theme_type_variation = &"PipLabel"
 	_time_label.clip_text = true
-	_time_label.custom_minimum_size = Vector2(96, 0)
+	_time_label.custom_minimum_size = Vector2(96.0 * TypeScale.factor(), 0)
 	_time_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_time_label)
 

@@ -116,7 +116,7 @@ func _draw() -> void:
 func _compose() -> void:
 	_title_label = Label.new()
 	_title_label.theme_type_variation = &"CardTitle"
-	_title_label.add_theme_font_size_override("font_size", 30)
+	_title_label.add_theme_font_size_override("font_size", TypeScale.scaled(30))
 	_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_title_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_title_label)
@@ -593,7 +593,7 @@ class EntryCard:
 		head.add_child(head_column)
 		_name_label = Label.new()
 		_name_label.theme_type_variation = &"CardTitle"
-		_name_label.add_theme_font_size_override("font_size", 21)
+		_name_label.add_theme_font_size_override("font_size", TypeScale.scaled(21))
 		_name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		# MIN-WIDTH FLOOR (probe-measured): an autowrap label's first-pass
 		# minimum can collapse toward zero, and a wrap evaluated at ~1px
@@ -605,7 +605,7 @@ class EntryCard:
 		head_column.add_child(_name_label)
 		_role_label = Label.new()
 		_role_label.theme_type_variation = &"RoleLine"
-		_role_label.add_theme_font_size_override("font_size", 15)
+		_role_label.add_theme_font_size_override("font_size", TypeScale.scaled(15))
 		_role_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		_role_label.custom_minimum_size = Vector2(160.0, 0.0)
 		_role_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
