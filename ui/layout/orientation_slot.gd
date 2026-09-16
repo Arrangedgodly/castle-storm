@@ -23,6 +23,13 @@ class_name OrientationSlot
 ## Which topology this slot arranges. Set by the two thin scenes.
 @export var portrait_topology: bool = true
 
+## Optional run-header strip along the table's top edge (T-UI-03's run
+## header: leader name + regime ink). OFF by default — the T-UI-02 lab
+## composition and its pinned topology tests are exactly unchanged
+## (a zero-height header collapses topology_rects to the original rects).
+## The Spread's thin slot scenes turn it on.
+@export var show_header: bool = false
+
 ## Edge margin around the whole slot (design units; the ResponsiveScreen's
 ## safe-margin container adds the notch margins on top of this).
 @export var edge_margin: float = 12.0
@@ -41,6 +48,8 @@ const RAIL_KINDS: Array[Inks.ResourceKind] = [
 var _rail: HBoxContainer
 var _spread: Control
 var _chronicle: VBoxContainer
+var _header: HBoxContainer
+var _ground: Control
 
 
 func _ready() -> void:
@@ -50,6 +59,13 @@ func _ready() -> void:
 	ground.set_anchors_preset(Control.PRESET_FULL_RECT)
 	ground.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(ground)
+	_ground = ground
+
+	if show_header:
+		_header = HBoxContainer.new()
+		_header.add_theme_constant_override("separation", 16)
+		_header.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(_header)
 
 	_rail = HBoxContainer.new()
 	_rail.add_theme_constant_override("separation", 18)
@@ -90,22 +106,34 @@ func _notification(what: int) -> void:
 func layout_topology() -> void:
 	if _rail == null or _spread == null or _chronicle == null:
 		return
+	var header_size := Vector2.ZERO
+	if _header != null:
+		header_size = _header.get_combined_minimum_size()
 	var rects := topology_rects(portrait_topology, size,
-		_rail.get_combined_minimum_size(), _chronicle.get_combined_minimum_size(), edge_margin)
+		_rail.get_combined_minimum_size(), _chronicle.get_combined_minimum_size(), edge_margin, header_size)
 	_fit(_rail, rects["rail"])
 	_fit(_spread, rects["spread"])
 	_fit(_chronicle, rects["chronicle"])
+	if _header != null:
+		_fit(_header, rects["header"])
 
 
 ## The pure topology: rail/spread/chronicle rects for one orientation.
 ##   portrait  — rail top, spread middle, chronicle bottom;
 ##   landscape — chronicle top, spread middle, rail bottom (brief §6).
+## `header_size` (T-UI-03, additive; default zero) inserts an optional
+## header strip at the very top and shifts everything below it down — with
+## a zero-height header the rects are EXACTLY the pre-T-UI-03 values (the
+## T-UI-02 lab + its pinned tests are untouched by construction).
 ## The spread keeps a non-negative height at degenerate sizes (a clamp,
 ## not a clip: parents that respect the slot's minimum size never hit it).
 static func topology_rects(portrait: bool, bounds: Vector2, rail_size: Vector2,
-		chronicle_size: Vector2, margin: float) -> Dictionary:
-	var wide := maxf(0.0, bounds.x - 2.0 * margin)
-	var rail := Rect2(Vector2(margin, margin), Vector2(wide, rail_size.y))
+		chronicle_size: Vector2, margin: float, header_size: Vector2 = Vector2.ZERO) -> Dictionary:
+	var wide: float = maxf(0.0, bounds.x - 2.0 * margin)
+	var header := Rect2(Vector2(margin, margin), Vector2(wide, header_size.y))
+	# A zero-height header must shift NOTHING (backward-exact topology).
+	var header_shift: float = 0.0 if header_size.y <= 0.0 else header_size.y + margin
+	var rail := Rect2(Vector2(margin, margin + header_shift), Vector2(wide, rail_size.y))
 	var chronicle := Rect2(
 		Vector2(margin, bounds.y - margin - chronicle_size.y),
 		Vector2(wide, chronicle_size.y))
@@ -113,16 +141,18 @@ static func topology_rects(portrait: bool, bounds: Vector2, rail_size: Vector2,
 		var top: float = rail.position.y + rail.size.y + margin
 		var bottom: float = chronicle.position.y - margin
 		return {
+			"header": header,
 			"rail": rail,
 			"spread": Rect2(Vector2(margin, top), Vector2(wide, maxf(0.0, bottom - top))),
 			"chronicle": chronicle,
 		}
-	var flipped_chronicle := Rect2(Vector2(margin, margin), Vector2(wide, chronicle_size.y))
+	var flipped_chronicle := Rect2(Vector2(margin, margin + header_shift), Vector2(wide, chronicle_size.y))
 	var flipped_rail := Rect2(
 		Vector2(margin, bounds.y - margin - rail_size.y), Vector2(wide, rail_size.y))
 	var top_l: float = flipped_chronicle.position.y + flipped_chronicle.size.y + margin
 	var bottom_l: float = flipped_rail.position.y - margin
 	return {
+		"header": header,
 		"rail": flipped_rail,
 		"spread": Rect2(Vector2(margin, top_l), Vector2(wide, maxf(0.0, bottom_l - top_l))),
 		"chronicle": flipped_chronicle,
@@ -131,18 +161,33 @@ static func topology_rects(portrait: bool, bounds: Vector2, rail_size: Vector2,
 
 ## The slot's own honest minimum: rail + spread floor + chronicle stacked
 ## (portrait) — the height every parent must grant for an unclipped table.
+## An enabled header adds its height (the strip is content, not overlay).
 func _get_minimum_size() -> Vector2:
 	if _rail == null or _spread == null or _chronicle == null:
 		return Vector2.ONE * Inks.TOUCH_GRIP_MIN
 	var rail_s: Vector2 = _rail.get_combined_minimum_size()
 	var chronicle_s: Vector2 = _chronicle.get_combined_minimum_size()
 	var spread_s: Vector2 = _spread.get_combined_minimum_size()
+	var header_h := 0.0
+	if _header != null:
+		header_h = _header.get_combined_minimum_size().y + 2.0 * edge_margin
 	return Vector2(
 		maxf(maxf(rail_s.x, spread_s.x), chronicle_s.x) + 2.0 * edge_margin,
-		rail_s.y + spread_s.y + chronicle_s.y + 4.0 * edge_margin)
+		rail_s.y + spread_s.y + chronicle_s.y + header_h + 4.0 * edge_margin)
 
 
 # --- presenter seams ----------------------------------------------------------------
+
+
+## The table ground (T-UI-03 binds regime + phase here). Null before _ready.
+func get_ground() -> Control:
+	return _ground
+
+
+## The run-header strip (T-UI-03), when this slot was built with
+## `show_header`; null otherwise (the presenter falls back gracefully).
+func get_header() -> HBoxContainer:
+	return _header
 
 
 ## Add a card (any Control — a composed CardFrame in practice) to this

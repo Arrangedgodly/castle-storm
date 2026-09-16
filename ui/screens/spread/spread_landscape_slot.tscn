@@ -1,0 +1,12 @@
+; The Spread's landscape slot — the SAME OrientationSlot script as the
+; T-UI-02 foundation (thin scene, no forked components) with the T-UI-03
+; run-header strip enabled: panoramic table, chronicle top, pips along
+; the bottom edge, header above the chronicle.
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://ui/layout/orientation_slot.gd" id="1_slot"]
+
+[node name="SpreadLandscapeSlot" type="Control"]
+script = ExtResource("1_slot")
+portrait_topology = false
+show_header = true

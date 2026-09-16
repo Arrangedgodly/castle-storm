@@ -26,6 +26,13 @@ const PORTRAIT_SLOT_SCENE := preload("res://ui/layout/portrait_slot.tscn")
 const LANDSCAPE_SLOT_SCENE := preload("res://ui/layout/landscape_slot.tscn")
 const ROUTER_SCRIPT := preload("res://ui/layout/layout_router.gd")
 
+## Slot scenes to instance (T-UI-03, additive): screens may substitute thin
+## variants of the SAME OrientationSlot script (e.g. the Spread's
+## header-enabled slots) without forking any component. Defaults keep the
+## T-UI-02 lab composition exactly.
+@export var portrait_slot_scene: PackedScene = PORTRAIT_SLOT_SCENE
+@export var landscape_slot_scene: PackedScene = LANDSCAPE_SLOT_SCENE
+
 ## Design margin inside the window (safe-area insets add on top).
 @export var margin: float = 12.0
 
@@ -45,10 +52,10 @@ func _ready() -> void:
 	_host.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(_host)
 
-	_portrait_slot = PORTRAIT_SLOT_SCENE.instantiate() as Control
+	_portrait_slot = portrait_slot_scene.instantiate() as Control
 	_portrait_slot.name = "PortraitSlot"
 	_host.add_child(_portrait_slot)
-	_landscape_slot = LANDSCAPE_SLOT_SCENE.instantiate() as Control
+	_landscape_slot = landscape_slot_scene.instantiate() as Control
 	_landscape_slot.name = "LandscapeSlot"
 	_host.add_child(_landscape_slot)
 

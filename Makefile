@@ -48,6 +48,18 @@ run-gallery:
 run-responsive:
 	$(GODOT_BIN) --path . res://ui/layout/responsive_lab.tscn
 
+# The Spread — THE GAME (T-UI-03): the home screen wired to a real
+# engine host (canonical composition, seeded demo run, live pips/cards/
+# chronicle/Watchful Eye). Debug accel: F (or pad R5, the
+# debug_fast_forward action) cycles the time scale 1x -> 60x -> 600x; P
+# freezes the world. CS_DEMO_RESET=0 continues the previous session
+# (default: each run starts the same seeded fresh demo); CS_SEED=<int>
+# overrides the seed. Screenshot hooks (windowed):
+#   CS_SPREAD_SHOT=/path.png make run-game                # quiet state
+#   CS_SPREAD_SHOT=/p.png CS_SPREAD_LOUD=1 make run-game  # pressured (telegraph)
+run-game:
+	$(GODOT_BIN) --path . res://ui/screens/spread/spread_screen.tscn
+
 # Boundary validation (T-ARCH-01 acceptance):
 #     make version   # expect 4.7.2.stable.official.ed1daf0bf
 #     make import    # godot --headless --path . --import
@@ -57,10 +69,10 @@ run-responsive:
 GODOT_BIN ?= tools/godot/godot
 
 .DEFAULT_GOAL := help
-.PHONY: help version import check run test save-debug balance-sweep vendor-assets run-gallery run-responsive export
+.PHONY: help version import check run test save-debug balance-sweep vendor-assets run-gallery run-responsive run-game export
 
 help:
-	@echo "Targets: version | import | check | run | run-gallery | run-responsive | test | save-debug | balance-sweep | vendor-assets | export  (GODOT_BIN defaults to tools/godot/godot)"
+	@echo "Targets: version | import | check | run | run-game | run-gallery | run-responsive | test | save-debug | balance-sweep | vendor-assets | export  (GODOT_BIN defaults to tools/godot/godot)"
 
 version:
 	@$(GODOT_BIN) --version

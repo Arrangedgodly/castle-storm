@@ -1,0 +1,19 @@
+; The Spread — the game's home screen (T-UI-03). Runnable windowed via
+; `make run-game` (the seeded demo run); loads headless in the test
+; suites at all four common sizes.
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://ui/screens/spread/spread_screen.gd" id="1_spread"]
+[ext_resource type="PackedScene" path="res://ui/screens/spread/spread_portrait_slot.tscn" id="2_portrait"]
+[ext_resource type="PackedScene" path="res://ui/screens/spread/spread_landscape_slot.tscn" id="3_landscape"]
+
+[node name="SpreadScreen" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_spread")
+portrait_slot_scene = ExtResource("2_portrait")
+landscape_slot_scene = ExtResource("3_landscape")

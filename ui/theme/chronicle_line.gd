@@ -69,6 +69,7 @@ func _ready() -> void:
 	_label.theme_type_variation = &"ChronicleLine"
 	_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_label.clip_text = true  # T-UI-03: long prints run to the strip's edge, never past the table
 	_label.text = text
 	_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_row.add_child(_label)

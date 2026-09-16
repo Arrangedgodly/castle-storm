@@ -63,6 +63,7 @@ func _ready() -> void:
 	_name_label.theme_type_variation = &"CardTitle"
 	_name_label.text = card_name
 	_name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_name_label.clip_text = true  # T-UI-03: roster-scale columns never let a name widen the card past the table
 	_name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_name_label)
 	_rule = RULE_SCENE.instantiate()
@@ -76,6 +77,7 @@ func _ready() -> void:
 	_role_label.theme_type_variation = &"RoleLine"
 	_role_label.text = role_line
 	_role_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_role_label.clip_text = true  # T-UI-03: countdown/role plates clip, never overflow
 	_role_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_role_label)
 	_apply_arrangement()

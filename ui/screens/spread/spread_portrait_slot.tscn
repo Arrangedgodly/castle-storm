@@ -1,0 +1,12 @@
+; The Spread's portrait slot — the SAME OrientationSlot script as the
+; T-UI-02 foundation (thin scene, no forked components) with the T-UI-03
+; run-header strip enabled: pips top rail, stacked spread, chronicle
+; bottom, header above the rail.
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://ui/layout/orientation_slot.gd" id="1_slot"]
+
+[node name="SpreadPortraitSlot" type="Control"]
+script = ExtResource("1_slot")
+portrait_topology = true
+show_header = true

@@ -255,6 +255,9 @@ const EDGE_FORM_STATES: Dictionary = {
 }
 
 ## Sim event vocabulary (docs/sim-engine.md §11/§14/§15/§16) -> chronicle class.
+## T-UI-03 extension: the real recorded kinds the Spread prints (the
+## T-UI-01 map was authored against the design's event names — the
+## historical keys stay, the sim's actual kind ids join them additively).
 const EVENT_LINE_CLASSES: Dictionary = {
 	&"suspicion_warn": LineClass.WARN, &"suspicion_telegraph": LineClass.WARN,
 	&"crackdown_struck": LineClass.STRIKE, &"crackdown_seized": LineClass.STRIKE,
@@ -267,6 +270,15 @@ const EVENT_LINE_CLASSES: Dictionary = {
 	&"unit_promoted": LineClass.PLAIN, &"building_built": LineClass.PLAIN,
 	&"building_upgraded": LineClass.PLAIN, &"gate_offer": LineClass.PLAIN,
 	&"grant_paid": LineClass.PLAIN,
+	# T-UI-03: the sim's actual kind ids (tests/acceptance event records).
+	&"recruit_arrived": LineClass.PLAIN, &"recruit_accepted": LineClass.PLAIN,
+	&"recruit_dismissed": LineClass.PLAIN, &"gear_equipped": LineClass.PLAIN,
+	&"building_milestone": LineClass.PLAIN, &"resources_granted": LineClass.PLAIN,
+	&"run_started": LineClass.PLAIN, &"run_restarted": LineClass.PLAIN,
+	&"run_lost": LineClass.STRIKE, &"run_aborted": LineClass.STRIKE,
+	&"run_denied": LineClass.PLAIN, &"lifecycle_denied": LineClass.PLAIN,
+	&"upgrade_denied": LineClass.PLAIN, &"assault_lost": LineClass.STRIKE,
+	&"assault_casualties": LineClass.STRIKE,
 }
 
 
