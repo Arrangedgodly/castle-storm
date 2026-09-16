@@ -385,6 +385,17 @@ func begin_quote(event: Dictionary, host: GameHost, bounds: Vector2, floor_y: fl
 	_place_quote(bounds, floor_y)
 
 
+## Open the blockquote with ALREADY-COMPOSED rows (T-UI-09's catch-up
+## print: the while-you-were-away panel speaks the summary payload, not
+## the suspicion vocabulary). Same grammar as every blockquote this layer
+## prints — placed within bounds above floor_y, dwells, folds itself,
+## never modal.
+func open_quote_rows(rows: Array[Dictionary], bounds: Vector2, floor_y: float,
+		dwell: float) -> void:
+	_quote.open_rows(rows, dwell)
+	_place_quote(bounds, floor_y)
+
+
 ## Append one printed row to the open quote (extends the dwell — the
 ## blockquote is one story, the timer restarts per print). The grown
 ## panel RE-PLACES through the same discipline every open uses (bounds +

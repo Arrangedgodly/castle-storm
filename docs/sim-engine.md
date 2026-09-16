@@ -1003,8 +1003,11 @@ var report := service.apply(engine, run.meta, now_epoch)  # host: foreground/loa
   detail; `catch_up_clock_rewound` (value = rewound seconds) on a
   backwards clock — zero state change, never punishment. The returned
   report Dictionary (resource deltas per type, arrivals, completions,
-  promotions, run endings, suspicion delta) is T-UI-09's data;
-  `chronicle_line(report)` renders the placeholder voice.
+  promotions, run endings, crackdowns that landed in-window, suspicion
+  delta) is T-UI-09's data (the consumer landed:
+  `ui/screens/spread/catch_up_print.gd` + the check-in unfold — see
+  docs/catch-up.md §7); `chronicle_line(report)` renders the placeholder
+  voice.
 - **Measured** (`marathon_catch_up_gap`, full MVP stack + suspicion):
   capped 8h = 480 ticks resolves in ~7ms (budget 100ms); two away
   windows + a kill-mid-catch-up revival + first-launch + rewind all

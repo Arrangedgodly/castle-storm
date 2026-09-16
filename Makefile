@@ -74,6 +74,12 @@ run-responsive:
 #   CS_SPREAD_SHOT=/p.png CS_SPREAD_SUSPICION=3 make run-game  # the CRUSHED beat over the swept table
 #   CS_SPREAD_SHOT=/p.png CS_SPREAD_CHRONICLE=1 make run-game  # the ledger over three real hands (T-UI-08)
 #   CS_SPREAD_SHOT=/p.png CS_SPREAD_CHRONICLE=2 make run-game  # 50-hand ring: newest + mid-ring tall page (.turn.png) + oldest (.old.png)
+#   CS_SPREAD_SHOT=/p.png CS_SPREAD_CATCHUP=1 make run-game    # mid-session away window -> the print on the LIVE table (T-UI-09)
+#   CS_SPREAD_SHOT=/p.png CS_SPREAD_CATCHUP=2 make run-game    # SEED: play 6h, background (anchor+save), quit (prints the =3 command)
+#   CS_SPREAD_SHOT=/p.png CS_DEMO_RESET=0 CS_DEMO_NOW=<epoch> CS_SPREAD_CATCHUP=3 make run-game
+#                                                               # RESUME: boots through the real save — the check-in
+#                                                               # unfold + the while-you-were-away print + the
+#                                                               # foreground->actionable wall measurement
 run-game:
 	$(GODOT_BIN) --path . res://ui/screens/spread/spread_screen.tscn
 

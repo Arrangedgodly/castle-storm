@@ -91,6 +91,12 @@ var driving: bool = true:
 ## toggles it.
 var delivering_catch_up := false
 
+## The report of the MOST RECENTLY resolved away window ({} before the
+## first foreground). The BOOT seam: a window resolved inside boot() fires
+## catch_up_resolved before any screen has connected, so T-UI-09's check-in
+## beat reads THIS instead — the summary is never lost to mount order.
+var last_catch_up_report := {}
+
 var _accum_seconds := 0.0
 var _consumed_seq := 0
 var _ticks_since_autosave := 0
@@ -188,6 +194,7 @@ func foreground(p_now_epoch: int) -> Dictionary:
 	var applied := int(report.get("applied_ticks", 0))
 	_drain_events()
 	delivering_catch_up = false
+	last_catch_up_report = report
 	if applied > 0:
 		_emit_advanced(applied)
 		catch_up_resolved.emit(report)

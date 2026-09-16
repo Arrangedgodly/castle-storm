@@ -26,10 +26,15 @@
 class_name IntroPresenter
 extends RefCounted
 
-## The reveal variants (docs/sim-engine.md §12 outcome vocabulary).
+## The reveal variants (docs/sim-engine.md §12 outcome vocabulary) — plus
+## the CHECK-IN variant (T-UI-09): a resumed session's short unfold, a
+## returning player's paper (the chronicle cannot derive it: the session
+## boundary is a host fact, so the caller's hint is AUTHORITATIVE for
+## exactly this variant).
 const VARIANT_FIRST_RUN := &"first_run"
 const VARIANT_WIN_RESTART := &"win_restart"
 const VARIANT_LOSS_RESTART := &"loss_restart"
+const VARIANT_RESUMED := &"resumed"
 
 ## The one gesture's chip (every variant: unfold = open, the motion
 ## grammar's session-start verb; the signature double rule prints on it).
@@ -40,6 +45,12 @@ const CHIP_LABEL := "Unfold the spread"
 ## MotionProfile so reduced motion lands near-instant (the intro IS the
 ## loading moment into the spread, never a wait).
 const UNFOLD_SECONDS := 1.7
+
+## The CHECK-IN unfold's authored duration — strictly faster than the
+## deal's reveal (a returning player already knows the world; the brief's
+## 3-second promise is measured foreground -> actionable card, and the
+## reveal dwell + this sweep + a gesture must all fit inside it).
+const RESUMED_UNFOLD_SECONDS := 1.0
 
 ## Interaction budget the intro contracts to the spread (the acceptance
 ## line "intro -> spread in <= 3 interactions"); the reveal itself waits
@@ -53,14 +64,19 @@ const MAX_INTERACTIONS := 3
 ## The whole reveal as data. Pure: reads only the run lifecycle's query
 ## surfaces + the shared meta; for restart variants the caller has ALREADY
 ## restarted the run (the new identity is drawn — the spread's seam order:
-## beats print first, then the new leader is dealt).
-static func reveal_view(host: GameHost) -> Dictionary:
+## beats print first, then the new leader is dealt). `p_resumed` forces
+## the CHECK-IN variant (T-UI-09 — the session boundary is a host fact
+## the chronicle cannot derive) and `p_catch_up` is the resolved away
+## window's REAL report payload (may be {} — the window was never resolved
+## on this boot).
+static func reveal_view(host: GameHost, p_resumed := false,
+		p_catch_up := {}) -> Dictionary:
 	var run := host.run()
 	var pack := Inks.pack()
 	var previous: Dictionary = {}
 	if not host.meta.chronicle.is_empty():
 		previous = host.meta.chronicle[host.meta.chronicle.size() - 1]
-	var variant := variant_for(host)
+	var variant := VARIANT_RESUMED if p_resumed else variant_for(host)
 	var regime_id := run.regime_id()
 	# The leader's face: the run starts as a peasant — the pack's base-unit
 	# face (landed art or the authored placeholder, never invented).
@@ -91,7 +107,8 @@ static func reveal_view(host: GameHost) -> Dictionary:
 		"regime": regime,
 		"previous": previous,
 		"bank": host.meta.legacy_points,
-		"lines": reveal_lines(variant, leader, regime, previous, host.meta.legacy_points),
+		"lines": reveal_lines(variant, leader, regime, previous, host.meta.legacy_points,
+			host.is_run_running(), p_catch_up, host.engine.sim_hours()),
 		"chip": CHIP_LABEL,
 	}
 
@@ -112,11 +129,32 @@ static func variant_for(host: GameHost) -> StringName:
 
 
 ## The reveal's printed lines, in order (class + text). Pure copy builder
-## — testable without a host; every %s is caller-supplied ACTUAL data.
+## — testable without a host; every %s is caller-supplied ACTUAL data. The
+## CHECK-IN variant's away line is CatchUpPrint's (one voice source for
+## the window's facts; the blockquote carries the detail after the sweep).
 static func reveal_lines(variant: StringName, leader: Dictionary, regime: Dictionary,
-		previous: Dictionary, bank: int) -> Array[Dictionary]:
+		previous: Dictionary, bank: int, run_alive := true,
+		p_catch_up := {}, p_sim_hours := 0) -> Array[Dictionary]:
 	var lines: Array[Dictionary] = []
 	var regime_name := String(regime["name"])
+	match variant:
+		VARIANT_RESUMED:
+			# The returning hand: the leader's FIRST name (the loss-restart
+			# precedent — the full plate is on the leader card beside it),
+			# the away line from the REAL report, then the table beneath.
+			if run_alive:
+				lines.append(_row(Inks.LineClass.PLAIN,
+					"%s keeps the standard — hour %d of the hand."
+					% [String(leader["name"]).split(" ")[0], p_sim_hours]))
+				lines.append(_row(Inks.LineClass.PLAIN, CatchUpPrint.away_line(p_catch_up)))
+				lines.append(_row(Inks.LineClass.PLAIN,
+					"The spread waits beneath — the chronicle has the rest."))
+			else:
+				lines.append(_row(Inks.LineClass.STRIKE,
+					"The hand ended while you were away."))
+				lines.append(_row(Inks.LineClass.PLAIN, CatchUpPrint.away_line(p_catch_up)))
+				lines.append(_row(Inks.LineClass.PLAIN, "The next hand waits beneath."))
+			return lines
 	match variant:
 		VARIANT_FIRST_RUN:
 			lines.append(_row(Inks.LineClass.PLAIN,
@@ -165,9 +203,12 @@ static func _article(regime_name: String) -> String:
 
 
 ## The unfold duration under the current motion profile (full = authored
-## 1–3s; reduced = near-instant / synchronous).
-static func unfold_seconds() -> float:
-	return MotionProfile.duration(UNFOLD_SECONDS)
+## 1–3s; reduced = near-instant / synchronous). The CHECK-IN variant is
+## deliberately FASTER than the deal's reveal (RESUMED_UNFOLD_SECONDS) —
+## a returning player's 3-second promise, never a re-wait.
+static func unfold_seconds(p_variant: StringName = VARIANT_FIRST_RUN) -> float:
+	var full := RESUMED_UNFOLD_SECONDS if p_variant == VARIANT_RESUMED else UNFOLD_SECONDS
+	return MotionProfile.duration(full)
 
 
 ## Determinism oracle over the view's CONTENT: two hosts in the same run

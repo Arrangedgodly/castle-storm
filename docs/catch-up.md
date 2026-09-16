@@ -126,10 +126,24 @@ seconds) — the ring tail keeps the raw per-tick events for detail; we do
 not replay thousands of events at the player. The returned report
 Dictionary carries: flags (`first_launch`, `rewound`, `capped`,
 `skipped_paused`), the raw/clamped/applied numbers, per-type resource
-deltas, arrivals, training completions, promotions, run endings, and the
-suspicion delta. `CatchUpService.chronicle_line(report)` renders the Prof X
-placeholder lines (rewind / freeze / capped / plain; empty for a
-nothing-happened foreground).
+deltas, arrivals, training completions, promotions, run endings,
+crackdowns that landed inside the window, and the suspicion delta.
+`CatchUpService.chronicle_line(report)` renders the Prof X placeholder
+lines (rewind / freeze / capped / plain; empty for a nothing-happened
+foreground).
+
+**T-UI-09 (the consumer, landed 2026-09-15):** the resumed session opens
+with the intro's SHORT unfold variant (`VARIANT_RESUMED`, 1.0s sweep +
+0.75s dwell, auto or one gesture), then the window prints as a
+while-you-were-away chronicle BLOCKQUOTE on the table
+(`ui/screens/spread/catch_up_print.gd` — elapsed/capped clause, per-type
+resources, arrivals/completions/promotions, suspicion delta,
+crackdowns-with-weight; one quiet strip line for a nothing-happened
+window; the wry line leads a rewound one). A window resolved inside
+`boot()` fires its signal before any screen connects, so `GameHost.
+last_catch_up_report` is the boot seam the check-in reads. Never a
+"welcome back" modal — the quote dwells and folds itself, the table is
+live beneath it.
 
 ## 8. Deviation of record: R4's `knight_assembly_offline` row
 
@@ -170,3 +184,4 @@ plus this bound keep gate-offer pressure manageable forever
 | kill mid-catch-up / save-during-away | same file `test_kill_mid_catch_up...` + `marathon_catch_up_gap` |
 | twin parity (fast-forward == live ticks) | same file + `marathon_catch_up_gap` (resources per type, hash, arrivals, suspicion) |
 | compute budget (<100ms for capped 8h) | `marathon_catch_up_gap` (measured 7ms) |
+| the while-you-were-away print (capped/uncapped/zero/rewound/crackdown-while-away), the check-in unfold + focus landing, input parity ×3, reduced motion | `tests/unit/test_catch_up_ux.gd` (T-UI-09) |

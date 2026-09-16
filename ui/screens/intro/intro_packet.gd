@@ -186,8 +186,7 @@ func bind(view: Dictionary) -> void:
 	var variant: StringName = view["variant"]
 	var leader: Dictionary = view["leader"]
 	var regime: Dictionary = view["regime"]
-	_title_label.text = "THE FIRST HAND" if variant == IntroPresenter.VARIANT_FIRST_RUN \
-		else "THE NEXT HAND"
+	_title_label.text = _title_for(variant)
 	_leader_frame.set("edge_form", Inks.EdgeForm.SOLID)
 	_leader_frame.set("regime_id", regime["id"])
 	_leader_frame.set("misprint_seed", int(view["run_number"]) * 31 + 7)
@@ -219,6 +218,18 @@ func bind(view: Dictionary) -> void:
 	visible = true
 	_relaid()
 	_apply(0.0)
+
+
+## The masthead per variant: the first deal, the next hand, or the
+## returning hand (T-UI-09's check-in — the same hand resumes).
+static func _title_for(variant: StringName) -> String:
+	match variant:
+		IntroPresenter.VARIANT_FIRST_RUN:
+			return "THE FIRST HAND"
+		IntroPresenter.VARIANT_RESUMED:
+			return "THE HAND RETURNS"
+		_:
+			return "THE NEXT HAND"
 
 
 ## The leader's plate: the personality tags + trait stub in the print

@@ -48,6 +48,17 @@
 ## quote, then T-UI-05's loss-restart reveal). All of it paper on the
 ## table — the anti-goal is popup chrome.
 ##
+## THE CHECK-IN (T-UI-09): a RESUMED session (anything but the fresh
+## first deal) opens with the intro's SHORT unfold variant — the same
+## hand's leader under the same regime, the away line from the REAL
+## catch-up report, auto-opening inside the 3-second promise — and the
+## resolved away window prints as a while-you-were-away BLOCKQUOTE on the
+## table (CatchUpPrint's rows: elapsed/capped, per-type resources,
+## arrivals/completions/promotions, suspicion, crackdowns-with-weight),
+## its headline scrolling into the chronicle strip. Never a "welcome
+## back" modal: the quote dwells and folds itself, the table is live
+## beneath it the whole time, focus lands on the first actionable card.
+##
 ## Dev inspection hook (not a game path): CS_SPREAD_SHOT=/path.png renders
 ## for a settling window and saves one capture, then quits; pair with
 ## CS_SPREAD_LOUD=1 for the pressured state (see _capture_hook), with
@@ -60,7 +71,11 @@
 ## telegraph choice card / the landed-crackdown blockquote / the crushed
 ## beat's quote over the swept table), with CS_SPREAD_CHRONICLE=1/2 for
 ## the chronicle ledger (T-UI-08: three real hands / the 50-hand ring,
-## newest + oldest pages).
+## newest + oldest pages), or with CS_SPREAD_CATCHUP=1/2 for the check-in
+## beats (T-UI-09: a mid-session away window resolved on the live table /
+## a full process-restart resume through a real save — the short unfold +
+## the while-you-were-away print, with the foreground->actionable
+## measurement printed).
 extends ResponsiveScreen
 
 const RUN_HEADER_SCRIPT := preload("res://ui/screens/spread/run_header.gd")
@@ -103,6 +118,7 @@ var stats := {
 	&"choice_cards": 0, &"choices_made": 0, &"quotes_printed": 0,
 	&"crushes_played": 0, &"eye_strikes": 0, &"ground_flashes": 0,
 	&"chronicles_opened": 0, &"chronicles_closed": 0,
+	&"catch_up_prints": 0, &"quiet_lines": 0,
 }
 
 ## The leader intro / restart reveal (T-UI-05): ON at boot, from the
@@ -140,6 +156,13 @@ var _table_frozen := false
 ## events arrive after).
 var _pre_crackdown_cards: Array = []
 var _flip_queue := CardMotion.PromotionFlipQueue.new()
+## The boot-resolved away window awaiting the check-in unfold's close
+## (the intro's paper folds first, THEN the blockquote prints on the
+## table it revealed — never stacked paper).
+var _pending_catch_up := {}
+## Dev-inspection wall mark (the resumed-boot capture's foreground
+## reference — see _catch_up_then_capture; never a game path).
+var _catchup_boot_msec := -1
 ## Entrance deals are armed only after the FIRST full bind — the boot deal
 ## is the packet unfold's business (T-UI-05); cards JOINING a live table
 ## (recruits arriving, offers becoming estate cards) slide-and-settle.
@@ -179,11 +202,15 @@ func _ready() -> void:
 func _refresh_from_state_deferred() -> void:
 	refresh_from_state.call_deferred()
 	_maybe_open_boot_intro.call_deferred()
+	_maybe_open_resumed_intro.call_deferred()
 
 
 ## The seeded demo session: a real save-backed host. CS_DEMO_RESET=1 (the
 ## Makefile default) wipes the demo save root so every `make run-game` is
 ## the same seeded fresh run; CS_DEMO_RESET=0 continues the session.
+## CS_DEMO_NOW=<epoch> injects the platform host's "now" into boot (the
+## T-UI-09 capture path: a resumed boot resolves its away window through
+## the real service — timestamps injected, never read from the OS).
 func build_demo_host() -> GameHost:
 	var root := "user://saves"
 	if OS.get_environment("CS_DEMO_RESET") != "0":
@@ -194,12 +221,26 @@ func build_demo_host() -> GameHost:
 		seed_value = int(seed_text)
 	var demo := GameHost.new(seed_value, root)
 	demo.autosave_interval_ticks = AUTOSAVE_TICKS
-	demo.boot(0)
+	if OS.get_environment("CS_SPREAD_CATCHUP") == "3":
+		# Dev-inspection wall mark for the 3-second promise measurement
+		# (see _catch_up_then_capture; not a game path).
+		_catchup_boot_msec = Time.get_ticks_msec()
+	demo.boot(_demo_now_epoch())
 	if OS.get_environment("CS_SPREAD_LOUD") == "1":
 		demo_policy = DemoPolicy.new(40, 40, true)
 	else:
 		demo_policy = DemoPolicy.new(16, 8, false)
 	return demo
+
+
+## The platform host's injected "now" for the demo (0 = none — the
+## session boots without a foreground boundary; T-PERF-01 wires the real
+## platform seam).
+func _demo_now_epoch() -> int:
+	var text := OS.get_environment("CS_DEMO_NOW")
+	if not text.is_empty() and text.is_valid_int():
+		return int(text)
+	return 0
 
 
 func _wipe_save_root(root: String) -> void:
@@ -526,6 +567,25 @@ func _maybe_open_boot_intro() -> void:
 	_intro.open(host, get_router())
 
 
+## THE CHECK-IN BEAT (T-UI-09): any session that is NOT the fresh first
+## deal — hours into the first hand, or any later hand — opens with the
+## intro's SHORT unfold variant instead: the SAME hand's leader under the
+## same regime (never a re-deal), the away line from the window the host
+## resolved at boot (`last_catch_up_report` — the boot seam: the signal
+## fired before this screen could connect), auto-opening inside the
+## 3-second promise. The away print follows the fold (see
+## _on_intro_closed); a mid-session foreground (screen already mounted)
+## prints without papering over the live table.
+func _maybe_open_resumed_intro() -> void:
+	if not intro_enabled or _intro == null or _intro.is_open():
+		return
+	if host.meta.runs_recorded == 0 and host.engine.tick_count <= 1:
+		return  # the fresh first deal — T-UI-05's reveal owns this entry
+	_pending_catch_up = host.last_catch_up_report
+	stats[&"intros_opened"] += 1
+	_intro.open(host, get_router(), IntroPresenter.VARIANT_RESUMED, _pending_catch_up)
+
+
 ## Mount the intro (deferred by the run-loss path so the aftermath's full
 ## refresh lands first — the crushing beat prints, THEN the reveal papers
 ## over it). `p_variant` is a hint; the presenter re-derives the truth
@@ -540,16 +600,33 @@ func _open_intro(p_variant: StringName = &"") -> void:
 	_intro.open(host, get_router(), p_variant)
 
 
-## The reveal folded away (its one gesture landed): the table takes focus
-## back — first card, else the slot's first focusable (an empty first-run
-## table has no cards yet; a screen must seed itself, the router's rule).
-func _on_intro_closed(_variant: StringName) -> void:
+## The reveal folded away (its one gesture — or its auto timer — landed):
+## the table takes focus back — first card, else the slot's first
+## focusable (an empty first-run table has no cards yet; a screen must
+## seed itself, the router's rule). The CHECK-IN variant's fold also
+## releases the while-you-were-away print onto the now-visible table.
+func _on_intro_closed(variant: StringName) -> void:
 	stats[&"intros_unfolded"] += 1
 	if _crush_after_intro:
 		# The run died behind the reveal: the table tells the story now.
 		_crush_after_intro = false
 		_start_crush_beat()
 		return
+	if variant == IntroPresenter.VARIANT_RESUMED:
+		var report := _pending_catch_up
+		_pending_catch_up = {}
+		if not report.is_empty():
+			# The boot-resolved window: its events drained before this
+			# screen connected, so the strip never printed them — the
+			# print pushes its own headline row (the mid-session path's
+			# drain already did).
+			_deliver_catch_up(report, true)
+		if not host.is_run_running() and intro_enabled:
+			# The hand ENDED inside the away window (a crush behind the
+			# reveal): the blockquote tells it, then the loss-restart
+			# reveal deals the next hand once the quote has had its read.
+			get_tree().create_timer(SuspicionEvents.QUOTE_DWELL) \
+				.timeout.connect(_open_intro)
 	var active := get_active_slot() as OrientationSlot
 	if active == null:
 		return
@@ -560,6 +637,26 @@ func _on_intro_closed(_variant: StringName) -> void:
 	for focusable in active.focusables():
 		focusable.grab_focus()
 		return
+
+
+## THE WHILE-YOU-WERE-AWAY PRINT (T-UI-09): the resolved window as paper
+## on the table — the blockquote (dwell, self-folding, never blocking)
+## when the window ticked or the clock was wound backwards, else a single
+## quiet strip line. `p_push_strip` is true only on the boot path (the
+## mid-session foreground's unified drain already printed the headline
+## into the strip).
+func _deliver_catch_up(report: Dictionary, p_push_strip: bool) -> void:
+	if int(report.get("applied_ticks", 0)) > 0 or bool(report.get("rewound", false)):
+		stats[&"catch_up_prints"] += 1
+		_suspicion.open_quote_rows(CatchUpPrint.rows(report),
+			_design_bounds().size, _quote_floor(), SuspicionEvents.QUOTE_DWELL * 2.0)
+		if p_push_strip:
+			presenter.push_row(CatchUpPrint.headline_row(report))
+			_bind_chronicle()
+	elif p_push_strip:
+		stats[&"quiet_lines"] += 1
+		presenter.push_row(CatchUpPrint.quiet_row())
+		_bind_chronicle()
 
 
 # --- card interactions (T-UI-04) -------------------------------------------------------
@@ -620,9 +717,12 @@ func _play_promotion_flip(card_id: String, uid: int) -> void:
 		SpreadCards.rebind_card(node_ref, fresh_ref))
 
 
-## The foreground boundary resolved a catch-up window: replay the queued
-## offline flips, staggered (latest capped set — see PromotionFlipQueue).
-func _on_catch_up_resolved(_report: Dictionary) -> void:
+## The foreground boundary resolved a catch-up window (MID-SESSION: the
+## screen is mounted, the table live): replay the queued offline flips,
+## staggered (latest capped set — see PromotionFlipQueue), and print the
+## while-you-were-away blockquote onto the live table. The strip's
+## headline already printed through this drain's own event.
+func _on_catch_up_resolved(report: Dictionary) -> void:
 	var replay := _flip_queue.take_all()
 	for i in replay.size():
 		var card_id := replay[i]
@@ -631,6 +731,7 @@ func _on_catch_up_resolved(_report: Dictionary) -> void:
 			stats[&"flip_replays"] += 1
 			_play_promotion_flip(card_id, uid)
 		get_tree().create_timer(0.25 * float(i)).timeout.connect(do_flip)
+	_deliver_catch_up(report, false)
 
 
 ## Build the one screen-level action fan (outside the slots: it is paper
@@ -1386,6 +1487,8 @@ func _capture_hook() -> void:
 		_suspicion_then_capture(int(OS.get_environment("CS_SPREAD_SUSPICION")), settle)
 	elif not OS.get_environment("CS_SPREAD_CHRONICLE").is_empty():
 		_chronicle_then_capture(int(OS.get_environment("CS_SPREAD_CHRONICLE")), settle)
+	elif not OS.get_environment("CS_SPREAD_CATCHUP").is_empty():
+		_catch_up_then_capture(int(OS.get_environment("CS_SPREAD_CATCHUP")), settle)
 	elif OS.get_environment("CS_SPREAD_LOUD") == "1":
 		_pressure_then_capture()
 	else:
@@ -1478,6 +1581,117 @@ func _suspicion_then_capture(mode: int, settle: float) -> void:
 		get_tree().quit(0)
 		return
 	_settle_then_capture(settle if settle > 0.0 else 0.4)
+
+
+## CS_SPREAD_CATCHUP=1 (T-UI-09): the MID-SESSION print — the demo runs
+## a few hours live, then the app backgrounds (anchor + save, injected
+## epoch T0), and a 9h37m foreground resolves the CAPPED window on the
+## LIVE table; the capture waits for the while-you-were-away blockquote
+## and prints the foreground->print wall time. =2 (SEED): the drive ends
+## AT the background boundary (anchor + run saved, no foreground) — run
+## again with =3 to resume. =3 (RESUME): expects CS_DEMO_RESET=0 +
+## CS_DEMO_NOW=<T0+gap> — the process boots RESUMED through the real
+## save: the check-in unfold plays over the caught-up table, auto-opens,
+## the print lands, and the capture reports the honest
+## foreground->actionable-card wall time (the 3-second promise).
+## Timestamps are injected constants; no OS clock is read by the game.
+func _catch_up_then_capture(mode: int, settle: float) -> void:
+	const T0 := 1_800_000_000  # synthetic platform epoch (printed for the =3 chaining)
+	host.time_scale = TIME_SCALES[TIME_SCALES.size() - 1]
+	time_scale_index = TIME_SCALES.size() - 1
+	if mode != 3:
+		# A player opens the game before they play it: the FIRST-HAND boot
+		# reveal folds before the fresh-seed drives act (mode 3 boots
+		# RESUMED — its check-in reveal IS the capture, never pre-folded).
+		for i in 90:
+			await get_tree().process_frame
+			if _intro != null and _intro.is_open():
+				break
+		if _intro != null and _intro.is_open():
+			_intro.unfold()
+			for i in 300:
+				await get_tree().process_frame
+				if not _intro.is_open():
+					break
+	if mode == 2:
+		# SEED: a few live hours, then the app hides — anchor + save, quit.
+		var seeded := 0.0
+		while seeded < 6.0:
+			host.fast_forward(SimEngine.TICKS_PER_SIM_HOUR)
+			if demo_policy != null and demo_policy.on_ticks(SimEngine.TICKS_PER_SIM_HOUR):
+				demo_policy.apply(host)
+			seeded += 1.0
+		refresh_from_state()
+		host.background(T0)
+		print("[spread] catch-up seed: %dh live, anchor saved at T0=%d, sim %dh, cards %d — now run =3 with CS_DEMO_RESET=0 CS_DEMO_NOW=%d"
+			% [int(seeded), T0, int(host.engine.sim_hours()),
+				host.units().total_units() + host.units().pending_offers(),
+				T0 + 9 * 3600 + 37 * 60])
+		_capture_now("pre-away table")
+		get_tree().quit(0)
+		return
+	if mode == 1:
+		# MID-SESSION: the window resolves on the LIVE table.
+		var lived := 0.0
+		while lived < 5.0:
+			host.fast_forward(SimEngine.TICKS_PER_SIM_HOUR)
+			if demo_policy != null and demo_policy.on_ticks(SimEngine.TICKS_PER_SIM_HOUR):
+				demo_policy.apply(host)
+			lived += 1.0
+		refresh_from_state()
+		host.background(T0)
+		var started := Time.get_ticks_msec()
+		var report := host.foreground(T0 + 9 * 3600 + 37 * 60)  # 9h37m -> capped 8h
+		for i in 300:
+			await get_tree().process_frame
+			if int(stats[&"catch_up_prints"]) > 0:
+				break
+		var focus := get_viewport().gui_get_focus_owner()
+		print("[spread] catch-up print (mid-session): applied %d ticks (capped %s), rows %d, printed %dms after foreground, focus on table: %s"
+			% [int(report["applied_ticks"]), str(report["capped"]),
+				_suspicion.quote_rows().size(), Time.get_ticks_msec() - started,
+				str(focus != null and focus.has_meta(&"spread_card_id"))])
+		for row: Dictionary in _suspicion.quote_rows():
+			print("[spread]   away: %s" % String(row["text"]))
+		_settle_then_capture(settle if settle > 0.0 else 0.4)
+		return
+	# MODE 3 — RESUME: this process booted through CS_DEMO_NOW (see
+	# build_demo_host); the check-in beat owns the entry.
+	for i in 90:
+		await get_tree().process_frame
+		if _intro != null and _intro.is_open():
+			break
+	if _intro == null or not _intro.is_open():
+		print("[spread] catch-up resume: the check-in reveal never opened (fresh boot? CS_DEMO_RESET=0 + CS_DEMO_NOW required) — capturing as-is")
+		_settle_then_capture(0.3)
+		return
+	var view := _intro.view()
+	print("[spread] catch-up resume: variant '%s', leader '%s' under '%s', report ticks %d (capped %s)"
+		% [String(view["variant"]), String(view["leader"]["name"]),
+			String(view["regime"]["name"]), int(host.last_catch_up_report.get("applied_ticks", 0)),
+			str(host.last_catch_up_report.get("capped", false))])
+	for line: Dictionary in view["lines"]:
+		print("[spread]   print: %s" % String(line["text"]))
+	_capture_now("check-in reveal")
+	# The auto-unfold (0.75s dwell + 1.0s sweep), then the print on the
+	# revealed table — the honest foreground->actionable measurement.
+	for i in 600:
+		await get_tree().process_frame
+		if not _intro.is_open():
+			break
+	for i in 300:
+		await get_tree().process_frame
+		if int(stats[&"catch_up_prints"]) > 0:
+			break
+	var focus := get_viewport().gui_get_focus_owner()
+	var actionable := focus != null and focus.has_meta(&"spread_card_id")
+	var elapsed := Time.get_ticks_msec() - _catchup_boot_msec if _catchup_boot_msec >= 0 else -1
+	print("[spread] catch-up resume: unfold closed + print landed, interactions %d (auto), focus on a card: %s — FOREGROUND -> ACTIONABLE %dms (the 3s promise)"
+		% [_intro.interactions, str(actionable), elapsed])
+	for row: Dictionary in _suspicion.quote_rows():
+		print("[spread]   away: %s" % String(row["text"]))
+	_capture_now("resumed spread + while-you-were-away", ".away")
+	get_tree().quit(0)
 
 
 ## CS_SPREAD_CHRONICLE=1: the ledger (T-UI-08) over a FEW real hands —

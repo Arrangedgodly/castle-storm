@@ -442,7 +442,11 @@ func chronicle_line_for(event: Dictionary, host: GameHost) -> Variant:
 		&"assault_denied":
 			return _row(kind, "The assault is refused — the army is not yet an army (power %d)." % event["value2"])
 		&"catch_up_applied":
-			return _row(kind, "While you were away, the plot pressed on (%d minutes of it)." % event["value"])
+			# One voice source for the window's headline: the strip row, the
+			# blockquote's lead and the check-in reveal's away line all read
+			# CatchUpPrint (T-UI-09). value2 = the clamped seconds that
+			# actually applied.
+			return _row(kind, CatchUpPrint.headline_text(int(event["value2"])))
 		&"catch_up_clock_rewound":
 			return _row(kind, "The castle clock was found wound backwards. Nothing was said.")
 		&"upgrade_denied", &"lifecycle_denied", &"run_denied":

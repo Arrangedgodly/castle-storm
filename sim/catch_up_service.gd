@@ -113,7 +113,7 @@ func cap_ticks() -> int:
 ##   elapsed_seconds (raw, post-overflow-clamp), clamped_seconds        : int
 ##   applied_ticks, from_tick, to_tick, cap_seconds, cap_ticks          : int
 ##   events_in_window, arrivals, training_completions,
-##   promotions, run_endings                                            : int
+##   promotions, run_endings, crackdowns                                : int
 ##   resources_before / resources_after / resource_delta : Dictionary (int)
 ##   suspicion_present : bool; suspicion_before/after/delta : int
 ##
@@ -187,6 +187,10 @@ func apply(engine: SimEngine, meta: RunMeta, now_epoch: int) -> Dictionary:
 		"promotions": _count_events(engine, seq_before, seq_after, &"unit_promoted"),
 		"run_endings": _count_events(engine, seq_before, seq_after, &"run_won")
 			+ _count_events(engine, seq_before, seq_after, &"run_lost"),
+		# Crackdowns that LANDED inside the window (rare — the telegraph must
+		# have been armed before the player left): T-UI-09 prints these with
+		# weight, so the summary carries the count (docs/catch-up.md §7).
+		"crackdowns": _count_events(engine, seq_before, seq_after, &"crackdown_struck"),
 		"resources_before": resources_before,
 		"resources_after": resources_after,
 		"resource_delta": _resource_delta(resources_before, resources_after),

@@ -346,13 +346,35 @@ func test_boot_opens_the_first_hand_focused_on_the_one_gesture() -> void:
 	screen.queue_free()
 
 
-func test_resumed_session_does_not_redeal() -> void:
-	MotionProfile.forced = 1
+func test_resumed_session_opens_the_checkin_not_a_redeal() -> void:
+	## T-UI-09 landed: the resumed session's entry beat is the CHECK-IN
+	## unfold (the short variant over the SAME hand), never a re-deal —
+	## the leader, regime and run index are all unchanged. FULL motion so
+	## the reveal is inspectable inside its dwell; the auto/sync paths are
+	## the catch-up suite's (Engine.time_scale strategy).
+	MotionProfile.forced = 0
 	var host := _test_host()
+	var leader_before := host.run().leader_name()
+	var regime_before := host.run().regime_id()
 	host.fast_forward(3 * SimEngine.TICKS_PER_SIM_HOUR)  # hours in — a resumed first run
 	var screen: SpreadScreen = await _mounted_screen(host)
-	await get_tree().process_frame
-	assert_bool(screen._intro.is_open()).is_false()  # T-UI-09's check-in owns that entry
+	assert_bool(screen._intro.is_open()).is_true()
+	assert_str(String(screen._intro.view()["variant"])).is_equal(
+		String(IntroPresenter.VARIANT_RESUMED))
+	assert_str(String(screen._intro.view()["leader"]["name"])).is_equal(leader_before)
+	assert_str(String(screen._intro.view()["regime"]["id"])).is_equal(String(regime_before))
+	assert_int(host.run().run_index).is_equal(1)  # no restart was dealt
+	assert_bool(host.is_run_running()).is_true()
+	# Fold it deterministically (injected strides, the T-UI-05 pattern).
+	screen._intro.unfold()
+	assert_float(screen._intro.last_unfold_seconds) \
+		.is_equal(IntroPresenter.unfold_seconds(IntroPresenter.VARIANT_RESUMED))
+	var strides := 0
+	while screen._intro.is_open() and strides < 32:
+		screen._intro._packet._process(screen._intro.last_unfold_seconds / 8.0)
+		strides += 1
+	assert_bool(screen._intro.is_open()).is_false()
+	assert_int(screen._intro.interactions).is_equal(0)  # a direct call is not a player input
 	screen.queue_free()
 
 
