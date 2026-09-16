@@ -1485,8 +1485,10 @@ func _suspicion_then_capture(mode: int, settle: float) -> void:
 ## abort), the new hand is dealt, and the chronicle opens from the header
 ## chip's verb; capture at CS_SPREAD_SHOT (the newest page, the live-hand
 ## strip, the seals). =2: the ring after MANY hands — 50 real runs with
-## varied durations and all three outcomes, captured at the newest page
-## AND the ring's far end (.old.png) with the page chips' states.
+## varied durations and all three outcomes, captured at the newest page,
+## the MID-RING TALL PAGE exactly one turn in (.turn.png — the round-1
+## verifier repro shape: a full band-exceeding page after ONE turn), AND
+## the ring's far end (.old.png) with the page chips' states.
 func _chronicle_then_capture(mode: int, settle: float) -> void:
 	# The drive ends runs; the spread would mount the loss reveal on each
 	# ending (its documented role) — disabled for the drive (sibling-suite
@@ -1544,6 +1546,21 @@ func _chronicle_then_capture(mode: int, settle: float) -> void:
 		await get_tree().process_frame
 	_capture_now("chronicle newest page")
 	if mode == 2:
+		# THE MID-RING TALL PAGE after ONE turn (the round-1 verifier
+		# repro shape): a full 6-card page that exceeds its band, exactly
+		# one turn in — the capture the original walk could never show
+		# (it ended on the fitting 2-entry oldest page, so the stale-scroll
+		# defect was invisible to it).
+		_chronicle.turn_page(1)
+		for i in 20:
+			await get_tree().process_frame
+		var tall_scroll := _chronicle.sheet().scroll()
+		print("[spread] chronicle capture: mid-ring page %d/%d after ONE turn — entries %d, scroll %d/%d (at top: %s)"
+			% [_chronicle.page + 1, int(_chronicle.view()["page_count"]),
+				(_chronicle.view()["entries"] as Array).size(),
+				tall_scroll.scroll_vertical, int(tall_scroll.get_v_scroll_bar().max_value),
+				str(tall_scroll.scroll_vertical == 0)])
+		_capture_now("chronicle mid-ring tall page", ".turn")
 		while _chronicle.page + 1 < int(_chronicle.view()["page_count"]):
 			_chronicle.turn_page(1)
 		for i in 20:

@@ -174,11 +174,14 @@ func _on_chip(id: StringName) -> void:
 
 ## Focus seeds the walk: the first ENTRY of the page (the ring is the
 ## readable thing); the empty chronicle seeds the back chip — a screen
-## must seed itself, the router's rule.
+## must seed itself, the router's rule. The seed SETTLES on the page's
+## REAL layout (the sheet's contract — `settle_seed` awaits the
+## post-sort geometry, resets the scroll to the top, then grabs focus),
+## never on the pre-sort rects a fixed deferral would consume.
 func _seed_focus() -> void:
 	var focusables := _sheet.focusables()
 	if not focusables.is_empty():
-		focusables[0].grab_focus.call_deferred()
+		_sheet.settle_seed(focusables[0])
 
 
 # --- input ------------------------------------------------------------------------------

@@ -14,7 +14,10 @@
 ##     and returns focus to the chip, page turns + refusals, input
 ##     parity x3 (chip tap / pad primary / Enter through the real
 ##     pipeline), FOCUS-BASED SCROLLING ACTUALLY SCROLLS (a focused
-##     entry lands inside the scroll viewport), the longest
+##     entry lands inside the scroll viewport), PAGE TURNS ON
+##     BAND-EXCEEDING PAGES SETTLE AT THE TOP with the seeded focused
+##     entry ON-SCREEN in both directions (the round-1 verifier FAIL,
+##     pinned on the turn path), the longest
 ##     identity-pool names fit their labels in REAL font metrics (the
 ##     T-UI-06 lesson: shape content, never clip), both orientations
 ##     unclipped at the four common sizes;
@@ -149,6 +152,25 @@ func _mounted_screen(host: GameHost, intro_on := false) -> SpreadScreen:
 	await get_tree().process_frame
 	await get_tree().process_frame
 	return screen
+
+
+## The seed settles on the page's REAL layout (the round-1 fix's
+## contract): poll for the SEEDED STATE — the viewport's focus owner is
+## one of the freshly-bound page's own focusables — instead of trusting
+## a fixed frame count. `settle_seed` resets the scroll BEFORE the grab,
+## so focus landing means the page has settled (post-sort rects, top).
+func _await_seeded(chronicle: ChronicleScreenScript) -> void:
+	for i in 60:
+		await get_tree().process_frame
+		var focus := get_viewport().gui_get_focus_owner() as Control
+		if focus == null:
+			continue
+		for card in chronicle.sheet().entries():
+			if card == focus:
+				return
+		for chip in chronicle.sheet().chips():
+			if chip == focus:
+				return
 
 
 # --- presenter: the record mapped exactly -----------------------------------------------
@@ -368,8 +390,7 @@ func test_header_chip_opens_the_ledger_and_back_returns_focus() -> void:
 	# The chip's press opens the ledger (the one verb).
 	var chip := _header_chip(screen)
 	chip.pressed.emit()
-	await get_tree().process_frame
-	await get_tree().process_frame  # the deferred focus seed lands
+	await _await_seeded(screen._chronicle)
 	var chronicle := screen._chronicle
 	assert_bool(chronicle.is_open()).is_true()
 	assert_int(int(screen.stats[&"chronicles_opened"])).is_equal(1)
@@ -448,8 +469,7 @@ func test_focus_based_scrolling_actually_scrolls() -> void:
 	# Force a page TALLER than the band (the test seam): 6 wrapped cards.
 	chronicle.per_page = 6
 	chronicle.open(host, screen.get_router())
-	await get_tree().process_frame
-	await get_tree().process_frame
+	await _await_seeded(chronicle)
 	var sheet := chronicle.sheet()
 	var scroll := sheet.scroll()
 	var entries := sheet.entries()
@@ -475,6 +495,93 @@ func test_focus_based_scrolling_actually_scrolls() -> void:
 	screen.queue_free()
 
 
+## THE ROUND-1 VERIFIER FAIL, PINNED ON THE TURN PATH: on a page that
+## EXCEEDS its band (the typical phone-portrait page — 6 real cards,
+## content ~1250px over the ~934px band), EVERY page turn must land the
+## ledger at the TOP with the seeded FOCUSED first entry ON-SCREEN, in
+## BOTH directions. The old deferred ensure read the freshly-bound
+## cards' PRE-SORT rects (still stacked under the dying previous page)
+## and scrolled each fresh page to its MAXIMUM, stranding the focused
+## card fully above the viewport (probe-measured: scroll 354/354, card0
+## at global y −204).
+func test_tall_page_turns_settle_at_top_with_focus_on_screen() -> void:
+	get_window().size = Vector2i(720, 1280)  # phone portrait (per_page 6)
+	var host := _test_host()
+	_synthetic_ring(host, 26)  # 20+ real entries: 4 full pages + a 2-entry tail
+	var screen: SpreadScreen = await _mounted_screen(host)
+	var chronicle := screen._chronicle
+	chronicle.per_page = 6  # the derived portrait page size, pinned
+	chronicle.open(host, screen.get_router())
+	await _await_seeded(chronicle)
+	var sheet := chronicle.sheet()
+	var scroll := sheet.scroll()
+	assert_int((chronicle.view()["entries"] as Array).size()).is_equal(6)
+	# OPEN settles at the top with the seeded card on-screen.
+	_assert_page_settled_at_top(sheet, scroll, true)
+	# OLDER through every page of the ring (pages 1..3 full 6-card pages
+	# that exceed the band; page 4 the 2-entry tail that fits it).
+	for page in range(1, 5):
+		chronicle.turn_page(1)
+		await _await_seeded(chronicle)
+		assert_int(int(chronicle.view()["page"])).is_equal(page)
+		_assert_page_settled_at_top(sheet, scroll, page < 4)
+	# NEWER back down through the SAME full pages — both directions, the
+	# exact assertion shape of the focus-scroll contract, on every turn.
+	for page in range(3, -1, -1):
+		chronicle.turn_page(-1)
+		await _await_seeded(chronicle)
+		assert_int(int(chronicle.view()["page"])).is_equal(page)
+		_assert_page_settled_at_top(sheet, scroll, true)
+	assert_int(int(chronicle.stats[&"page_turns"])).is_equal(8)
+	screen.queue_free()
+
+
+## The per-turn settle contract: the scroll sits at the TOP, the seeded
+## FOCUSED first entry is fully inside the scroll viewport, and — when
+## `band_exceeding` — the page REALLY exceeds its band (otherwise the
+## scroll assertions are vacuous).
+func _assert_page_settled_at_top(sheet: ChronicleSheet, scroll: ScrollContainer,
+		band_exceeding: bool) -> void:
+	var entries := sheet.entries()
+	assert_int(entries.size()).is_greater(0)
+	if band_exceeding:
+		var content := scroll.get_child(0) as Control
+		assert_float(content.get_combined_minimum_size().y).is_greater(scroll.size.y + 1.0)
+	assert_int(scroll.scroll_vertical).is_equal(0)
+	var focus := get_viewport().gui_get_focus_owner() as Control
+	assert_that(focus).is_not_null()
+	assert_bool(focus == (entries[0] as Control)).is_true()
+	var viewport_rect := Rect2(scroll.global_position, scroll.size)
+	var card_rect: Rect2 = (entries[0] as Control).get_global_rect()
+	assert_bool(viewport_rect.encloses(card_rect.grow(-1.0))).is_true()
+
+
+## The small-page companions stay green: a ONE-page ring prints only the
+## BACK chip, opens at the top, and its refused turn drifts nothing.
+func test_one_page_ring_stays_at_top_and_prints_only_back() -> void:
+	get_window().size = Vector2i(720, 1280)
+	var host := _test_host()
+	_synthetic_ring(host, 4)  # one page at 6 per page
+	var screen: SpreadScreen = await _mounted_screen(host)
+	var chronicle := screen._chronicle
+	chronicle.per_page = 6
+	chronicle.open(host, screen.get_router())
+	await _await_seeded(chronicle)
+	assert_int(int(chronicle.view()["page_count"])).is_equal(1)
+	assert_int(chronicle.sheet().chips().size()).is_equal(1)  # only BACK
+	var scroll := chronicle.sheet().scroll()
+	assert_int(scroll.scroll_vertical).is_equal(0)
+	_assert_page_settled_at_top(chronicle.sheet(), scroll, false)
+	# The out-of-range turn refuses (the chip printed its strike) and the
+	# page stays settled at the top.
+	chronicle.turn_page(1)
+	await get_tree().process_frame
+	assert_int(int(chronicle.stats[&"refused_pages"])).is_equal(1)
+	assert_int(int(chronicle.view()["page"])).is_equal(0)
+	assert_int(scroll.scroll_vertical).is_equal(0)
+	screen.queue_free()
+
+
 func test_ledger_answers_from_all_three_input_modes() -> void:
 	get_window().size = Vector2i(720, 1280)
 	# (a) TOUCH: a chip press is the gesture (page turn).
@@ -496,8 +603,7 @@ func test_ledger_answers_from_all_three_input_modes() -> void:
 	var screen_b: SpreadScreen = await _mounted_screen(host_b)
 	screen_b._chronicle.per_page = 5
 	screen_b._chronicle.open(host_b, screen_b.get_router())
-	await get_tree().process_frame
-	await get_tree().process_frame  # the deferred focus seed lands
+	await _await_seeded(screen_b._chronicle)
 	# Walk focus down the ring onto the OLDER chip, then A.
 	var focus := get_viewport().gui_get_focus_owner()
 	for i in 6:
@@ -518,8 +624,7 @@ func test_ledger_answers_from_all_three_input_modes() -> void:
 	var screen_c: SpreadScreen = await _mounted_screen(host_c)
 	screen_c._chronicle.per_page = 5
 	screen_c._chronicle.open(host_c, screen_c.get_router())
-	await get_tree().process_frame
-	await get_tree().process_frame
+	await _await_seeded(screen_c._chronicle)
 	var focus_c := get_viewport().gui_get_focus_owner()
 	for i in 6:
 		focus_c = focus_c.find_next_valid_focus()
@@ -653,8 +758,7 @@ func test_unclipped_at_four_sizes_focus_never_stranded() -> void:
 		for f in 3:
 			await get_tree().process_frame
 		chronicle.open(host, router)
-		await get_tree().process_frame
-		await get_tree().process_frame
+		await _await_seeded(chronicle)
 		assert_bool(chronicle.is_open()).is_true()
 		# The page size derives from the live height — every entry of the
 		# page renders, the sheet fits the design, nothing clips.

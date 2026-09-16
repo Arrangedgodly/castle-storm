@@ -78,6 +78,10 @@ var _empty_rows: Array[Control] = []
 var _footer_label: Label
 var _chips: Array[ActionFan.ActionChip] = []
 var _sheet_rect := Rect2()
+## Bumped on every bind: a settle still awaiting a superseded page's
+## layout aborts instead of grabbing focus for a page that is gone (the
+## rapid-turn guard).
+var _bind_token := 0
 
 
 func _ready() -> void:
@@ -196,6 +200,7 @@ func _rebuild_chips(view: Dictionary) -> void:
 
 ## Bind the presenter's view. Same view => same render (snapshot_hash).
 func bind(view: Dictionary) -> void:
+	_bind_token += 1  # any settle still holding the previous page aborts
 	_title_label.text = String(view["title"])
 	_title_label.add_theme_color_override("font_color", Inks.INK)
 	_count_label.text = _count_line(view)
@@ -240,10 +245,12 @@ func _count_line(view: Dictionary) -> String:
 
 
 ## Rebuild the entry cards to the page's entries + the empty state.
-## A FRESH PAGE STARTS AT THE TOP (scroll reset): the focus-ensure that
-## follows the seed reads freshly-added children whose rects the
-## container has not repositioned yet — a stale ensure there scrolls the
-## wrong way (probe-measured: a fresh page jumped to its bottom).
+## A FRESH PAGE STARTS AT THE TOP: the immediate reset here is provisional
+## — the definitive one lands in `settle_seed` once the page's layout is
+## REAL (post-sort rects), because the focus-ensure that follows the seed
+## must never consume the freshly-added children's stale geometry (the
+## verifier's round-1 FAIL: the ensure scrolled fresh pages to their
+## bottom and stranded the seeded card above the viewport).
 func _rebuild_entries(view: Dictionary) -> void:
 	for entry in _entries:
 		entry.queue_free()
@@ -280,14 +287,92 @@ func _rebuild_entries(view: Dictionary) -> void:
 ## THE FOCUS-SCROLL CONTRACT (Daredevil): a focused entry is ALWAYS
 ## scrolled into view — pad/keyboard focus walks the ring, the paper
 ## follows. ScrollContainer does not do this by itself. The ensure is
-## DEFERRED past the container's own child reposition: an ensure reading
-## freshly-added children scrolls on stale rects the wrong way
-## (probe-measured: a fresh page jumped to its bottom off entry 0's
-## pre-layout rect; fresh pages additionally reset to the top above).
+## DEFERRED past the container's own child reposition — on a SETTLED page
+## (a focus walk) one deferral is enough. A card no longer on this page
+## (a newer bind superseded it mid-settle) never ensures.
 func _ensure_entry_visible(card: Control) -> void:
 	if _scroll == null or card == null or not is_instance_valid(card):
 		return
+	if not _entries.has(card):
+		return  # the page turned again under the walk — stale card
 	_scroll.ensure_control_visible.call_deferred(card)
+
+
+## THE FRESH-PAGE SETTLE (the verifier's round-1 FAIL, fixed at the
+## root): a fresh page lands with the scroll at the TOP and its seeded
+## focus ON-SCREEN, computed from the page's REAL layout — never from a
+## fixed deferred frame. On a page turn the dying previous page's cards
+## and the container's QUEUED re-sort out-last a single deferral: the
+## seeded first card still holds its PRE-SORT rect (down where the
+## container stacked it under the dying page), so an ensure reading that
+## rect scrolls the ledger to its maximum and the re-sort then strands
+## the focused card fully above the viewport (probe-measured: scroll
+## 354/354 at a 934px band, card0 at global y −204). This awaits the
+## layout the scroll math actually consumes, re-asserts the top, and only
+## then grabs focus — the focus-ensure that follows reads REAL rects.
+func settle_seed(seed: Control) -> void:
+	if seed == null or _scroll == null:
+		return
+	var token := _bind_token
+	await _await_real_layout(token)
+	if token != _bind_token or not is_inside_tree() \
+			or not is_instance_valid(seed) or not seed.is_visible_in_tree():
+		return  # a newer bind (or a close) superseded this settle
+	_scroll.scroll_vertical = 0
+	seed.grab_focus()
+
+
+## Wait until the layout the scroll math consumes is REAL, not assumed:
+## VALIDATED, never a fixed frame count. The post-sort invariant: the
+## page's first entry sits AT THE TOP of the scroll's content (pre-sort
+## it holds a position below the dying page's cards), and the geometry
+## stamp holds still across two consecutive frames (a re-sort still in
+## flight moves it). Bounded — a degenerate layout degrades to the old
+## fixed-defer behavior rather than blocking the seed forever.
+func _await_real_layout(token: int) -> void:
+	var prev := ""
+	for i in 12:
+		await get_tree().process_frame
+		if token != _bind_token or not is_inside_tree():
+			return
+		var stamp := _geometry_stamp()
+		if _layout_is_real() and stamp == prev:
+			return
+		prev = stamp
+
+
+## The first entry sits at the very top of the scroll's content: true
+## only once the container's re-sort has repositioned the freshly-bound
+## cards (the stale geometry the round-1 ensure consumed fails this —
+## the first card reads hundreds of px down the content).
+func _layout_is_real() -> bool:
+	if _entries.is_empty():
+		return true  # nothing to reposition (the empty state / chips page)
+	if _scroll == null or not is_inside_tree():
+		return false
+	var first := _entries[0] as Control
+	if not is_instance_valid(first) or first.size.y < 1.0:
+		return false
+	var content_y := first.global_position.y - _scroll.global_position.y \
+		+ float(_scroll.scroll_vertical)
+	return absf(content_y) <= 0.5
+
+
+## The geometry the scroll math consumes, as a comparable stamp: the
+## scroll offset, the content's combined minimum, the viewport, and the
+## first card's laid rect.
+func _geometry_stamp() -> String:
+	if _scroll == null or _list == null:
+		return "null"
+	var parts: Array[String] = [
+		"%d" % _scroll.scroll_vertical,
+		"%.2f" % _list.get_combined_minimum_size().y,
+		"%.2f" % _scroll.size.y,
+	]
+	if not _entries.is_empty() and is_instance_valid(_entries[0]):
+		var first := _entries[0] as Control
+		parts.append("%.2f %.2f" % [first.global_position.y, first.size.y])
+	return " ".join(parts)
 
 
 ## The entry cards in ledger order (tests + focus seeding).
