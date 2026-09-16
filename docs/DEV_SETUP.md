@@ -4,7 +4,7 @@
 
 - **Godot 4.7.2-stable** — standard (GDScript) build, **not** .NET.
 - **Compatibility renderer** (`gl_compatibility`, desktop + mobile) — set in `project.godot` under `[rendering]`.
-- Export targets (T-ARCH-02): Windows Desktop x86_64, macOS Universal (ad-hoc), Linux/X11 x86_64 (Steam Deck target).
+- Export targets (T-ARCH-02): Windows Desktop x86_64, macOS Universal (ad-hoc), Linux x86_64 (Steam Deck target) — see "Export pipeline" below.
 
 ## Vendored binary
 
@@ -45,7 +45,7 @@ make import    # --headless --path . --import   (run once after clone / adding a
 make check     # import + --headless --path . --quit  (project loads clean, exit 0)
 make run       # open the game
 make test      # scripts/ci.sh: gdUnit4 unit+property, then acceptance (R2)
-make export    # placeholder until T-ARCH-02 adds export presets
+make export    # all three desktop presets -> exports/ (see "Export pipeline" below)
 ```
 
 ## Test harness (T-QA-01, per R2)
@@ -75,14 +75,81 @@ make export    # placeholder until T-ARCH-02 adds export presets
   RNG; suite contract is documented in the `run_headless.gd` header.
 
 
-## Export templates (needed from T-ARCH-02 onward)
+## Export pipeline (T-ARCH-02, per R1)
 
-Headless CLI export requires the **4.7.2.stable** export templates installed
-for this binary. Either run the editor once (`tools/godot/godot -e`) and use
-*Editor > Manage Export Templates > Download*, or fetch the TPZ directly:
+One-command headless CLI exports of the three desktop presets (R1: Windows
+Desktop x86_64, macOS Universal ad-hoc, Linux x86_64 as the Steam Deck
+target). Presets live in the committed `export_presets.cfg` (safe to commit
+per R1 E7; secrets would go in `.godot/export_credentials.cfg`, never
+committed — none used).
 
-- `https://github.com/godotengine/godot/releases/download/4.7.2-stable/Godot_v4.7.2-stable_export_templates.tpz`
-- Unzip into `~/Library/Application Support/Godot/export_templates/4.7.2.stable/` (macOS).
+**Prerequisite, once per machine** — install the 4.7.2 export templates:
+
+```sh
+scripts/fetch_templates.sh   # downloads the official TPZ (R1 E1 URL) into an
+                             # out-of-repo cache (~/.cache/castle-storm/templates),
+                             # installs the 3 desktop release templates into
+                             # ~/Library/Application Support/Godot/export_templates/4.7.2.stable/
+                             # Idempotent; ALL=1 unpacks everything, FORCE=1 reinstalls.
+```
+
+Then:
+
+```sh
+make export          # all three -> exports/ (gitignored)
+make export-windows  # exports/windows/castle-storm.exe
+make export-macos    # exports/macos/castle-storm.dmg
+make export-linux    # exports/linux/castle-storm.x86_64
+```
+
+What each export is (verified 2026-09-16, sizes from the landed build):
+
+| Preset | Artifact | Shape |
+|---|---|---|
+| `Windows Desktop` x86_64 | `castle-storm.exe` (~110 MB) | **embedded PCK** (GDPC trailer, single file), project icon in the PE resources (16→256 px, auto-converted from `icon.svg`) |
+| `macOS` Universal | `castle-storm.dmg` (~70 MB) | `.app` with both x86_64 + arm64 slices, **ad-hoc signed** (`codesign/codesign=1` built-in, no Apple account), notarization disabled; the PCK ships *inside the bundle* at `Contents/Resources/Castle Storm.pck` — the macOS exporter does not embed into the universal binary, and the DMG is the single distributable artifact. Bundle id `com.castlestorm.game` (placeholder, revisit before distribution). |
+| `Linux` x86_64 | `castle-storm.x86_64` (~76 MB) | **embedded PCK** (GDPC trailer; verified = template + 6,292,052 B PCK + 12 B trailer, exactly), the Steam Deck build (1280×800 16:10 design target) |
+
+Notes:
+
+- `project.godot` sets `rendering/textures/vram_compression/import_etc2_astc=true`
+  — required or the macOS Universal export refuses (Apple GPUs have no S3TC);
+  textures re-import on the next `make import` after flipping it.
+- Icons: both Windows and macOS presets leave `application/icon` empty — the
+  exporter auto-converts the project icon (`res://icon.svg`). Verified in the
+  landed artifacts by pixel-comparing the embedded 128 px icon against an
+  engine rasterization of `icon.svg` (99.2% identical; the rest is the
+  generator's resampling).
+- The embedded-PCK check: last 12 bytes of the binary are the 8-byte PCK size
+  + `GDPC` magic, and the PCK header magic sits exactly at
+  `len(file) − 12 − pck_size`.
+- macOS exports must be produced on a Mac (R1 E9: DMG + correct +x). Running
+  the exported app locally for smoke: `hdiutil attach` the DMG, then
+  `HOME=<scratch> "<app>/Contents/MacOS/Castle Storm" --headless --quit`.
+
+## Steam Deck controller mapping (T-ARCH-02, per R1 E13/E14)
+
+Godot 4.5+ reads controllers through SDL3 (R1 E13): the Deck's physical pad
+surfaces as a standard Xbox-style gamepad, so InputMap actions bound to SDL
+joypad indices work on the Deck unchanged; Steam Input handles everything
+else (R1 E15). The one documented R1 gotcha (E14): joypad events must be
+bound to **Any Device (`device = -1`)** or Linux builds can lose controller
+input on the Deck. All five actions comply (pinned by
+`tests/unit/test_input_map.gd`).
+
+| Steam Deck button | SDL / Godot `button_index` | Action | Also on |
+|---|---|---|---|
+| **A** (bottom face) | 0 | `primary` — confirm / press focused card | Enter, Space, left click |
+| **B** (right face) | 1 | `back` — back / fold / cancel | Esc |
+| **X** (left face) | 2 | `secondary` | E |
+| **R1** (right shoulder) | 5 | `debug_fast_forward` — time-scale ladder (dev) | F |
+| **L3** (left stick click) | 6 | `pause` — freeze the world | P |
+
+Deliberately unbound: Menu (9) — the conventional future "settings/pause"
+home; D-pad/sticks drive focus navigation via the engine's `ui_*` actions on
+the focused Control chain (gameplay code never reads `ui_*` directly, R3).
+Changing any binding is a product decision: update this table and
+`tests/unit/test_input_map.gd` together.
 
 ## Repository layout
 
@@ -95,11 +162,12 @@ for this binary. Either run the editor once (`tools/godot/godot -e`) and use
 | `saves/` | Save architecture: versioned, atomic writes (T-ARCH-03) |
 | `tests/` | `unit/`, `property/` (gdUnit4), `acceptance/` (SceneTree runner) per R2 |
 | `addons/gdUnit4/` | Vendored gdUnit4 v6.2.1 test framework (committed) |
-| `scripts/` | `ci.sh` — local CI entry point (stages: unit/property/accept) |
+| `scripts/` | `ci.sh` — local CI entry point; `fetch_templates.sh` — export-template installer; `vendor_assets.sh` — art pipeline |
 | `reports/` | gdUnit4 JUnit XML + HTML reports (gitignored) |
 | `tools/godot/` | Vendored engine binary (gitignored) |
 | `docs/` | `DEV_SETUP.md`, `gdscript-conventions.md`, `content-schema.md` |
 
 Input actions (bound to **Any Device** so Linux/Deck exports keep controller
 input, per R1/E14): `primary`, `secondary`, `back`, `pause`, `debug_fast_forward`.
-Gameplay code must not use `ui_*` actions (R3 focus-navigation rule).
+Gameplay code must not use `ui_*` actions (R3 focus-navigation rule). The
+Deck button table lives in "Steam Deck controller mapping" above.

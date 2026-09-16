@@ -63,3 +63,6 @@ secondary={
 
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
+; T-ARCH-02: ASTC import required for the macOS Universal export preset
+; (Apple GPUs have no S3TC; the exporter refuses universal/arm64 without it).
+textures/vram_compression/import_etc2_astc=true

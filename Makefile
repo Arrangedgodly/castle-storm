@@ -99,10 +99,10 @@ run-game:
 GODOT_BIN ?= tools/godot/godot
 
 .DEFAULT_GOAL := help
-.PHONY: help version import check run test save-debug balance-sweep vendor-assets run-gallery run-responsive run-game export
+.PHONY: help version import check run test save-debug balance-sweep vendor-assets run-gallery run-responsive run-game export export-windows export-macos export-linux
 
 help:
-	@echo "Targets: version | import | check | run | run-game | run-gallery | run-responsive | test | save-debug | balance-sweep | vendor-assets | export  (GODOT_BIN defaults to tools/godot/godot)"
+	@echo "Targets: version | import | check | run | run-game | run-gallery | run-responsive | test | save-debug | balance-sweep | vendor-assets | export | export-windows | export-macos | export-linux  (GODOT_BIN defaults to tools/godot/godot; exports need scripts/fetch_templates.sh once)"
 
 version:
 	@$(GODOT_BIN) --version
@@ -125,6 +125,28 @@ save-debug:
 balance-sweep:
 	$(GODOT_BIN) --headless --path . -s res://scripts/balance_sweep.gd
 
-export:
-	@echo "export: presets land in T-ARCH-02 (Windows x86_64 / macOS Universal / Linux-X11 x86_64)"
-	@echo "usage: $(GODOT_BIN) --headless --path . --export-release \"<preset>\" exports/<output>"
+# Export pipeline (T-ARCH-02, per R1): one-command headless CLI exports of the
+# three desktop presets in export_presets.cfg (committed per R1 E7):
+#     make export          # all three -> exports/ (gitignored)
+#     make export-windows  # exports/windows/castle-storm.exe   (x86_64, embedded PCK)
+#     make export-macos    # exports/macos/castle-storm.dmg     (Universal, ad-hoc signed)
+#     make export-linux    # exports/linux/castle-storm.x86_64 (Steam Deck target, embedded PCK)
+# Prerequisite (once per machine): the 4.7.2 export templates —
+#     scripts/fetch_templates.sh
+# downloads the official TPZ (R1 E1 URL) into an out-of-repo cache and installs
+# the three desktop release templates where the engine expects them (see
+# docs/DEV_SETUP.md). macOS exports run ON a Mac (R1 E9: DMG + ad-hoc signing).
+export: export-windows export-macos export-linux
+	@ls -lh exports/windows/castle-storm.exe exports/macos/castle-storm.dmg exports/linux/castle-storm.x86_64
+
+export-windows:
+	mkdir -p exports/windows
+	$(GODOT_BIN) --headless --path . --export-release "Windows Desktop" exports/windows/castle-storm.exe
+
+export-macos:
+	mkdir -p exports/macos
+	$(GODOT_BIN) --headless --path . --export-release "macOS" exports/macos/castle-storm.dmg
+
+export-linux:
+	mkdir -p exports/linux
+	$(GODOT_BIN) --headless --path . --export-release "Linux" exports/linux/castle-storm.x86_64
