@@ -97,6 +97,12 @@ var _beat_done := false
 var _beat_lines: Array[Dictionary] = []
 var _beat_bounds := Vector2.ZERO
 var _beat_floor := 0.0
+## The quote's LAST placement discipline (every `_place_quote` refreshes
+## them): an append re-places through the same bounds + floor the open
+## used, so the grown panel never outgrows them (round-3 fix).
+var _quote_bounds := Vector2.ZERO
+var _quote_floor_y := 0.0
+var _quote_placed := false
 var _strike_fx := Callable()  # the screen's eye-strike + ground-flash wiring
 
 
@@ -380,9 +386,17 @@ func begin_quote(event: Dictionary, host: GameHost, bounds: Vector2, floor_y: fl
 
 
 ## Append one printed row to the open quote (extends the dwell — the
-## blockquote is one story, the timer restarts per print).
+## blockquote is one story, the timer restarts per print). The grown
+## panel RE-PLACES through the same discipline every open uses (bounds +
+## floor, content-sized at the designed width): the appends arrive in
+## the same drain as the open, and an uncorrected append left the panel
+## at its content-min width (~220px) growing DOWN past its floor — in
+## landscape the strip ran off the window bottom and cut the scatter
+## line off-screen (the round-2 verifier's find, fixed round-3).
 func append_quote_row(row: Dictionary) -> void:
 	_quote.append_row(row, QUOTE_DWELL * 2.0)
+	if _quote_placed:
+		_place_quote(_quote_bounds, _quote_floor_y)
 
 
 ## The scatter row, composed with names, appended to the open quote.
@@ -397,6 +411,9 @@ func replace_quote(bounds: Vector2, floor_y: float) -> void:
 
 
 func _place_quote(bounds: Vector2, floor_y: float) -> void:
+	_quote_bounds = bounds
+	_quote_floor_y = floor_y
+	_quote_placed = true
 	_quote.size = _quote.get_combined_minimum_size()
 	var rect := quote_rect(bounds, _quote.size, floor_y)
 	_quote.size = rect.size
@@ -804,6 +821,10 @@ class EventQuote:
 		_arm_dwell(dwell)
 
 
+	## Append one row; measurement is EXACT (dying rows are detached
+	## before their free — see _rebuild), but PLACEMENT belongs to the
+	## layer: SuspicionEvents.append_quote_row re-places through
+	## quote_rect after this, restoring the designed panel width.
 	func append_row(row: Dictionary, dwell: float) -> void:
 		if not visible:
 			open_rows([row], dwell)
@@ -832,6 +853,11 @@ class EventQuote:
 
 	func _rebuild() -> void:
 		for line in _lines:
+			# Detach BEFORE the free: a queue_free'd row stays in the tree
+			# until idle and would count toward get_combined_minimum_size()
+			# at append-measure time (old + new rows both measured — the
+			# inflated heights of the round-2 landscape artifact).
+			_content.remove_child(line)
 			line.queue_free()
 		_lines.clear()
 		for row in _rows:

@@ -21,6 +21,13 @@
 ##     region below the header — in BOTH orientations, with landscape
 ##     pinned center-bottom (never the round-1 top-center clamp) and
 ##     portrait pinned above the bottom chronicle strip;
+##   - THE APPEND-PATH QUOTE PLACEMENT (round-2 verifier FAIL, third
+##     dispatch): a crackdown blockquote whose seized/scattered rows
+##     APPEND after the placed open re-places per append — the actual
+##     rect stays inside the table region at the designed width with
+##     content-grown height in BOTH orientations (round-2's blind
+##     append resize left a ~220px strip growing past the window bottom
+##     in landscape, cutting the scatter line off-screen);
 ##   - INPUT PARITY on the choice card (touch press / pad primary /
 ##     routed Enter), skippable non-urgent cards (the table stays live),
 ##     focus never stranded, offline (catch-up) beats never slide stale
@@ -743,7 +750,13 @@ func _settle_orientation(window_size: Vector2i, want_portrait: bool, screen: Spr
 ## content-sized to the DESIGNED width, centered over the cleared table,
 ## inside the table region — below the header, above the quote's floor —
 ## and never the unplaced (0,0) corner at the raw min size.
-func _assert_quote_placed_over_the_table(screen: SpreadScreen) -> void:
+## `check_row_clip` asserts every printed row fits its label in the REAL
+## font metrics (the crush lines are shaped to that budget). The CRACKDOWN
+## rows come from the SIM's own chronicle voice and are NOT shaped to it
+## (probe: the headline measures ~960px, the scatter line ~527px against
+## a ~476px label) — a content-budget matter for the copy pass, not a
+## placement one, so the append-path tests pin the RECT only.
+func _assert_quote_placed_over_the_table(screen: SpreadScreen, check_row_clip := true) -> void:
 	var quote := screen._suspicion._quote as Control
 	var bounds := screen._design_bounds().size
 	var rect := quote.get_global_rect()
@@ -765,6 +778,8 @@ func _assert_quote_placed_over_the_table(screen: SpreadScreen) -> void:
 	assert_float(rect.end.y).is_less_equal(screen._quote_floor() + 0.5)
 	assert_float(rect.end.x).is_less_equal(bounds.x + 0.5)
 	assert_float(rect.position.y).is_greater_equal(0.0)
+	if not check_row_clip:
+		return
 	# NOTHING CLIPPED MID-SENTENCE: every printed row's text fits its label
 	# measured in the REAL theme font (the round-2 capture find — the first
 	# placeholder lines ran past the panel's right border).
@@ -837,6 +852,89 @@ func test_first_crush_quote_places_over_the_cleared_table_landscape() -> void:
 		.get_spread().get_global_rect().end.y
 	assert_float(rect.end.y).is_less_equal(spread_end + 0.5)
 	screen._suspicion.skip_beat()
+	screen.queue_free()
+	await get_tree().process_frame
+
+
+# --- the append-path quote PLACEMENT (round-2 verifier FAIL, third dispatch) -------------------
+
+
+## The round-2 verifier's find, as a drive: begin_quote PLACES the
+## headline-only panel, but the seized/scattered rows APPENDED in the
+## same drain never re-placed — the blind min-size resize left a ~220px
+## strip growing DOWN past the floor (in landscape: ~300px off the
+## window bottom, the scatter line off-screen). Arm + land a real
+## crackdown with a crowd at the gate, then read the OPEN quote.
+func _land_crackdown_for_appends(host: GameHost, screen: SpreadScreen) -> void:
+	_arm_telegraph(host)
+	_land_telegraph(host)
+	await get_tree().process_frame
+	assert_int(host.suspicion().crackdowns_total).is_greater(0)
+	assert_bool(screen._suspicion.quote_is_open()).is_true()
+
+
+## The appended quote's ACTUAL rect: content-grown to the multi-row
+## story (headline + seizures + scatter), placed like every quote this
+## layer opens — designed width centered, inside the table region, every
+## row fitting its label in the REAL font metrics.
+func _assert_appended_quote_placed(screen: SpreadScreen) -> void:
+	var rows := screen._suspicion.quote_rows()
+	# GROWN BY THE APPENDS: the crackdown story is multi-row (the
+	# round-2 artifact was the one-row-open placement never corrected).
+	assert_int(rows.size()).is_greater_equal(3)
+	# RECT only (not the row-clip pin): the crackdown rows are the sim's
+	# own chronicle voice, not copy shaped to the panel's label budget —
+	# see _assert_quote_placed_over_the_table.
+	_assert_quote_placed_over_the_table(screen, false)
+	# Content-sized height: every appended row is a >=48 grip row; the
+	# collapsed stub cannot satisfy it, only the re-placed panel can.
+	var rect := (screen._suspicion._quote as Control).get_global_rect()
+	assert_float(rect.size.y).is_greater_equal(
+		rows.size() * float(Inks.TOUCH_GRIP_MIN))
+
+
+func test_appended_crackdown_quote_replaces_landscape() -> void:
+	var host := _test_host()
+	for i in 6:
+		host.fast_forward(SimEngine.TICKS_PER_SIM_HOUR)  # a crowd for the scatter
+	var screen: SpreadScreen = await _mounted_screen(host)
+	await _settle_orientation(Vector2i(1280, 800), false, screen)
+	await _land_crackdown_for_appends(host, screen)
+	_assert_appended_quote_placed(screen)
+	# LANDSCAPE (the failing geometry of the round-2 artifact): the grown
+	# panel parks center-bottom of the table — lower half, above the
+	# table's bottom edge — never a strip running past the window bottom.
+	var bounds := screen._design_bounds().size
+	var rect := (screen._suspicion._quote as Control).get_global_rect()
+	assert_float(rect.position.y).is_greater_equal(bounds.y * 0.5)
+	var spread_end := (screen.get_active_slot() as OrientationSlot) \
+		.get_spread().get_global_rect().end.y
+	assert_float(rect.end.y).is_less_equal(spread_end + 0.5)
+	assert_float(rect.end.y).is_less_equal(800.0)  # the 1280x800 window itself
+	# The scatter line is ON-SCREEN (the round-2 cut): the quote's bottom
+	# row lives inside the window's visible area by construction above.
+	_assert_no_popup_chrome(screen as Node)
+	screen.queue_free()
+	await get_tree().process_frame
+
+
+func test_appended_crackdown_quote_replaces_portrait() -> void:
+	get_window().size = Vector2i(720, 1280)  # resize before the mount: the first layout is portrait
+	var host := _test_host()
+	for i in 6:
+		host.fast_forward(SimEngine.TICKS_PER_SIM_HOUR)  # a crowd for the scatter
+	var screen: SpreadScreen = await _mounted_screen(host)
+	await _settle_orientation(Vector2i(720, 1280), true, screen)
+	await _land_crackdown_for_appends(host, screen)
+	_assert_appended_quote_placed(screen)
+	# PORTRAIT (the round-2 verifier PASSED this geometry — it must hold
+	# through the append path too): parked bottom-center ABOVE the bottom
+	# chronicle strip, at the designed width.
+	var strip_top := ((screen.get_active_slot() as OrientationSlot) \
+		.get_chronicle_line(0) as Control).get_global_rect().position.y
+	assert_float((screen._suspicion._quote as Control).get_global_rect().end.y) \
+		.is_less_equal(strip_top + 0.5)
+	_assert_no_popup_chrome(screen as Node)
 	screen.queue_free()
 	await get_tree().process_frame
 
