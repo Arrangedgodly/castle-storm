@@ -7,11 +7,16 @@
 ## regime's ground, line-form state, the misprint character), relaid as a
 ## SIEGE LANE —
 ##
-##   portrait  : the castle card at the head of the table, the army ranked
-##               below it, the march runs UP the table;
+##   portrait  : the castle card at the head of the table, then the open
+##               corridor where the battle line forms (the march runs UP
+##               the table, pressing at the wall), the print-block tally
+##               MID-LANE behind the line, the army ranked TALL at the
+##               foot — the portrait lane has height to spend, and every
+##               stretch of it is castle, field, tally, or host (no dead
+##               band; finishing #4);
 ##   landscape : the castle on the Crown's edge (the right, where the Eye
 ##               perches), the army ranked to the left, the march runs
-##               ACROSS the panoramic table.
+##               ACROSS the panoramic table, the tally at the head.
 ##
 ## The print-block meter is the scoreboard: pre-commit it prints the odds
 ## (permille -> filled blocks + readable confidence); during the beats it
@@ -52,6 +57,10 @@ const STANDOFF_GAP := 10.0
 ## Layout margins.
 const MARGIN := 14.0
 const GAP := 10.0
+## Portrait rank cards stack taller than the shared print-scale cap (the
+## vertical reserve, finishing #4): a small host ranks at 168-unit cards
+## instead of 132, so the foot of the portrait lane carries its weight.
+const RANK_MAX_H_PORTRAIT := 168.0
 
 ## The regime under assault (tints ground + hairlines + garrison ink).
 var regime_id: StringName = &"":
@@ -555,21 +564,15 @@ func _apply_castle_form(phase: StringName) -> void:
 			_castle.set_form(Inks.EdgeForm.SOLID)  # the castle held
 
 
-## The battle line's staging band — the slice of the army band NEAREST
-## the castle. The march's authored targets are a FORMATION in this band
-## (its own fitted grid, cards pressing at the wall), so settled beats
-## never stack cards into an overlapping clump: the line is a rank, not
-## a fan.
+## The battle line's staging band — where the march lands. Portrait: the
+## CORRIDOR the lane reserves between the castle and the mid-lane tally
+## (the open field below the walls — `line` in lane_layout). Landscape:
+## the slice of the army band NEAREST the castle (the Crown's edge). The
+## march's authored targets are a FORMATION in this band (its own fitted
+## grid, cards pressing at the wall), so settled beats never stack cards
+## into an overlapping clump: the line is a rank, not a fan.
 func _line_band() -> Rect2:
-	var army: Rect2 = _layout["army"]
-	var castle: Rect2 = _layout["castle"]
-	if portrait:
-		var width := clampf(castle.size.x * 1.6, 150.0, army.size.x)
-		var height := clampf(army.size.y * 0.6, 110.0, 320.0)
-		return Rect2(Vector2(castle.get_center().x - width * 0.5, army.position.y),
-			Vector2(width, height))
-	var width := clampf(army.size.x * 0.34, 120.0, 280.0)
-	return Rect2(Vector2(army.end.x - width, army.position.y), Vector2(width, army.size.y))
+	return _layout["line"]
 
 
 ## Author every rank's target for a march fraction: home seat lerped
@@ -592,8 +595,12 @@ func _beat_targets(fraction: float) -> void:
 func _place_ranks() -> void:
 	if _layout.is_empty() or _ranks.is_empty():
 		return
-	var seats := army_seats(_layout["army"], _ranks.size())
-	var card_size := army_card_size(_layout["army"], _ranks.size())
+	# Portrait ranks stack taller (the vertical reserve, finishing #4); the
+	# landscape band keeps the shared print-scale cap — same value as the
+	# statics' default, so landscape rects stay bit-identical.
+	var rank_max := RANK_MAX_H_PORTRAIT if portrait else 132.0
+	var seats := army_seats(_layout["army"], _ranks.size(), rank_max)
+	var card_size := army_card_size(_layout["army"], _ranks.size(), rank_max)
 	for i in _ranks.size():
 		var rank := _ranks[i]
 		rank.seat = seats[i]
@@ -633,10 +640,14 @@ static func _mix(hash_value: int, value: int) -> int:
 
 # --- pure layout statics (test-pinned) ---------------------------------------------------
 #
-# The siege lane as pure rect math: title + meter strip at the head, the
-# castle card at the far end, the army band between the meter and the
-# chronicle/actions foot. Same bounds -> same rects (the deterministic
-# render contract every screen in this codebase keeps).
+# The siege lane as pure rect math. Portrait: title at the head, then the
+# castle, the open corridor where the battle line forms, the tally
+# MID-LANE, the army band at the foot (the vertical reserve spent —
+# finishing #4: the old head-meter layout left a ~30% dead band at small
+# rosters). Landscape: the tally at the head, the castle at the far end,
+# the army band between the tally and the chronicle/actions foot. Same
+# bounds -> same rects (the deterministic render contract every screen in
+# this codebase keeps).
 
 
 static func lane_layout(p_portrait: bool, bounds: Vector2) -> Dictionary:
@@ -644,7 +655,6 @@ static func lane_layout(p_portrait: bool, bounds: Vector2) -> Dictionary:
 	var gap := GAP
 	var wide := maxf(0.0, bounds.x - 2.0 * m)
 	var title := Rect2(Vector2(m, m + 2.0), Vector2(wide, 46.0))
-	var meter := Rect2(title.position + Vector2(0, title.size.y + gap), Vector2(wide, 86.0))
 	var actions := Rect2(Vector2(m, bounds.y - m - float(Inks.TOUCH_GRIP_MIN) - 12.0),
 		Vector2(wide, float(Inks.TOUCH_GRIP_MIN) + 12.0))
 	var chronicle := Rect2(
@@ -653,22 +663,39 @@ static func lane_layout(p_portrait: bool, bounds: Vector2) -> Dictionary:
 	var quote := Rect2(
 		chronicle.position - Vector2(0, 92.0 + gap),
 		Vector2(wide, 92.0))
-	var lane_top := meter.end.y + gap
 	var lane_bottom := quote.position.y - gap
-	var lane_height := maxf(120.0, lane_bottom - lane_top)
 	if p_portrait:
+		var lane_top := title.end.y + gap
+		var lane_height := maxf(120.0, lane_bottom - lane_top)
 		var castle_w := clampf(wide * 0.34, 120.0, 208.0)
 		var castle_h := clampf(lane_height * 0.5, 120.0, castle_w * 1.3)
 		var castle := Rect2(
 			Vector2(m + (wide - castle_w) * 0.5, lane_top),
 			Vector2(castle_w, castle_h))
+		# The corridor (the battle line's reserved field, STANDOFF_GAP off
+		# the walls): proportional to the lane, never crowding out the
+		# tally or the host's minimum band when the lane runs short.
+		var line_w := clampf(castle_w * 1.6, 150.0, wide)
+		var corridor_h := clampf(lane_height * 0.15, 104.0, 150.0)
+		corridor_h = clampf(corridor_h, 0.0,
+			maxf(0.0, lane_height - castle_h - 3.0 * gap - 86.0 - 96.0))
+		var line := Rect2(
+			Vector2(castle.get_center().x - line_w * 0.5, castle.end.y + gap),
+			Vector2(line_w, corridor_h))
+		# The tally MID-LANE: behind the line it counts the fight; on the
+		# odds screen the measure of the contest prints BETWEEN the castle
+		# and the host.
+		var meter := Rect2(Vector2(m, line.end.y + gap), Vector2(wide, 86.0))
 		var army := Rect2(
-			Vector2(m, castle.end.y + gap),
-			Vector2(wide, maxf(96.0, lane_bottom - castle.end.y - gap)))
+			Vector2(m, meter.end.y + gap),
+			Vector2(wide, maxf(96.0, lane_bottom - meter.end.y - gap)))
 		return {
 			"title": title, "meter": meter, "castle": castle, "army": army,
-			"chronicle": chronicle, "quote": quote, "actions": actions,
+			"line": line, "chronicle": chronicle, "quote": quote, "actions": actions,
 		}
+	var meter := Rect2(title.position + Vector2(0, title.size.y + gap), Vector2(wide, 86.0))
+	var lane_top := meter.end.y + gap
+	var lane_height := maxf(120.0, lane_bottom - lane_top)
 	var castle_size := Vector2(clampf(wide * 0.22, 150.0, 210.0), clampf(lane_height, 140.0, 272.0))
 	var castle_l := Rect2(
 		Vector2(bounds.x - m - castle_size.x, lane_top + (lane_height - castle_size.y) * 0.5),
@@ -676,8 +703,10 @@ static func lane_layout(p_portrait: bool, bounds: Vector2) -> Dictionary:
 	var army_l := Rect2(
 		Vector2(m, lane_top),
 		Vector2(maxf(96.0, castle_l.position.x - m - gap * 2.0), lane_height))
+	var line_w := clampf(army_l.size.x * 0.34, 120.0, 280.0)
 	return {
 		"title": title, "meter": meter, "castle": castle_l, "army": army_l,
+		"line": Rect2(Vector2(army_l.end.x - line_w, army_l.position.y), Vector2(line_w, army_l.size.y)),
 		"chronicle": chronicle, "quote": quote, "actions": actions,
 	}
 
@@ -705,18 +734,20 @@ static func _fit_grid(band: Rect2, count: int, min_h := 56.0, max_h := 132.0) ->
 	return {"size": Vector2(min_h * ASPECT, min_h), "cols": cols}
 
 
-## Uniform card size for a ranked band (the fitted grid's card).
-static func army_card_size(band: Rect2, count: int) -> Vector2:
-	return _fit_grid(band, count)["size"]
+## Uniform card size for a ranked band (the fitted grid's card). `max_h`
+## raises the cap for the portrait home band (the vertical reserve); the
+## default is the shared print-scale cap, so existing calls are unchanged.
+static func army_card_size(band: Rect2, count: int, max_h := 132.0) -> Vector2:
+	return _fit_grid(band, count, 56.0, max_h)["size"]
 
 
 ## Grid seats for the ranked band (row-major, centered) — deterministic
 ## in (band, count) alone.
-static func army_seats(band: Rect2, count: int) -> Array[Vector2]:
+static func army_seats(band: Rect2, count: int, max_h := 132.0) -> Array[Vector2]:
 	var seats: Array[Vector2] = []
 	if count <= 0:
 		return seats
-	var fit: Dictionary = _fit_grid(band, count)
+	var fit: Dictionary = _fit_grid(band, count, 56.0, max_h)
 	var card: Vector2 = fit["size"]
 	var cols := int(fit["cols"])
 	var rows := ceili(float(count) / float(cols))

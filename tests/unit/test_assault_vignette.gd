@@ -674,6 +674,159 @@ func test_siege_lane_layout_rects() -> void:
 	assert_float(card_size.y).is_greater_equal(63.9)
 
 
+## Finishing #4 (the portrait odds lane's dead band): the vertical reserve
+## is SPENT — the tally prints mid-lane between the castle and the host,
+## the corridor below the castle is the battle line's reserved field, the
+## ranks stack taller at the foot. The occupancy measure: the largest
+## contiguous barren vertical band between the title and the chronicle
+## foot (the odds state's visible ground, the quote band included since
+## the outcome print owns it but the odds state leaves it empty) must
+## stay under 25% at every roster — small rosters are the critique's case.
+func test_portrait_lane_spends_the_vertical_reserve() -> void:
+	for bounds in [Vector2(720, 1280), Vector2(800, 1280)]:
+		var layout := AssaultStage.lane_layout(true, bounds)
+		var castle: Rect2 = layout["castle"]
+		var meter: Rect2 = layout["meter"]
+		var army: Rect2 = layout["army"]
+		var line: Rect2 = layout["line"]
+		# The tally is MID-LANE: strictly between the castle and the host.
+		assert_float(meter.position.y).is_greater(castle.end.y)
+		assert_float(meter.end.y).is_less(army.position.y)
+		# The corridor is the battle line's field: standoff gap off the
+		# castle walls, centered on the castle, clear of the tally.
+		assert_float(line.position.y).is_equal_approx(castle.end.y + 10.0, 0.01)
+		assert_float(line.end.y).is_less_equal(meter.position.y)
+		assert_float(line.get_center().x).is_equal_approx(castle.get_center().x, 0.01)
+		assert_float(line.position.x).is_greater_equal(13.5)
+		assert_float(line.end.x).is_less_equal(float(bounds.x) - 13.5)
+		# The taller-ranks lever actually delivered at small rosters.
+		var tall := AssaultStage.army_card_size(army, 6, AssaultStage.RANK_MAX_H_PORTRAIT)
+		var cap := AssaultStage.army_card_size(army, 6)
+		assert_float(tall.y).is_greater(cap.y)
+		# Occupancy: no contiguous barren vertical band over 25% at ANY
+		# roster (small rosters are the finding; large ones for honesty).
+		var title: Rect2 = layout["title"]
+		var chronicle: Rect2 = layout["chronicle"]
+		var top := title.end.y + 10.0
+		var bottom := chronicle.position.y - 10.0
+		for count in [1, 2, 3, 4, 5, 6, 8, 11, 24]:
+			var seats: Array[Vector2] = AssaultStage.army_seats(army, count, AssaultStage.RANK_MAX_H_PORTRAIT)
+			var card := AssaultStage.army_card_size(army, count, AssaultStage.RANK_MAX_H_PORTRAIT)
+			var intervals: Array = []
+			for rect in [castle, meter]:
+				if (rect as Rect2).position.y < bottom and (rect as Rect2).end.y > top:
+					intervals.append([maxf((rect as Rect2).position.y, top), minf((rect as Rect2).end.y, bottom)])
+			for seat in seats:
+				intervals.append([seat.y, seat.y + card.y])
+			intervals.sort_custom(func(a, b): return a[0] < b[0])
+			var merged: Array = []
+			for interval in intervals:
+				if merged.is_empty() or interval[0] > merged[merged.size() - 1][1]:
+					merged.append([interval[0], interval[1]])
+				else:
+					merged[merged.size() - 1][1] = maxf(merged[merged.size() - 1][1], interval[1])
+			var worst := 0.0
+			var cursor := top
+			for interval in merged:
+				worst = maxf(worst, interval[0] - cursor)
+				cursor = maxf(cursor, interval[1])
+			worst = maxf(worst, bottom - cursor)
+			assert_float(100.0 * worst / (bottom - top)).is_less_equal(25.0)
+
+
+## Finishing #4's other half: the landscape lane is UNTOUCHED — every
+## rect bit-identical to the pre-refinement formulas (probed at the two
+## landscape common sizes and pinned here so any drift fails loudly).
+func test_landscape_lane_rects_pinned_bit_identical() -> void:
+	var pinned: Array[Dictionary] = [
+		{
+			"bounds": Vector2(1280, 800),
+			"title": Rect2(Vector2(14.0, 16.0), Vector2(1252.0, 46.0)),
+			"meter": Rect2(Vector2(14.0, 72.0), Vector2(1252.0, 86.0)),
+			"castle": Rect2(Vector2(1056.0, 200.0), Vector2(210.0, 272.0)),
+			"army": Rect2(Vector2(14.0, 168.0), Vector2(1022.0, 336.0)),
+			"chronicle": Rect2(Vector2(14.0, 616.0), Vector2(1252.0, 96.0)),
+			"quote": Rect2(Vector2(14.0, 514.0), Vector2(1252.0, 92.0)),
+			"actions": Rect2(Vector2(14.0, 726.0), Vector2(1252.0, 60.0)),
+		},
+		{
+			"bounds": Vector2(1920, 1080),
+			"title": Rect2(Vector2(14.0, 16.0), Vector2(1892.0, 46.0)),
+			"meter": Rect2(Vector2(14.0, 72.0), Vector2(1892.0, 86.0)),
+			"castle": Rect2(Vector2(1696.0, 340.0), Vector2(210.0, 272.0)),
+			"army": Rect2(Vector2(14.0, 168.0), Vector2(1662.0, 616.0)),
+			"chronicle": Rect2(Vector2(14.0, 896.0), Vector2(1892.0, 96.0)),
+			"quote": Rect2(Vector2(14.0, 794.0), Vector2(1892.0, 92.0)),
+			"actions": Rect2(Vector2(14.0, 1006.0), Vector2(1892.0, 60.0)),
+		},
+	]
+	for pin in pinned:
+		var layout := AssaultStage.lane_layout(false, pin["bounds"])
+		for key in ["title", "meter", "castle", "army", "chronicle", "quote", "actions"]:
+			var rect: Rect2 = layout[key]
+			var want: Rect2 = pin[key]
+			assert_float(rect.position.x).is_equal_approx(want.position.x, 0.01)
+			assert_float(rect.position.y).is_equal_approx(want.position.y, 0.01)
+			assert_float(rect.size.x).is_equal_approx(want.size.x, 0.01)
+			assert_float(rect.size.y).is_equal_approx(want.size.y, 0.01)
+	# The landscape rank fit keeps the shared print-scale cap (the taller
+	# portrait cap must not leak across topologies).
+	var band := Rect2(Vector2(14, 168), Vector2(1022, 336))
+	assert_float(AssaultStage.army_card_size(band, 6).y).is_equal(132.0)
+	assert_float(AssaultStage.army_card_size(band, 6, 132.0).y).is_equal(
+		AssaultStage.army_card_size(band, 6).y)
+
+
+## Finishing #4, the re-layout's focus contract: an orientation swap
+## while the odds table is open re-lays the siege lane WITHOUT touching
+## the chips — focus stays on the safe verb, the chain stays cyclic.
+func test_odds_focus_chain_survives_the_relayout() -> void:
+	get_window().size = Vector2i(720, 1280)
+	var host := _knight_host(WIN_SEED, 2)
+	var screen: SpreadScreen = await _mounted_screen(host)
+	var router: LayoutRouter = screen.get_router()
+	for i in 240:
+		await get_tree().process_frame
+		if router.is_portrait():
+			break
+	assert_bool(router.is_portrait()).is_true()
+	await _open_assault(screen)
+	var assault := screen._assault
+	var focus := get_viewport().gui_get_focus_owner()
+	assert_that(focus).is_not_null()
+	assert_str(String((focus as BaseButton).action.get("id", ""))).is_equal("retreat")
+	# The chain is a cyclic trap across the chips in print order.
+	var walked: Array[String] = []
+	var cursor: Control = focus
+	for i in 4:
+		walked.append(String((cursor as BaseButton).action.get("id", "")))
+		var next: Control = cursor.get_node(cursor.focus_next) as Control
+		assert_that(next).is_not_null()
+		cursor = next
+	assert_str(",".join(walked)).is_equal("retreat,commit,retreat,commit")
+	# Swap topology under the open table: rects re-lay, focus never strands.
+	for orientation in [1, 0, 1]:  # landscape, portrait, landscape
+		router.force_orientation(orientation)
+		await get_tree().process_frame
+		await get_tree().process_frame
+		assert_bool(assault.is_open()).is_true()
+		var owner: Control = get_viewport().gui_get_focus_owner()
+		assert_that(owner).is_not_null()
+		assert_str(String((owner as BaseButton).action.get("id", ""))).is_equal("retreat")
+		assert_int(assault.stage().chips().size()).is_equal(2)
+		# The lane actually re-laid per topology (the structure flipped).
+		var relaid: Dictionary = assault.stage()._layout
+		var castle_r: Rect2 = relaid["castle"]
+		var army_r: Rect2 = relaid["army"]
+		if orientation == 1:
+			assert_float(castle_r.position.x).is_greater_equal(army_r.end.x - 0.01)
+		else:
+			assert_float(army_r.position.y).is_greater((relaid["meter"] as Rect2).end.y)
+			assert_float(castle_r.end.y).is_less((relaid["meter"] as Rect2).position.y)
+	router.clear_forced()
+	screen.queue_free()
+
+
 func test_open_table_unclipped_at_four_sizes() -> void:
 	var host := _knight_host(WIN_SEED, 2)
 	var screen: SpreadScreen = await _mounted_screen(host)
