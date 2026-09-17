@@ -19,6 +19,7 @@ extends GdUnitTestSuite
 
 const SPREAD_SCENE := "res://ui/screens/spread/spread_screen.tscn"
 const SpreadScreen := preload("res://ui/screens/spread/spread_screen.gd")
+const WatchfulEyeScript := preload("res://ui/screens/spread/watchful_eye.gd")
 const LOUD_SEED := 20261103  # spread_screen.DEFAULT_SEED — the screenshot seed
 
 const TEST_SIZES: Array[Vector2i] = [
@@ -453,6 +454,172 @@ func test_watchful_eye_position_scales_with_suspicion() -> void:
 	assert_float(rect.end.x).is_less_equal(design.x + 0.5)
 	assert_float(rect.position.x).is_greater_equal(-0.5)
 	screen.queue_free()
+
+
+# --- the armed Eye (finishing refinement #3: armed salience + the lane) ------------------
+
+
+func test_eye_armed_metrics_commit_the_deep_seat() -> void:
+	## An armed telegraph is a STATE, not a level: the Eye overrides the
+	## meter's residue and commits to the deep seat (full inset, full card
+	## scale, full dread) — the loud state, whatever the meter says.
+	for points in [40, 55, 70, 88, 100]:
+		var metrics: Dictionary = SpreadPresenter.eye_metrics(points, 100, 35, 70, true, true)
+		assert_float(metrics["inset"]).is_equal(1.0) \
+			.override_failure_message("armed inset must be the full slide")
+		assert_float(metrics["scale"]).is_equal(1.0)
+		assert_float(metrics["dread"]).is_equal(1.0)
+		assert_bool(metrics["armed"]).is_true()
+		assert_int(metrics["edge_form"]).is_equal(Inks.EdgeForm.STRUCK)
+	# A dead run has no armed telegraph (the Eye withdrew; the lane lifts).
+	var dead: Dictionary = SpreadPresenter.eye_metrics(80, 100, 35, 70, true, false)
+	assert_bool(dead["armed"]).is_false()
+	assert_bool(dead["visible"]).is_false()
+
+
+func test_eye_rest_metrics_are_the_authored_creep() -> void:
+	## The REST pin: unarmed metrics are EXACTLY the authored quiet creep
+	## (the creep is the design — the armed escalation must not leak).
+	for points in [1, 10, 25, 50, 69, 85, 100]:
+		var metrics: Dictionary = SpreadPresenter.eye_metrics(points, 100, 35, 70, false, true)
+		var progress := float(points) / 100.0
+		assert_float(metrics["inset"]).is_equal(progress)
+		assert_float(metrics["scale"]).is_equal(0.55 + 0.45 * progress)
+		assert_float(metrics["dread"]).is_equal(0.55 + 0.45 * progress)
+		assert_bool(metrics["armed"]).is_false()
+
+
+func test_armed_eye_plate_countdown_rule_and_clear_lane() -> void:
+	## THE ARMED PLATE on the live table: the card grows to the armed
+	## minimum, the countdown escalates to the numeral-plate grammar (the
+	## double red rule + caption + big numeral), and NO card on the table
+	## crowds the seat — the lane reserve did its layout work.
+	var host := _test_host()
+	var policy := DemoPolicy.new(16, 8, false)
+	_drive_policy(host, policy, 8.0)  # a real roster on the table
+	var screen: SpreadScreen = await _mounted_screen(host)
+	await _settle_window(screen, Vector2i(1280, 800), false)
+	var active := screen.get_active_slot() as OrientationSlot
+	var eye := screen.eye_of(active)
+	# The documented telegraph seam arms the Eye live (meter -> telegraph).
+	host.suspicion().set_suspicion(78)
+	host.fast_forward(2)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	assert_bool(host.suspicion().crackdown_land_tick != -1).is_true()
+	# The plate grew to the armed card.
+	assert_vector(eye.custom_minimum_size) \
+		.is_equal_approx(WatchfulEyeScript.ARMED_CARD_MIN, Vector2(0.1, 0.1))
+	assert_vector(eye.size).is_equal_approx(WatchfulEyeScript.ARMED_CARD_MIN, Vector2(0.1, 0.1))
+	# The countdown escalated: caption + numeral under the double red rule.
+	assert_str(eye._countdown.text).is_equal("lands in")
+	assert_int(eye._countdown.get_theme_font_size(&"font_size")) \
+		.is_equal(TypeScale.scaled(WatchfulEyeScript.ARMED_CAPTION_SIZE))
+	assert_bool(eye._countdown.get_theme_color(&"font_color") == Inks.RED).is_true()
+	assert_bool(eye._numeral.visible).is_true()
+	assert_str(eye._numeral.text).is_equal("%dh" % SpreadPresenter.eye_hours_left(host))
+	assert_int(eye._numeral.get_theme_font_size(&"font_size")) \
+		.is_equal(TypeScale.scaled(WatchfulEyeScript.ARMED_NUMERAL_SIZE))
+	# The hours print IN INK (the numeral-plate grammar — the SIZE is the
+	# escalation; red carries the countdown text + rule, staying inside the
+	# brief's 30-60% accent commitment).
+	assert_bool(eye._numeral.get_theme_color(&"font_color") == Inks.INK).is_true()
+	assert_bool(eye._rule.visible).is_true()
+	assert_int(eye._rule.get("form")).is_equal(3)  # RuleMark.RuleForm.DOUBLE
+	assert_bool(eye._rule.get("rule_ink") == Inks.RED).is_true()
+	# THE LANE: both slots' card fields narrowed, and no card rect touches
+	# the armed Eye's seat (the perch-crowding fix, layout-level).
+	for slot: OrientationSlot in [screen.get_portrait_slot(), screen.get_landscape_slot()]:
+		assert_float(float(slot.get_spread().get("right_reserve"))).is_greater(0.0)
+	for slot: OrientationSlot in [screen.get_portrait_slot(), screen.get_landscape_slot()]:
+		var slot_eye := screen.eye_of(slot)
+		var seat: Rect2 = slot_eye.get_global_rect()
+		for child in slot.get_spread().get_children():
+			var card := child as Control
+			if card != null:
+				assert_bool(card.get_global_rect().intersects(seat)).is_false() \
+					.override_failure_message(
+						"the armed Eye crowds card %s" % String(card.get_meta(&"spread_card_id", "?")))
+	# RELIEF: laying low cancels the telegraph — the plate returns to the
+	# quiet stub, the countdown to its role line, the lane lifts, and the
+	# perch formula takes the Eye back (the creep resumes as authored).
+	host.suspicion().set_suspicion(60)
+	host.fast_forward(2)
+	host.driving = false  # freeze the world: the pin reads a settled state
+	# The relief plays the retreat flinch (a 0.45s scale tween) — the pin
+	# waits it out: a scaled control's global origin breathes with the
+	# pulse, and the perch formula compares against the settled rect.
+	for i in 120:
+		await get_tree().process_frame
+		if eye.retreat_t >= 1.0:
+			break
+	await get_tree().process_frame  # the reserve lift's re-layout settles
+	await get_tree().process_frame
+	screen._bind_eye()  # rebind against the settled geometry, then pin (this suite's pattern)
+	await get_tree().process_frame
+	assert_bool(host.suspicion().crackdown_land_tick == -1).is_true()
+	assert_vector(eye.custom_minimum_size).is_equal(Vector2.ZERO)
+	assert_vector(eye.size).is_equal_approx(
+		Vector2(Inks.TOUCH_GRIP_MIN * 1.6, Inks.TOUCH_GRIP_MIN * 2.0), Vector2(0.1, 0.1))
+	assert_bool(eye._numeral.visible).is_false()
+	assert_bool(eye._rule.visible).is_false()
+	var share := int(round(float(host.suspicion().suspicion_points())
+		/ float(host.suspicion().max_points()) * 100.0))
+	assert_str(eye._countdown.text).is_equal("the Crown watches — %d" % share)
+	assert_bool(eye._countdown.has_theme_font_size_override(&"font_size")).is_false()
+	for slot: OrientationSlot in [screen.get_portrait_slot(), screen.get_landscape_slot()]:
+		assert_float(float(slot.get_spread().get("right_reserve"))).is_zero()
+	# And the resting position is the authored perch again (read the state
+	# the bind read — the same rebind above, so the formula compares true).
+	var spread_rect: Rect2 = active.get_spread().get_global_rect()
+	var slot_rect := active.get_global_rect()
+	var progress := clampf(float(host.suspicion().suspicion_points())
+		/ float(host.suspicion().max_points()), 0.0, 1.0)
+	var max_inset: float = maxf(0.0, spread_rect.size.x * 0.5 - eye.size.x)
+	assert_float(eye.global_position.x).is_equal_approx(
+		slot_rect.end.x - eye.size.x - 8.0 - progress * max_inset, 0.5)
+	screen.queue_free()
+
+
+func test_rest_eye_plate_stays_the_quiet_creep() -> void:
+	## The rest pin on the live table: unarmed, the plate is the periphery
+	## stub with one quiet role line — no armed grammar leaks into rest.
+	var host := _test_host()
+	var policy := DemoPolicy.new(16, 8, false)
+	_drive_policy(host, policy, 4.0)
+	var screen: SpreadScreen = await _mounted_screen(host)
+	await _settle_window(screen, Vector2i(720, 1280), true)
+	var active := screen.get_active_slot() as OrientationSlot
+	var eye := screen.eye_of(active)
+	host.driving = false  # freeze the world: the pin reads a settled state
+	host.suspicion().set_suspicion(12)
+	screen._bind_eye()
+	await get_tree().process_frame
+	assert_bool(eye._rule.visible).is_false()
+	assert_bool(eye._numeral.visible).is_false()
+	assert_vector(eye.custom_minimum_size).is_equal(Vector2.ZERO)
+	assert_str(eye._countdown.text).is_equal("the Crown watches — %d" % 12)
+	assert_bool(eye._countdown.has_theme_font_size_override(&"font_size")).is_false()
+	assert_bool(eye._countdown.get_theme_color(&"font_color") == Inks.INK_SOFT).is_true()
+	# The periphery stub perches by the authored formula (the creep at 12%).
+	var spread_rect: Rect2 = active.get_spread().get_global_rect()
+	var slot_rect := active.get_global_rect()
+	var max_inset: float = maxf(0.0, spread_rect.size.x * 0.5 - eye.size.x)
+	assert_float(eye.global_position.x).is_equal_approx(
+		slot_rect.end.x - eye.size.x - 8.0 - 0.12 * max_inset, 0.5)
+	screen.queue_free()
+
+
+func test_armed_eye_wash_prints_wider_than_the_card() -> void:
+	## The strike wash's ground footprint: WASH_EXTENT times the card,
+	## centered — the wider strike wash (pure; the pulse pins its alpha).
+	var card := Rect2(Vector2(100.0, 200.0), Vector2(144.0, 202.0))
+	var wash: Rect2 = WatchfulEyeScript.wash_rect(card)
+	assert_vector(wash.size).is_equal(card.size * WatchfulEyeScript.WASH_EXTENT)
+	assert_vector(wash.get_center()).is_equal(card.get_center())
+	# The strike bell keeps its authored peak (0.38 alpha at the middle).
+	var peak: Dictionary = WatchfulEyeScript.strike_params(0.5)
+	assert_float(peak["wash"]).is_equal(0.38)
 
 
 func test_layout_hash_is_a_function_of_sim_state() -> void:

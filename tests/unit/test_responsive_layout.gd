@@ -305,6 +305,69 @@ func test_spread_mode_flags() -> void:
 	assert_int(spread.mode).is_equal(CardSpread.Mode.PANORAMIC)
 
 
+# --- 5b. The armed Eye's lane reserve (finishing refinement #3) --------------------------
+
+
+## The additive-param pattern (the header insert's own backward-exactness
+## rule): a zero reserve reproduces the pre-refinement rects EXACTLY —
+## the resting table's layout is pinned, only the armed state narrows it.
+func test_lane_reserve_zero_is_backward_exact() -> void:
+	for n in [1, 5, 11]:
+		var default_stacked := CardSpread.stacked_layout(n, Vector2(720, 955), 3, Vector2(20, 20))
+		var zero_stacked := CardSpread.stacked_layout(n, Vector2(720, 955), 3, Vector2(20, 20), 0.0)
+		assert_int(zero_stacked.size()).is_equal(default_stacked.size())
+		for i in zero_stacked.size():
+			assert_bool(zero_stacked[i] == default_stacked[i]) \
+				.override_failure_message("stacked reserve=0 moved a resting card")
+		var default_pan := CardSpread.panoramic_layout(n, Vector2(1104, 395), Vector2(20, 20), 24.0, 10.0)
+		var zero_pan := CardSpread.panoramic_layout(n, Vector2(1104, 395), Vector2(20, 20), 24.0, 10.0, 0.0)
+		assert_int(zero_pan.size()).is_equal(default_pan.size())
+		for i in zero_pan.size():
+			assert_bool((zero_pan[i]["rect"] as Rect2) == (default_pan[i]["rect"] as Rect2)) \
+				.override_failure_message("panoramic reserve=0 moved a resting card")
+			assert_float(float(zero_pan[i]["rotation"])).is_equal(float(default_pan[i]["rotation"]))
+
+
+## A standing reserve keeps EVERY card rect clear of the table's right
+## lane — the armed Watchful Eye's seat (the perch must not crowd the
+## fan's end card; the table itself makes way). Both topologies, at a
+## real reserve (the armed lane) and crowded rosters.
+func test_lane_reserve_keeps_cards_clear_of_the_armed_seat() -> void:
+	var reserve := 184.0  # the landscape armed lane net of the spread margin
+	for n in [1, 5, 11, 24]:
+		var stacked := CardSpread.stacked_layout(n, Vector2(1104, 395), 3, Vector2(20, 20), reserve)
+		for rect in stacked:
+			assert_float(rect.end.x).is_less_equal(1104.0 - reserve + 0.5) \
+				.override_failure_message("a stacked card entered the armed lane")
+		var panoramic := CardSpread.panoramic_layout(n, Vector2(1104, 395), Vector2(20, 20), 24.0, 10.0, reserve)
+		for entry in panoramic:
+			assert_float((entry["rect"] as Rect2).end.x).is_less_equal(1104.0 - reserve + 0.5) \
+				.override_failure_message("the fan's end card entered the armed lane")
+
+
+## The reserve joins the honest minimum (a parent sizing the spread below
+## cards-plus-lane would squeeze cards under the grip).
+func test_lane_reserve_joins_the_minimum_size() -> void:
+	# Two fresh spreads (the min cache computes once per instance — the
+	# existing min-size tests' own pattern: configure, then read).
+	var bare_spread := _spread_with_cards(5)
+	bare_spread.columns = 2
+	bare_spread.space = Vector2(20, 20)
+	var bare: float = bare_spread.get_combined_minimum_size().x
+	var reserved := _spread_with_cards(5)
+	reserved.columns = 2
+	reserved.space = Vector2(20, 20)
+	reserved.right_reserve = 160.0
+	assert_float(reserved.get_combined_minimum_size().x).is_equal_approx(bare + 160.0, 0.01)
+	# And back to bare when the lane lifts.
+	var relifted := _spread_with_cards(5)
+	relifted.columns = 2
+	relifted.space = Vector2(20, 20)
+	relifted.right_reserve = 160.0
+	relifted.right_reserve = 0.0
+	assert_float(relifted.get_combined_minimum_size().x).is_equal_approx(bare, 0.01)
+
+
 # --- 6. Minimum sizes -------------------------------------------------------------------
 
 

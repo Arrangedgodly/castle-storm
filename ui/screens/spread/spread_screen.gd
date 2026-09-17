@@ -168,6 +168,11 @@ var _day_sheet: DaySheetScreen
 ## one printed teaching line at the first dashed (in-progress) edge the
 ## session shows — once per session, the lightest honest cadence.
 var _primer_printed := false
+## The telegraph-armed latch (finishing refinement #3): true while the
+## Watchful Eye holds the armed lane — drives the card field's reserve
+## and the per-batch countdown refresh (the plate's numeral must never
+## go stale while the player watches it).
+var _eye_armed := false
 ## A run ended WHILE the vignette was open (the edge crush): the intro
 ## mounts after the vignette closes — paper never stacks on paper. When
 ## the ending was a real CRUSH, the crush beat plays first (T-UI-06) and
@@ -486,6 +491,12 @@ func _on_ticks(ticks: int) -> void:
 		return
 	if _suspicion != null and _suspicion.choice_is_open() and bool(_suspicion.choice_model().get("urgent", false)):
 		_suspicion.refresh_countdown(SpreadPresenter.eye_hours_left(host))
+	# THE ARMED EYE'S COUNTDOWN rides the same per-batch channel as the
+	# choice card's (finishing refinement #3): the plate's numeral is now
+	# the loud one — a stale hour on the big mark would be worse than the
+	# old small one. The eye's own targeted rebind; nothing else moves.
+	if _eye_armed:
+		_bind_eye()
 	var view_resources: Array = _view["resources"]
 	for i in view_resources.size():
 		view_resources[i]["amount"] = host.engine.get_resource(view_resources[i]["id"])
@@ -1408,7 +1419,9 @@ func _bind_pips() -> void:
 
 ## The Eye: fresh metrics from the suspicion system (the eye section's
 ## own state — three ints and a countdown) bound in both slots, placed
-## inside each slot's spread band (periphery = the right edge).
+## inside each slot's spread band (periphery = the right edge). ARMED
+## (finishing refinement #3): the plate grows to the armed card and takes
+## the reserved lane seat (see _apply_eye_reserve).
 func _bind_eye() -> void:
 	stats[&"eye_binds"] += 1
 	var suspicion := host.suspicion()
@@ -1418,24 +1431,61 @@ func _bind_eye() -> void:
 		tunables.suspicion_warn_threshold, tunables.suspicion_crackdown_threshold,
 		suspicion.crackdown_land_tick != -1, host.is_run_running())
 	var hours_left := SpreadPresenter.eye_hours_left(host)
+	# THE ARMED LANE: the reserve rides the eye's own channel — arming
+	# narrows the card field, relief or a dead run lifts it.
+	_eye_armed = bool(eye["armed"]) and hours_left >= 0
+	_apply_eye_reserve()
 	for slot: OrientationSlot in [get_portrait_slot(), get_landscape_slot()]:
 		var node := eye_of(slot)
 		if node == null:
 			continue
 		node.bind(eye, hours_left)
-		_place_eye(slot, node, eye)
+		_place_eye(slot, node, eye, hours_left)
 
 
-func _place_eye(slot: OrientationSlot, node: Control, metrics: Dictionary) -> void:
+## THE ARMED LANE RESERVE (finishing refinement #3, layout-level): while
+## the telegraph is armed, each slot's spread narrows — CardSpread's
+## right_reserve keeps every card (and the fan's rotated end-card corners)
+## clear of the armed Eye's seat. The perch must not crowd the fan's end
+## card; the table itself makes way. Pure placement math on the eye's own
+## constants (WatchfulEye.armed_lane), applied to both slots.
+func _apply_eye_reserve() -> void:
+	if host == null:
+		return
+	for slot: OrientationSlot in [get_portrait_slot(), get_landscape_slot()]:
+		var spread := slot.get_spread() as CardSpread
+		if spread == null:
+			continue
+		var reserve := 0.0
+		if _eye_armed:
+			# The lane is measured against the SLOT's right edge, the
+			# reserve against the spread's — convert across the margin.
+			reserve = WATCHFUL_EYE_SCRIPT.armed_lane(slot.portrait_topology) \
+				- (slot.get_global_rect().end.x - spread.get_global_rect().end.x)
+		if absf(float(spread.get("right_reserve")) - reserve) > 0.01:
+			# A re-sort must never strand a settling card short of its seat.
+			CardMotion.snap_all(spread)
+			spread.set("right_reserve", reserve)
+			spread.queue_sort()
+
+
+func _place_eye(slot: OrientationSlot, node: Control, metrics: Dictionary,
+		hours_left: int) -> void:
 	## The perch hugs the table's right edge, vertically centered in the
 	## spread band; inset slides the card toward the table's heart. Always
 	## fully inside the slot rect (nothing may clip outside the design).
+	## ARMED (finishing refinement #3): the committed seat in the reserved
+	## lane — deeper than the perch, never crowding the card field.
 	var spread_rect: Rect2 = slot.get_spread().get_global_rect()
 	var slot_rect := slot.get_global_rect()
-	var inset: float = metrics["inset"]
 	var card_size: Vector2 = node.get_combined_minimum_size()
-	var max_inset: float = maxf(0.0, spread_rect.size.x * 0.5 - card_size.x)
 	node.size = card_size
+	if bool(metrics["armed"]) and hours_left >= 0:
+		node.global_position = WATCHFUL_EYE_SCRIPT.armed_seat(
+			slot_rect, spread_rect, card_size, slot.portrait_topology)
+		return
+	var inset: float = metrics["inset"]
+	var max_inset: float = maxf(0.0, spread_rect.size.x * 0.5 - card_size.x)
 	node.global_position = Vector2(
 		slot_rect.end.x - card_size.x - 8.0 - inset * max_inset,
 		clampf(spread_rect.get_center().y - card_size.y * 0.5,

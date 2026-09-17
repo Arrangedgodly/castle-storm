@@ -53,6 +53,18 @@ enum Mode {
 			space = value
 			queue_sort()
 
+## Width kept CLEAR of cards at the table's right edge (design units) —
+## the armed Watchful Eye's strike lane (finishing refinement #3: the
+## perch must not crowd the fan's end card when the telegraph arms, so the
+## table itself makes way). 0.0 (the default and the resting state) lays
+## out across the FULL width — every pre-existing rect is untouched by
+## construction (the additive-param pattern the header insert follows).
+@export var right_reserve: float = 0.0:
+	set(value):
+		if right_reserve != value:
+			right_reserve = maxf(0.0, value)
+			queue_sort()
+
 ## Card width / height. A card is a tall plate, not a square.
 const CARD_ASPECT := 0.68
 
@@ -123,19 +135,23 @@ func wire_focus_neighbors() -> void:
 
 ## STACKED: centered grid rects. Each card is sized to its cell preserving
 ## CARD_ASPECT, capped at MAX_CARD_HEIGHT; the grid centers in bounds.
+## `right_reserve` (finishing refinement #3, additive; default 0.0) narrows
+## the width the grid centers within — cards stay clear of the table's
+## right lane. With 0.0 the rects are EXACTLY the pre-refinement values.
 static func stacked_layout(count: int, bounds: Vector2, columns: int = 2,
-		space: Vector2 = Vector2(20, 20)) -> Array[Rect2]:
+		space: Vector2 = Vector2(20, 20), right_reserve: float = 0.0) -> Array[Rect2]:
 	var rects: Array[Rect2] = []
 	if count <= 0 or bounds.x <= 0.0 or bounds.y <= 0.0:
 		return rects
 	var cols := maxi(1, columns)
 	var rows := maxi(1, int(ceil(float(count) / float(cols))))
-	var cell_w := maxf(1.0, (bounds.x - float(cols - 1) * space.x) / float(cols))
+	var usable_w := maxf(1.0, bounds.x - right_reserve)
+	var cell_w := maxf(1.0, (usable_w - float(cols - 1) * space.x) / float(cols))
 	var cell_h := maxf(1.0, (bounds.y - float(rows - 1) * space.y) / float(rows))
 	var card := _card_size_for_cell(cell_w, cell_h)
 	var grid_w := float(cols) * card.x + float(cols - 1) * space.x
 	var grid_h := float(rows) * card.y + float(rows - 1) * space.y
-	var origin := Vector2((bounds.x - grid_w) * 0.5, (bounds.y - grid_h) * 0.5)
+	var origin := Vector2((usable_w - grid_w) * 0.5, (bounds.y - grid_h) * 0.5)
 	for i in count:
 		var col := i % cols
 		var row := i / cols
@@ -149,30 +165,35 @@ static func stacked_layout(count: int, bounds: Vector2, columns: int = 2,
 ## Cards bottom-align with a parabolic lift (center highest), advance by a
 ## full gap when the table has room and overlap when it does not; rotation
 ## swings +-fan_degrees across the fan. The span is centered in bounds.
+## `right_reserve` (finishing refinement #3, additive; default 0.0) narrows
+## the width the fan centers within — the end card never enters the table's
+## right lane. With 0.0 the entries are EXACTLY the pre-refinement values.
 static func panoramic_layout(count: int, bounds: Vector2, space: Vector2 = Vector2(20, 20),
-		arc_depth: float = 24.0, fan_degrees: float = 10.0) -> Array[Dictionary]:
+		arc_depth: float = 24.0, fan_degrees: float = 10.0,
+		right_reserve: float = 0.0) -> Array[Dictionary]:
 	var entries: Array[Dictionary] = []
 	if count <= 0 or bounds.x <= 0.0 or bounds.y <= 0.0:
 		return entries
-	var card_h := maxf(1.0, minf(MAX_CARD_HEIGHT, bounds.y - arc_depth - 2.0 * space.y - ROTATION_SLACK))
+	var usable_bounds := Vector2(maxf(1.0, bounds.x - right_reserve), bounds.y)
+	var card_h := maxf(1.0, minf(MAX_CARD_HEIGHT, usable_bounds.y - arc_depth - 2.0 * space.y - ROTATION_SLACK))
 	var card := Vector2(card_h * CARD_ASPECT, card_h)
 	if count == 1:
 		entries.append({
-			"rect": Rect2(Vector2((bounds.x - card.x) * 0.5, bounds.y - space.y - card.y), card),
+			"rect": Rect2(Vector2((usable_bounds.x - card.x) * 0.5, usable_bounds.y - space.y - card.y), card),
 			"rotation": 0.0,
 		})
 		return entries
-	var usable := bounds.x - 2.0 * space.x
+	var usable := usable_bounds.x - 2.0 * space.x
 	var step: float = minf(card.x + space.x, (usable - card.x) / float(count - 1))
 	var span := card.x + float(count - 1) * step
-	var x0 := (bounds.x - span) * 0.5
+	var x0 := (usable_bounds.x - span) * 0.5
 	var half := float(count - 1) * 0.5
 	for i in count:
 		var t := (float(i) - half) / half  # -1 .. 1 across the fan
 		var lift := arc_depth * (1.0 - t * t)  # center cards highest
 		entries.append({
 			"rect": Rect2(
-				Vector2(x0 + float(i) * step, bounds.y - space.y - card.y - lift),
+				Vector2(x0 + float(i) * step, usable_bounds.y - space.y - card.y - lift),
 				card),
 			"rotation": t * fan_degrees,
 		})
@@ -194,8 +215,8 @@ static func _card_size_for_cell(cell_w: float, cell_h: float) -> Vector2:
 
 func _get_minimum_size() -> Vector2:
 	## Honest floor: the grid of card minimums (STACKED) or the
-	## overlap-packed span (PANORAMIC) — parents sizing below this would
-	## clip cards under the touch grip.
+	## overlap-packed span (PANORAMIC), plus the standing right reserve —
+	## parents sizing below this would clip cards under the touch grip.
 	var controls: Array[Control] = _card_children()
 	if controls.is_empty():
 		return Vector2.ZERO
@@ -207,10 +228,10 @@ func _get_minimum_size() -> Vector2:
 		var cols := maxi(1, columns)
 		var rows := maxi(1, int(ceil(float(controls.size()) / float(cols))))
 		return Vector2(
-			float(cols) * cell.x + float(cols - 1) * space.x,
+			float(cols) * cell.x + float(cols - 1) * space.x + right_reserve,
 			float(rows) * cell.y + float(rows - 1) * space.y)
 	return Vector2(
-		cell.x + float(controls.size() - 1) * cell.x * PANORAMA_MIN_ADVANCE,
+		cell.x + float(controls.size() - 1) * cell.x * PANORAMA_MIN_ADVANCE + right_reserve,
 		cell.y + arc_depth + ROTATION_SLACK)
 
 
@@ -228,13 +249,13 @@ func _apply_layout(bounds: Vector2) -> void:
 		return
 	var controls: Array[Control] = _card_children()
 	if mode == Mode.STACKED:
-		var rects := stacked_layout(controls.size(), bounds, columns, space)
+		var rects := stacked_layout(controls.size(), bounds, columns, space, right_reserve)
 		for i in controls.size():
 			var card := controls[i]
 			card.rotation = 0.0
 			fit_child_in_rect(card, rects[i])
 	else:
-		var entries := panoramic_layout(controls.size(), bounds, space, arc_depth, fan_degrees)
+		var entries := panoramic_layout(controls.size(), bounds, space, arc_depth, fan_degrees, right_reserve)
 		for i in controls.size():
 			var card := controls[i]
 			var entry: Dictionary = entries[i]

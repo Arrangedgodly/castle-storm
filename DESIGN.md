@@ -354,7 +354,9 @@ full grips).
 
 **Key Characteristics:** hierarchy reads ground → cards → pips/numerals (edges first,
 numbers second, faces last); roster runs 1–30 cards; the Watchful Eye perches on the
-table's right edge, inset sliding toward the heart as suspicion rises.
+table's right edge, inset sliding toward the heart as suspicion rises — and when the
+telegraph arms, the card field reserves the right lane (`CardSpread.right_reserve`) so
+the Eye's full-size armed plate never crowds the fan's end card.
 
 ## Elevation & Depth
 
@@ -476,8 +478,19 @@ button chips, 5px on paper panels (theme styleboxes).
 - **WatchfulEye** (`ui/screens/spread/watchful_eye.gd`): suspicion as a CARD — a
   seal-less frame creeping in from the right-edge perch (position), edge by line form
   (solid watching / dashed closing / struck telegraph-armed), a drawn almond eye whose
-  iris dilates with dread, countdown plate, 0.55s strike bell (1.18× scale + red wash)
-  and 0.45s retreat flinch.
+  iris dilates with dread, countdown plate, 0.55s strike bell (1.18× scale + a red wash
+  that prints WIDER than the card onto the ground, 2.2× its rect) and 0.45s retreat
+  flinch. THE ARMED PLATE (finishing refinement #3): an armed telegraph is a state, not
+  a level — the Eye overrides the meter's creep (full inset, full scale, full dread),
+  grows to a full card (144×202 design units), and prints the choice card's urgent
+  vocabulary: a short DOUBLE red rule, the red countdown caption ("lands in"), and the
+  landing hours as the plate's largest mark in INK (the numeral-plate grammar — size
+  carries the escalation, never hue alone; red stays inside its 30–60% accent share).
+  The table makes way: CardSpread's `right_reserve` keeps the card field (and the fan's
+  rotated end-card corners) clear of the armed seat, so the perch never crowds the end
+  card. The resting creep is untouched — unarmed binds are exactly the authored quiet
+  forms, and the armed countdown refreshes per sim batch so the numeral never goes
+  stale.
 
 ### The Screens (paper over the table)
 

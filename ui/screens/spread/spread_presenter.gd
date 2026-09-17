@@ -318,11 +318,21 @@ static func _hours_left_label(units: UnitLifecycleSystem, uid: int) -> String:
 ## meter, plus dread (alpha) and scale. Thresholds are the sim's own
 ## (warn/crackdown); the telegraph countdown overrides to the STRUCK form
 ## — the Crown's verdict is being printed. No run: the Eye withdraws.
+##
+## THE ARMED ESCALATION (finishing refinement #3, the closing critique's
+## P2): an armed telegraph is a STATE, not a level — the Eye OVERRIDES the
+## meter's own creep and commits to the deep seat (inset 1.0, full card
+## scale, full dread) whatever the meter's residue. The RESTING creep is
+## untouched: unarmed metrics are exactly the authored meter functions
+## (the quiet creep is the design; only the armed state is loud).
 static func eye_metrics(points: int, max_points: int, warn: int, crackdown: int,
 		telegraph_armed: bool, run_alive: bool) -> Dictionary:
 	var clamped_max := maxi(1, max_points)
 	var progress: float = clampf(float(points) / float(clamped_max), 0.0, 1.0)
 	var visible: bool = run_alive and points > 0
+	# A dead run has no armed telegraph (the Eye withdraws; the table's
+	# lane reserve lifts with it — see the screen's eye-reserve bind).
+	var armed := telegraph_armed and run_alive
 	var edge_form: int = Inks.EdgeForm.SOLID
 	if telegraph_armed or points >= crackdown:
 		edge_form = Inks.EdgeForm.STRUCK
@@ -332,11 +342,11 @@ static func eye_metrics(points: int, max_points: int, warn: int, crackdown: int,
 		"visible": visible,
 		"points": points,
 		"max_points": clamped_max,
-		"inset": progress,
-		"scale": 0.55 + 0.45 * progress,
-		"dread": 0.55 + 0.45 * progress,
+		"inset": 1.0 if armed else progress,
+		"scale": 1.0 if armed else 0.55 + 0.45 * progress,
+		"dread": 1.0 if armed else 0.55 + 0.45 * progress,
 		"edge_form": edge_form,
-		"armed": telegraph_armed,
+		"armed": armed,
 	}
 
 
