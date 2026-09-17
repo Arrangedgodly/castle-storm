@@ -291,7 +291,7 @@ overrides for capture; `TypeScale.scaled(base)` keeps local overrides on the lad
 ### Copy integration (the printed voice)
 
 Every line is rendered by `sim/copy_deck.gd` (CopyDeck) from
-`content/mvp/copy_table.tres` — 92 keys, 2–4 variants each, rotated by data already in
+`content/mvp/copy_table.tres` — 96 keys, 2–4 variants each, rotated by data already in
 the view (event seq, run number, from_tick, beat hash — never RNG, never wall time).
 Copy may embellish tone; it may never invent facts. The no-clip line budgets
 (`docs/voice-bible.md` §4, font-metric-pinned in `tests/unit/test_copy_voice.gd`
@@ -346,8 +346,11 @@ of rotation slack reserve height for the rotated bounding boxes.
 
 **Density rhythm:** 12-unit table edge margin, 18-unit pip-rail separation, 20-unit
 card gaps, 6-unit chronicle-row separation, 16-unit header-strip separation. The run
-header (letterhead: leader name, regime-ink rule, regime name, clock) inserts at the
-very top and shifts everything below.
+header inserts at the very top and shifts everything below: a two-row COLUMN (probe-
+measured — the letterhead row has no width to spare at the 720 portrait base) — the
+letterhead (leader name, regime-ink rule, regime name, clock) at full table width,
+then THE LEDGER VERBS row (The Chronicle chip + The Day-Sheet chip, right-aligned,
+full grips).
 
 **Key Characteristics:** hierarchy reads ground → cards → pips/numerals (edges first,
 numbers second, faces last); roster runs 1–30 cards; the Watchful Eye perches on the
@@ -459,7 +462,9 @@ button chips, 5px on paper panels (theme styleboxes).
 - **RunHeader** (`ui/screens/spread/run_header.gd`): the letterhead — leader name
   (display face, 28px), a solid rule in the regime's second ink, uppercase regime
   name in the secondary, clock/power plate in PipLabel; text ink by the print rule
-  against the live ground.
+  against the live ground. It tops a two-row header column whose second row is THE
+  LEDGER VERBS (The Chronicle + The Day-Sheet ActionChips, right-aligned, full
+  grips, focus-equivalent across orientation swaps).
 - **ActionFan / ActionChip** (`ui/screens/spread/action_fan.gd`): the contextual
   affordance — a column of print-styled chips fanned at a card's edge (to its right,
   mirrored left when the table runs out, always inside the screen). Each chip: leading
@@ -496,6 +501,18 @@ All screens compose the same grammar; none fork a component:
   spreads over a 0.90 veil in the live regime's ground tone; outcome seals by form
   (WON double / CRUSHED struck / ABANDONED dashed); the live run prints as its own
   dashed strip, never an entry.
+- **DaySheetScreen** (`ui/screens/spread/day_sheet_screen.gd`): the live run's own
+  page — the retrieval surface for in-run history. Every line this hand printed
+  accumulates on one scrolled column of ChronicleLine rows, NEWEST FIRST (the
+  strip's reading order; the sought line is usually recent), with the blockquote-only
+  payloads included (the scatter rows with names, the while-you-were-away detail
+  rows). Data: the SpreadPresenter's run-scoped ledger (`push_row` is the one choke
+  point), cleared when a new hand is dealt, NOT persisted — the durable record of a
+  run is the chronicle entry it becomes; past the 600-row cap the oldest prints leave
+  the page and the truncation prints honestly. Opened from the header's Day-Sheet
+  verb; paper over a veiled table; the count rule prints dashed in red (the page
+  itself is work in progress); an open page is live paper (new prints land on top);
+  focus walks the rows with scroll-follow; back returns focus to the chip.
 
 ### Motion grammar
 
@@ -532,7 +549,7 @@ the reveal is content, not animation; entrance slides skip entirely):
 | MotionProfile / TypeScale | `ui/theme/motion_profile.gd` · `type_scale.gd` |
 | Component gallery (visual inspection) | `ui/theme/theme_gallery.tscn` (`make run-gallery`) |
 | LayoutRouter / OrientationSlot / CardSpread / ResponsiveScreen | `ui/layout/layout_router.gd` · `orientation_slot.gd` · `card_spread.gd` · `responsive_screen.gd` |
-| The Spread + card factory + fan + Eye + header + motion | `ui/screens/spread/` (spread_screen.gd, spread_cards.gd, card_actions.gd, action_fan.gd, card_motion.gd, watchful_eye.gd, run_header.gd, suspicion_events.gd, catch_up_print.gd, first_session.gd) |
+| The Spread + card factory + fan + Eye + header + motion | `ui/screens/spread/` (spread_screen.gd, spread_cards.gd, card_actions.gd, action_fan.gd, card_motion.gd, watchful_eye.gd, run_header.gd, suspicion_events.gd, catch_up_print.gd, first_session.gd, day_sheet_screen.gd) |
 | Intro / Assault / Chronicle screens | `ui/screens/intro/` · `ui/screens/assault/` · `ui/screens/chronicle/` |
 | Regime inks (content) | `content/mvp/regimes/{gilded_crown,iron_rotunda,paper_crown,velvet_fist}.tres` |
 | Copy system | `sim/copy_deck.gd` + `content/mvp/copy_table.tres` + `docs/voice-bible.md` |
@@ -553,6 +570,11 @@ the reveal is content, not animation; entrance slides skip entirely):
   UI code reads them through `Inks`/the manifest, never hardcodes.
 - **Do** print events as chronicle lines/blockquotes on the table; dwell and
   self-fold paper rather than dismissing it for the player.
+- **Do** keep in-run prints retrievable — the strip is a window, the day-sheet is
+  the hand's page (every strip row + blockquote payload accumulates on it, newest
+  first); teach the line-form grammar once per session at its first dashed edge,
+  and let the background save flush print one quiet filing line (the periodic
+  hourly autosave stays silent — routine status is not news).
 - **Do** budget single-line copy against its surface (476px quote rows / 610px strip
   / 232px choice card / 504px packet band) in the real italic face with ≥30px margin.
 - **Do** route every motion through `MotionProfile.duration()` and scale-bump local

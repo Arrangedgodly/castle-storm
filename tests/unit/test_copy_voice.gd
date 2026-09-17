@@ -93,6 +93,11 @@ const KEY_BUDGETS: Dictionary = {
 	&"first_gate": STRIP_BUDGET, &"first_assign": STRIP_BUDGET,
 	&"first_build": STRIP_BUDGET, &"first_trickle": STRIP_BUDGET,
 	&"first_train": STRIP_BUDGET,
+	# the finishing refinements (refinement #2) — strip rows that also
+	# print on the day-sheet's ~560px row label, pinned at the tighter
+	# quote budget
+	&"primer_lineform": QUOTE_BUDGET, &"autosave_filed": QUOTE_BUDGET,
+	&"daysheet_empty_1": QUOTE_BUDGET, &"daysheet_empty_2": QUOTE_BUDGET,
 }
 
 

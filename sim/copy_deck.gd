@@ -312,6 +312,20 @@ const DEFAULTS: Dictionary = {
 	&"first_train": [
 		"{name} joins the drill line — the conspiracy counts soldiers.",
 	],
+	# --- the finishing refinements (refinement #2) ---
+	&"primer_lineform": [
+		"Dashed: work in hand. Solid: settled. Struck: lost.",
+	],
+	&"autosave_filed": [
+		"The hour is filed at {hours}h — the hand is kept safe.",
+		"The clerk blots the hour at {hours}h — nothing is lost.",
+	],
+	&"daysheet_empty_1": [
+		"the day-sheet is blank — no print this hand yet",
+	],
+	&"daysheet_empty_2": [
+		"The first print of the hand will head the page.",
+	],
 }
 
 
@@ -412,6 +426,10 @@ const CONSUMERS: Dictionary = {
 	&"first_build": "first-session strip hint (the build order) — FirstSession",
 	&"first_trickle": "first-session strip line (the first produce) — FirstSession",
 	&"first_train": "first-session strip line (the drill line) — FirstSession",
+	&"primer_lineform": "line-form primer strip row (first dashed edge of a session) — SpreadScreen",
+	&"autosave_filed": "autosave strip row (the background flush) — SpreadScreen",
+	&"daysheet_empty_1": "day-sheet empty page — DaySheetScreen.view_for",
+	&"daysheet_empty_2": "day-sheet empty page — DaySheetScreen.view_for",
 }
 
 

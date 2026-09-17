@@ -366,10 +366,9 @@ func test_view_hash_deterministic_and_meta_sensitive() -> void:
 
 
 func _header_chip(screen: SpreadScreen) -> BaseButton:
-	var slot := screen.get_active_slot() as OrientationSlot
-	if slot == null or slot.get_header() == null:
-		return null
-	return slot.get_header().get_child(1) as BaseButton if slot.get_header().get_child_count() > 1 else null
+	# The verbs row nests the chips (finishing refinement #2's header
+	# restructure) — the lookup is by focus id, not child index.
+	return SpreadScreen.header_chip(screen.get_active_slot(), "chronicle_chip") as BaseButton
 
 
 func test_header_chip_opens_the_ledger_and_back_returns_focus() -> void:
@@ -378,12 +377,11 @@ func test_header_chip_opens_the_ledger_and_back_returns_focus() -> void:
 	_end_hand(host, &"win", 5)
 	_end_hand(host, &"loss", 3)
 	var screen: SpreadScreen = await _mounted_screen(host)
-	# The affordance is on BOTH slots' header strips, in world grammar,
-	# with the router's focus-equivalence id and a full grip.
+	# The affordance is on BOTH slots' header verbs rows, in world
+	# grammar, with the router's focus-equivalence id and a full grip.
 	for slot: OrientationSlot in [screen.get_portrait_slot(), screen.get_landscape_slot()]:
-		var strip := slot.get_header()
-		assert_int(strip.get_child_count()).is_greater_equal(2)
-		var chip := strip.get_child(1) as Control
+		var chip := SpreadScreen.header_chip(slot, "chronicle_chip")
+		assert_that(chip).is_not_null()
 		assert_str(String(chip.get_meta(&"focus_id", ""))).is_equal("chronicle_chip")
 		var min_size: Vector2 = chip.get_combined_minimum_size()
 		assert_float(min_size.y).is_greater_equal(float(Inks.TOUCH_GRIP_MIN))

@@ -14,9 +14,17 @@
 ##     T-COPY-01 deepens); suspicion beats DELEGATE to the system's own
 ##     chronicle_line (one voice source per vocabulary).
 ##
-## State kept across events: only the chronicle buffer (presentation
-## history — the engine's ring is bounded and unserialized, exactly like
-## §3 says presentation history lives outside the sim).
+## State kept across events: the chronicle buffer (presentation history —
+## the engine's ring is bounded and unserialized, exactly like §3 says
+## presentation history lives outside the sim) and THE DAY-SHEET — the
+## live run's own accumulating ledger (finishing refinement #2): every
+## row that ever printed on the strip (push_row is the one choke point —
+## events, nudges, refusals, the primer, the autosave line) PLUS the
+## blockquote-only payloads (the scatter rows with names, the catch-up
+## print's detail rows). Run-scoped by contract: a new hand turns the
+## page (begin_day_sheet_page), and it is NEVER persisted — the durable
+## record of a run is the chronicle entry it becomes (RunMeta); the
+## day-sheet is the clerk's working paper for the hand in play.
 class_name SpreadPresenter
 extends RefCounted
 
@@ -27,6 +35,13 @@ const CHRONICLE_BUFFER: int = 12
 ## 2 composed ChronicleLine rows).
 const CHRONICLE_STRIP_LINES: int = 2
 
+## Default day-sheet ceiling (test seam: the var). Bounds the page's
+## memory and the sheet's node churn at open; past it the OLDEST prints
+## leave the sheet and the view reports the truncation honestly. 600 rows
+## covers ~8 days of wall-time play at the sim's print cadence — far past
+## any real hand's retrieval needs, small enough to stay cheap.
+const DAY_SHEET_CAP_DEFAULT: int = 600
+
 ## The suspicion vocabulary (thresholds mirrored from the tunables the
 ## host's engine was composed with; read live via _suspicion_thresholds
 ## so content retunes flow through).
@@ -34,6 +49,18 @@ const EYE_STATES: Array[StringName] = [&"watching", &"closing", &"striking"]
 
 ## Rolling chronicle rows, oldest first ({class: int, text: String}).
 var chronicle: Array[Dictionary] = []
+
+## THE DAY-SHEET (finishing refinement #2): the live run's page, oldest
+## first, append order — the retrieval surface for every line this hand
+## has printed (the strip keeps 2 rows and the buffer 12; the day-sheet
+## keeps the hand). Cleared by begin_day_sheet_page at run boundaries.
+var day_sheet: Array[Dictionary] = []
+
+## Rows pressed off the top of the page past the cap (reported honestly).
+var day_sheet_dropped := 0
+
+## Day-sheet ceiling (the test seam over DAY_SHEET_CAP_DEFAULT).
+var day_sheet_cap := DAY_SHEET_CAP_DEFAULT
 
 
 # --- the view model ------------------------------------------------------------------
@@ -491,11 +518,49 @@ func chronicle_line_for(event: Dictionary, host: GameHost) -> Variant:
 
 
 ## Append an already-rendered row to the rolling buffer (the screen's
-## event path; rows render once, at event time).
+## event path; rows render once, at event time). The SAME row lands on the
+## day-sheet — one choke point, so strip, buffer and the run's page can
+## never disagree about what printed.
 func push_row(row: Dictionary) -> void:
 	chronicle.append(row)
 	if chronicle.size() > CHRONICLE_BUFFER:
 		chronicle = chronicle.slice(chronicle.size() - CHRONICLE_BUFFER)
+	day_sheet.append(row)
+	while day_sheet.size() > day_sheet_cap:
+		day_sheet.pop_front()
+		day_sheet_dropped += 1
+
+
+## Append blockquote-only rows to the day-sheet (WITHOUT the rolling
+## buffer — these payloads printed as paper on the table, not as strip
+## lines: the scatter rows with the swept gate crowd's NAMES, the
+## while-you-were-away print's detail rows beyond the headline). The
+## day-sheet records what the player SAW print, blockquote included.
+func push_rows(rows: Array[Dictionary]) -> void:
+	for row in rows:
+		day_sheet.append(row)
+	while day_sheet.size() > day_sheet_cap:
+		day_sheet.pop_front()
+		day_sheet_dropped += 1
+
+
+## A new hand was dealt: the page turns. The caller invokes this at the
+## run_started/run_restarted boundary BEFORE the boundary's own line
+## prints, so the new page opens with its own announcement.
+func begin_day_sheet_page() -> void:
+	day_sheet.clear()
+	day_sheet_dropped = 0
+
+
+## The page as the sheet prints it: NEWEST FIRST (documented choice — the
+## strip reads newest-first, the chronicle ring pages newest-first, and
+## the line being sought is almost always a recent one; reading order
+## matches arrival order on every print surface in this world).
+func day_sheet_newest_first() -> Array[Dictionary]:
+	var rows: Array[Dictionary] = []
+	for i in day_sheet.size():
+		rows.append(day_sheet[day_sheet.size() - 1 - i])
+	return rows
 
 
 ## Append an event's line to the rolling buffer (no-op for silent kinds).

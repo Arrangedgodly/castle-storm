@@ -23,11 +23,12 @@ class_name OrientationSlot
 ## Which topology this slot arranges. Set by the two thin scenes.
 @export var portrait_topology: bool = true
 
-## Optional run-header strip along the table's top edge (T-UI-03's run
-## header: leader name + regime ink). OFF by default — the T-UI-02 lab
-## composition and its pinned topology tests are exactly unchanged
-## (a zero-height header collapses topology_rects to the original rects).
-## The Spread's thin slot scenes turn it on.
+## The run-header strip along the table's top edge (T-UI-03's run
+## header: leader name + regime ink, then the ledger verbs row — the
+## chronicle chip and the day-sheet chip, right-aligned). OFF by
+## default — the T-UI-02 lab composition and its pinned topology tests
+## are exactly unchanged (a zero-height header collapses topology_rects
+## to the original rects). The Spread's thin slot scenes turn it on.
 @export var show_header: bool = false
 
 ## Edge margin around the whole slot (design units; the ResponsiveScreen's
@@ -48,7 +49,14 @@ const RAIL_KINDS: Array[Inks.ResourceKind] = [
 var _rail: HBoxContainer
 var _spread: Control
 var _chronicle: VBoxContainer
-var _header: HBoxContainer
+## The header COLUMN (the finishing refinement #2 restructure: the strip is
+## a VBox — row 0 the letterhead (RunHeader), row 1 the ledger verbs
+## (chronicle chip + day-sheet chip, right-aligned by the spread). The
+## probe-measured letterhead row has no width to spare at the 720 portrait
+## base (666 of 672 design units fixed); a second verb beside it would
+## clip the leader's name to a stub. A column keeps every verb at a full
+## grip AND widens the letterhead to the whole table.
+var _header: VBoxContainer
 var _ground: Control
 
 
@@ -62,8 +70,8 @@ func _ready() -> void:
 	_ground = ground
 
 	if show_header:
-		_header = HBoxContainer.new()
-		_header.add_theme_constant_override("separation", 16)
+		_header = VBoxContainer.new()
+		_header.add_theme_constant_override("separation", 6)
 		_header.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		add_child(_header)
 
@@ -184,9 +192,10 @@ func get_ground() -> Control:
 	return _ground
 
 
-## The run-header strip (T-UI-03), when this slot was built with
+## The run-header column (T-UI-03's letterhead row + the finishing
+## refinement's ledger-verbs row), when this slot was built with
 ## `show_header`; null otherwise (the presenter falls back gracefully).
-func get_header() -> HBoxContainer:
+func get_header() -> VBoxContainer:
 	return _header
 
 

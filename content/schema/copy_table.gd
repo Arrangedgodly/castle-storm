@@ -41,6 +41,7 @@ const ROTATING_KEYS: Array[StringName] = [
 	&"building_milestone", &"run_started", &"run_restarted",
 	&"catchup_headline", &"catchup_people_arrived",
 	&"card_warn_line", &"card_telegraph_line",
+	&"autosave_filed",
 ]
 
 ## The complete key vocabulary + each key's allowed `{tokens}` (empty list =
@@ -147,6 +148,11 @@ const KEY_TOKENS: Dictionary = {
 	&"first_build": [&"building"],
 	&"first_trickle": [&"amount", &"resource"],
 	&"first_train": [&"name"],
+	# --- the finishing refinements (refinement #2) ---
+	&"primer_lineform": [],
+	&"autosave_filed": [&"hours"],
+	&"daysheet_empty_1": [],
+	&"daysheet_empty_2": [],
 }
 
 ## Automated register floor: whole WORDS that BREAK the voice (modern

@@ -86,6 +86,9 @@ run-responsive:
 #                                                               # foreground->actionable wall measurement
 #   CS_SPREAD_SHOT=/p.png CS_SPREAD_CATCHUP=4 make run-game    # crackdown landing INSIDE the away window — the print's STRIKE
 #                                                               # row + the signed seizure losses, from a real resolved window
+#   CS_SPREAD_SHOT=/p.png CS_SPREAD_DAYSHEET=1 make run-game   # the run's own page open over a printed history (finishing #2:
+#                                                               # the day-sheet — 14h of prints, newest first, dashed count rule)
+#   CS_SPREAD_SHOT=/p.png CS_SPREAD_DAYSHEET=2 make run-game   # the header verbs row itself (letterhead + both ledger chips)
 #   CS_SPREAD_SHOT=/p.png CS_SPREAD_FIRST=1 make run-game      # the first session, moment 1: the EMPTY SPREAD (staked plots)
 #                                                               # + the first gate hint at the 7-minute arrival (T-UI-10)
 #   CS_SPREAD_SHOT=/p.png CS_SPREAD_FIRST=2 make run-game      # moment 2: the assignment + build-order hints, focus on the plot

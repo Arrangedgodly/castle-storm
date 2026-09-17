@@ -77,7 +77,10 @@
 ## =2 then =3, the short unfold + the while-you-were-away print with the
 ## foreground->actionable measurement printed / a crackdown landing
 ## INSIDE the away window: the print's STRIKE row + signed seizures),
-## or with CS_SPREAD_FIRST=1/2/3 for the first-session beats (T-UI-10:
+## with CS_SPREAD_DAYSHEET=1/2 for the run's own page (finishing
+## refinement #2: the day-sheet open over a printed history / the
+## header verbs row itself), or with CS_SPREAD_FIRST=1/2/3 for the
+## first-session beats (T-UI-10:
 ## the empty spread + the gate hint / the assignment + build hints with
 ## the focused plot card / the trickle print + the pacing report).
 extends ResponsiveScreen
@@ -92,6 +95,7 @@ const IntroScreenScript := preload("res://ui/screens/intro/intro_screen.gd")
 const INTRO_SCENE := preload("res://ui/screens/intro/intro_screen.tscn")
 const ChronicleScreenScript := preload("res://ui/screens/chronicle/chronicle_screen.gd")
 const CHRONICLE_SCENE := preload("res://ui/screens/chronicle/chronicle_screen.tscn")
+const DaySheetScreenScript := preload("res://ui/screens/spread/day_sheet_screen.gd")
 
 ## Default demo seed (deterministic identity + arrival draw; override
 ## with CS_SEED).
@@ -134,8 +138,10 @@ var stats := {
 	&"choice_cards": 0, &"choices_made": 0, &"quotes_printed": 0,
 	&"crushes_played": 0, &"eye_strikes": 0, &"ground_flashes": 0,
 	&"chronicles_opened": 0, &"chronicles_closed": 0,
+	&"day_sheets_opened": 0, &"day_sheets_closed": 0,
 	&"catch_up_prints": 0, &"quiet_lines": 0,
 	&"first_nudges": 0, &"first_focuses": 0,
+	&"primer_lines": 0, &"autosave_lines": 0,
 }
 
 ## The leader intro / restart reveal (T-UI-05): ON at boot, from the
@@ -152,6 +158,16 @@ var _assault: AssaultScreenScript
 var _intro: IntroScreenScript
 var _chronicle: ChronicleScreenScript
 var _pre_assault_focus: Control
+## THE DAY-SHEET (finishing refinement #2): the live run's own page — the
+## retrieval surface for every line this hand has printed (strip rows +
+## blockquote payloads). The chronicle screen's little sibling, opened
+## from the header's Day-Sheet verb; run-scoped, never persisted (the
+## durable record of a run is the chronicle entry it becomes).
+var _day_sheet: DaySheetScreen
+## The line-form primer's session latch (finishing refinement #2, P2):
+## one printed teaching line at the first dashed (in-progress) edge the
+## session shows — once per session, the lightest honest cadence.
+var _primer_printed := false
 ## A run ended WHILE the vignette was open (the edge crush): the intro
 ## mounts after the vignette closes — paper never stacks on paper. When
 ## the ending was a real CRUSH, the crush beat plays first (T-UI-06) and
@@ -208,6 +224,7 @@ func _ready() -> void:
 	_build_suspicion_layer()
 	_build_assault_screen()
 	_build_intro_screen()
+	_build_day_sheet_screen()
 	_build_chronicle_screen()
 	host.event_observed.connect(_on_event)
 	host.sim_advanced.connect(_on_ticks)
@@ -341,6 +358,12 @@ static func _mix(hash_value: int, value: int) -> int:
 ## The suspicion-event hooks (T-UI-06) run BEFORE the targets loop — a
 ## "full" target RETURNS out of this function.
 func _on_event(event: Dictionary) -> void:
+	# THE DAY-SHEET'S PAGE TURN (finishing refinement #2): a new hand was
+	# dealt — the clerk starts a fresh page BEFORE the boundary's own line
+	# prints, so the new page opens with its own announcement. Ended-run
+	# lines stay on the page they ended (the aftermath is still readable).
+	if event["type"] == &"run_started" or event["type"] == &"run_restarted":
+		presenter.begin_day_sheet_page()
 	var row: Variant = presenter.chronicle_line_for(event, host)
 	if row != null:
 		presenter.push_row(row)
@@ -556,38 +579,98 @@ func _build_chronicle_screen() -> void:
 	_chronicle.closed.connect(_on_chronicle_closed)
 
 
+## Build the day-sheet screen ONCE, BENEATH the chronicle in z-order
+## (the two ledger papers are mutually exclusive — whichever opens folds
+## the other — and both sit ABOVE the story layers' input owners only
+## while open). The run's own page, the chronicle screen's little
+## sibling.
+func _build_day_sheet_screen() -> void:
+	_day_sheet = DaySheetScreenScript.new()
+	_day_sheet.name = "DaySheetScreen"
+	# FULL-RECT, like every paper layer's root (the chronicle scene's own
+	# anchors): the page lays out against the whole design bounds.
+	_day_sheet.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(_day_sheet)
+	_day_sheet.closed.connect(_on_day_sheet_closed)
+
+
 ## Open the chronicle ledger (the header chip's verb): the run header's
 ## chronicle affordance, in world grammar. Focus is remembered so
-## closing returns the pad player to the chip that opened it.
+## closing returns the pad player to the chip that opened it. The two
+## ledger papers never stack: the run's page folds first.
 func open_chronicle() -> void:
 	if _chronicle == null:
 		return
 	stats[&"chronicles_opened"] += 1
 	close_fan()
+	if _day_sheet != null and _day_sheet.is_open():
+		_day_sheet.close()
 	_chronicle.open(host, get_router())
 
 
-## The ledger folded away: focus returns to the chronicle chip on the
-## active slot's header strip (the affordance that opened it).
-func _on_chronicle_closed() -> void:
-	stats[&"chronicles_closed"] += 1
-	var active := get_active_slot() as OrientationSlot
-	if active == null:
+## Open the run's own page (the header's Day-Sheet verb): every line
+## this hand has printed, newest first. The same paper discipline as the
+## chronicle — focus is remembered so closing returns the pad player to
+## the chip that opened it, and the chronicle ledger folds first (the
+## two papers never stack).
+func open_day_sheet() -> void:
+	if _day_sheet == null or host == null:
 		return
-	var strip := active.get_header()
-	if strip != null and strip.get_child_count() > 1:
-		var chip := strip.get_child(1) as Control
-		if chip != null:
-			chip.grab_focus()
-			return
+	stats[&"day_sheets_opened"] += 1
+	close_fan()
+	if _chronicle != null and _chronicle.is_open():
+		_chronicle.close()
+	_day_sheet.open(host, get_router(), presenter)
+
+
+## The run's page folded away: focus returns to the Day-Sheet chip on
+## the active slot's header verbs row (the affordance that opened it).
+func _on_day_sheet_closed() -> void:
+	stats[&"day_sheets_closed"] += 1
+	var active := get_active_slot() as OrientationSlot
+	var chip := header_chip(active, "day_sheet_chip") if active != null else null
+	if chip != null:
+		chip.grab_focus()
+		return
 	_focus_first_card()
 
 
-## Story paper outranks the ledger: fold the chronicle before a story
-## layer opens over it (choice card, vignette, crush beat, reveal).
+## The ledger chip with this focus id on a slot's header verbs row (the
+## chronicle chip, the day-sheet chip) — the shared lookup for the focus
+## returns and the tests (the verbs row nests the chips; the header's
+## child(1) is the ROW).
+static func header_chip(slot: OrientationSlot, focus_id: String) -> Control:
+	if slot == null:
+		return null
+	var strip := slot.get_header()
+	if strip == null or strip.get_child_count() < 2:
+		return null
+	for child in (strip.get_child(1) as Control).get_children():
+		if child is Control and String((child as Control).get_meta(&"focus_id", "")) == focus_id:
+			return child
+	return null
+
+
+## The ledger folded away: focus returns to the chronicle chip on the
+## active slot's header verbs row (the affordance that opened it).
+func _on_chronicle_closed() -> void:
+	stats[&"chronicles_closed"] += 1
+	var active := get_active_slot() as OrientationSlot
+	var chip := header_chip(active, "chronicle_chip") if active != null else null
+	if chip != null:
+		chip.grab_focus()
+		return
+	_focus_first_card()
+
+
+## Story paper outranks BOTH ledger papers: fold the chronicle and the
+## run's page before a story layer opens over them (choice card,
+## vignette, crush beat, reveal).
 func _close_chronicle() -> void:
 	if _chronicle != null and _chronicle.is_open():
 		_chronicle.close()
+	if _day_sheet != null and _day_sheet.is_open():
+		_day_sheet.close()
 
 
 ## Open the assault odds table (the army card's storm action, or the
@@ -737,12 +820,21 @@ func _on_intro_closed(variant: StringName) -> void:
 ## when the window ticked or the clock was wound backwards, else a single
 ## quiet strip line. `p_push_strip` is true only on the boot path (the
 ## mid-session foreground's unified drain already printed the headline
-## into the strip).
+## into the strip). The print's DETAIL rows (stores, people, the Crown's
+## eye — everything past the headline) also land on the day-sheet
+## (finishing refinement #2): the blockquote folds, the page remembers.
 func _deliver_catch_up(report: Dictionary, p_push_strip: bool) -> void:
 	if int(report.get("applied_ticks", 0)) > 0 or bool(report.get("rewound", false)):
 		stats[&"catch_up_prints"] += 1
-		_suspicion.open_quote_rows(CatchUpPrint.rows(report),
+		var quote_rows := CatchUpPrint.rows(report)
+		_suspicion.open_quote_rows(quote_rows,
 			_design_bounds().size, _quote_floor(), SuspicionEvents.QUOTE_DWELL * 2.0)
+		# The rewound window is one line (already the strip's rewound row);
+		# every other window's headline already printed through the strip —
+		# only the DETAIL past it is blockquote-only paper.
+		if not bool(report.get("rewound", false)) and quote_rows.size() > 1:
+			presenter.push_rows(quote_rows.slice(1))
+			_sync_open_day_sheet()
 		if p_push_strip:
 			presenter.push_row(CatchUpPrint.headline_row(report))
 			_bind_chronicle()
@@ -966,11 +1058,25 @@ func _on_crackdown_seized(event: Dictionary) -> void:
 			"class": Inks.line_class_for_event(event["type"]), "text": line})
 
 
-## The scatter row with the NAMES of the swept gate crowd.
+## The scatter row with the NAMES of the swept gate crowd. The named rows
+## also land on the day-sheet (finishing refinement #2): they are
+## blockquote-only payloads — the strip's own scattered line counts
+## recruits, the QUOTE names them, and the page keeps what the player
+## SAW print.
 func _on_crackdown_scattered(event: Dictionary) -> void:
 	if not _suspicion.quote_is_open():
 		return
+	var named_rows := SuspicionEvents.scatter_line(_pre_crackdown_cards, event)
 	_suspicion.append_scatter_row(_pre_crackdown_cards, event)
+	presenter.push_rows(named_rows)
+	_sync_open_day_sheet()
+
+
+## An open day-sheet page is live paper: rows that landed OUTSIDE the
+## strip's bind (blockquote-only payloads) sync it here.
+func _sync_open_day_sheet() -> void:
+	if _day_sheet != null and _day_sheet.is_open():
+		_day_sheet.sync_rows(host, presenter)
 
 
 ## The ground's aftermath flash: cold ink pays across the table for a
@@ -1211,7 +1317,36 @@ func _bind_cards_list(count_render := true) -> void:
 		spread.set("columns", columns)
 		spread.queue_sort()
 		_sync_focus_ids(slot)
+	_maybe_print_edge_primer()
 	_validate_open_fan()
+
+
+# --- the line-form primer (finishing refinement #2, P2) ----------------------------------
+
+
+## ONE teaching line the first time a dashed (in-progress) edge appears
+## in a SESSION (the closing critique's P2: the line-form vocabulary
+## carries state on every card and row, but no surface ever said so).
+## Once-only per session — a session-local latch, deliberately lighter
+## than the first-session layer's persisted flags: each session teaches
+## the grammar once at its first dashed edge (a staked plot's queued
+## paper, a training card, the Eye closing), and the line scrolls away
+## as the world keeps printing (it also lands on the day-sheet, where it
+## stays retrievable for the rest of the hand).
+func _maybe_print_edge_primer() -> void:
+	if _primer_printed or _view.is_empty():
+		return
+	for card: Dictionary in _view["cards"]:
+		if Inks.edge_form_for_state(card["edge_state"]) == Inks.EdgeForm.DASHED:
+			_primer_printed = true
+			stats[&"primer_lines"] += 1
+			presenter.push_row({
+				"class": Inks.LineClass.PLAIN,
+				"text": CopyDeck.line(Inks.pack().copy, &"primer_lineform",
+					host.engine.tick_count),
+			})
+			_bind_chronicle()
+			return
 
 
 ## One card's plates re-print in place (both slots) — the targeted path.
@@ -1315,6 +1450,12 @@ func _place_eye(slot: OrientationSlot, node: Control, metrics: Dictionary) -> vo
 ## composition; the quiet-state captures never crowded the strip enough
 ## to read as a collision). Re-running the pure topology after the bind
 ## places the strip and shifts everything below it, both orientations.
+## FINISHING REFINEMENT #2: the strip is a COLUMN — row 0 the letterhead
+## at the table's full width, row 1 THE LEDGER VERBS (the Chronicle chip
+## and the Day-Sheet chip, right-aligned). The letterhead row measured
+## 666-of-672 fixed units at the 720 portrait base: a second verb beside
+## it would stub the leader's name, and the column WIDENS the letterhead
+## instead (the name plate takes what the verbs vacate).
 func _bind_header() -> void:
 	stats[&"header_binds"] += 1
 	for slot: OrientationSlot in [get_portrait_slot(), get_landscape_slot()]:
@@ -1329,23 +1470,45 @@ func _bind_header() -> void:
 			slot.layout_topology()
 		header.bind(_view["leader"], _view["sim_hours"], _view["army_power"],
 			Inks.ground_for(_view["leader"]["regime_id"], _view["phase"]))
-		# THE CHRONICLE AFFORDANCE (T-UI-08): the ledger chip at the
-		# letterhead's right end — the same ActionChip grammar as every
-		# verb, one per slot (the router's focus_id equivalence carries
-		# the pad player's place across orientation swaps).
-		var chip := strip.get_child(1) if strip.get_child_count() > 1 else null
-		if chip == null:
-			var ledger := ActionFan.ActionChip.new()
-			ledger.action = {
-				"id": "chronicle", "label": "The Chronicle", "command": &"",
-				"subject": &"", "value": 0, "enabled": true, "reason": "",
-				"signature": false,
-			}
-			ledger.custom_minimum_size = Vector2(172.0, float(Inks.TOUCH_GRIP_MIN))
-			ledger.set_meta(&"focus_id", "chronicle_chip")
-			ledger.pressed.connect(open_chronicle)
-			strip.add_child(ledger)
+		# THE LEDGER VERBS ROW (T-UI-08 + finishing refinement #2): the
+		# chronicle chip and the day-sheet chip at the row's right end —
+		# the same ActionChip grammar as every verb, one of each per slot
+		# (the router's focus_id equivalence carries the pad player's
+		# place across orientation swaps).
+		var verbs := strip.get_child(1) if strip.get_child_count() > 1 else null
+		if verbs == null:
+			verbs = _build_ledger_verbs()
+			strip.add_child(verbs)
 			slot.layout_topology()
+
+
+## The header's verbs row: a right-aligned HBox (spacer + the two ledger
+## chips). Built once per slot by _bind_header.
+func _build_ledger_verbs() -> Control:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var spacer := Control.new()
+	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(spacer)
+	row.add_child(_ledger_chip("chronicle_chip", "The Chronicle", 172.0, open_chronicle))
+	row.add_child(_ledger_chip("day_sheet_chip", "The Day-Sheet", 160.0, open_day_sheet))
+	return row
+
+
+## One header ledger chip (the world's own verb grammar, full grip).
+func _ledger_chip(focus_id: String, label: String, width: float, handler: Callable) -> Control:
+	var chip := ActionFan.ActionChip.new()
+	chip.action = {
+		"id": focus_id, "label": label, "command": &"",
+		"subject": &"", "value": 0, "enabled": true, "reason": "",
+		"signature": false,
+	}
+	chip.custom_minimum_size = Vector2(width, float(Inks.TOUCH_GRIP_MIN))
+	chip.set_meta(&"focus_id", focus_id)
+	chip.pressed.connect(handler)
+	return chip
 
 
 ## Ground tone by run phase (regime ink + phase depth) in both slots.
@@ -1361,7 +1524,9 @@ func _bind_phase() -> void:
 
 
 ## The chronicle strip: newest prints at the top, both slots, inks chosen
-## by the ground beneath (the print rule).
+## by the ground beneath (the print rule). Every print also reaches the
+## day-sheet: an OPEN page is live paper — the new line lands on top of
+## it in the same breath (finishing refinement #2).
 func _bind_chronicle() -> void:
 	stats[&"chronicle_prints"] += 1
 	var rows := presenter.chronicle_strip()
@@ -1377,6 +1542,8 @@ func _bind_chronicle() -> void:
 				line.set("ground", ground)
 			else:
 				line.set("text", "")
+	if _day_sheet != null and _day_sheet.is_open():
+		_day_sheet.sync_rows(host, presenter)
 
 
 # --- helpers ----------------------------------------------------------------------------
@@ -1587,10 +1754,31 @@ func _unhandled_input(event: InputEvent) -> void:
 ## inventory; every layer below this seam receives injected timestamps).
 ## Headless tests never fire these; the unit suite drives the policy
 ## directly with injected epochs (tests/unit/test_app_lifecycle.gd).
+## THE AUTOSAVE LINE (finishing refinement #2, P3): the BACKGROUND flush
+## prints one quiet strip row — "the clerk files the hour" — so the save
+## the boundary just made is visible (and retrievable on the day-sheet
+## when the player returns). Only the background flush: the periodic
+## hourly autosave stays silent by choice (a line per sim hour is spam,
+## not status).
 func _notification(what: int) -> void:
 	if lifecycle == null or host == null:
 		return
-	lifecycle.handle_notification(what, int(Time.get_unix_time_from_system()))
+	var action := lifecycle.handle_notification(what, int(Time.get_unix_time_from_system()))
+	if action == &"backgrounded":
+		_print_autosave_line()
+
+
+## The background flush's one quiet print (CopyDeck's clerk, the real
+## sim hour). Class PLAIN — filing the hour is routine business.
+func _print_autosave_line() -> void:
+	stats[&"autosave_lines"] += 1
+	presenter.push_row({
+		"class": Inks.LineClass.PLAIN,
+		"text": CopyDeck.line(Inks.pack().copy, &"autosave_filed",
+			host.engine.tick_count, {"hours": host.engine.sim_hours()}),
+	})
+	if not _view.is_empty():
+		_bind_chronicle()
 
 
 func _process(delta: float) -> void:
@@ -1639,6 +1827,8 @@ func _capture_hook() -> void:
 		_first_session_then_capture(int(OS.get_environment("CS_SPREAD_FIRST")), settle)
 	elif not OS.get_environment("CS_SPREAD_CATCHUP").is_empty():
 		_catch_up_then_capture(int(OS.get_environment("CS_SPREAD_CATCHUP")), settle)
+	elif not OS.get_environment("CS_SPREAD_DAYSHEET").is_empty():
+		_day_sheet_then_capture(int(OS.get_environment("CS_SPREAD_DAYSHEET")), settle)
 	elif OS.get_environment("CS_SPREAD_LOUD") == "1":
 		# The loud/pressure drive owns its prelude (see _unfold_boot_intro):
 		# its captures were among the four veil-contaminated finds.
@@ -1982,6 +2172,46 @@ func _catch_up_then_capture(mode: int, settle: float) -> void:
 		print("[spread]   away: %s" % String(row["text"]))
 	_capture_now("resumed spread + while-you-were-away", ".away")
 	get_tree().quit(0)
+
+
+## CS_SPREAD_DAYSHEET=1 (finishing refinement #2): the run's own page —
+## the quiet demo policy runs ~14h so the hand has a real print history
+## (arrivals, drills, buildings, suspicion drift, the primer line), then
+## the day-sheet opens from the header verb and captures at CS_SPREAD_
+## SHOT (newest line first, the dashed count rule, the back verb).
+## =2: the page mid-run with the table visible beneath a CLOSED page
+## (the verbs row itself is the capture — the letterhead + both chips).
+func _day_sheet_then_capture(mode: int, settle: float) -> void:
+	await _unfold_boot_intro()
+	var lived := 0.0
+	while lived < 14.0:
+		host.fast_forward(SimEngine.TICKS_PER_SIM_HOUR)
+		if demo_policy != null and demo_policy.on_ticks(SimEngine.TICKS_PER_SIM_HOUR):
+			demo_policy.apply(host)
+		lived += 1.0
+	refresh_from_state()
+	if mode == 2:
+		print("[spread] day-sheet capture: the header verbs row (chronicle + day-sheet chips), %d lines on the page"
+			% presenter.day_sheet.size())
+		_settle_then_capture(settle if settle > 0.0 else 0.4)
+		return
+	# Freeze the table and fold any story paper: the capture is THE PAGE —
+	# a choice card arriving mid-settle would close it (the story outranks
+	# the ledger, by design) and the shot would show the table instead.
+	host.driving = false
+	if _suspicion != null:
+		_suspicion.fold_choice()
+		_suspicion.fold_quote()
+	open_day_sheet()
+	for i in 90:
+		await get_tree().process_frame
+		if get_viewport().gui_get_focus_owner() != null:
+			break
+	print("[spread] day-sheet capture: %dh in, %d lines, newest: '%s' — primer %s, strip rows %d"
+		% [int(host.engine.sim_hours()), presenter.day_sheet.size(),
+			String((presenter.day_sheet_newest_first()[0]["text"]) if not presenter.day_sheet.is_empty() else ""),
+			"printed" if _primer_printed else "unprinted", presenter.chronicle.size()])
+	_settle_then_capture(settle if settle > 0.0 else 0.4)
 
 
 ## CS_SPREAD_CHRONICLE=1: the ledger (T-UI-08) over a FEW real hands —

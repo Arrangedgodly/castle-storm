@@ -569,11 +569,10 @@ func _sweep_chronicle(harness) -> void:
 	var screen := await _mounted_screen(harness, host)
 	host.driving = false  # freeze the table: the ledger walk races nothing
 	# The header chip (focus seeded directly here; section 1's BFS already
-	# proved the dpad reaches it from the cards).
-	var chip: Control = null
-	var strip := (screen.get_active_slot() as OrientationSlot).get_header()
-	if strip != null and strip.get_child_count() > 1:
-		chip = strip.get_child(1) as Control
+	# proved the dpad reaches it from the cards). The verbs row nests the
+	# chips (finishing refinement #2) — the lookup is by focus id.
+	var chip: Control = SpreadScreen.header_chip(
+		screen.get_active_slot() as OrientationSlot, "chronicle_chip")
 	if not harness.check(chip != null, "nav/chronicle: the header chronicle chip exists"):
 		screen.queue_free()
 		await _frames(harness, 3)

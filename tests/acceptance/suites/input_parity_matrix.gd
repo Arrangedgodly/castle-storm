@@ -894,10 +894,13 @@ func _matrix_chronicle(harness) -> void:
 		host.meta.runs_recorded += 1
 	var screen = await _mounted_screen(harness, host)
 	host.driving = false
+	# The verbs row nests the chips (finishing refinement #2) — the lookup
+	# is by focus id, not child index.
 	var chip: Control = null
-	var strip = screen.get_active_slot().get_header()
-	if strip != null and strip.get_child_count() > 1:
-		chip = strip.get_child(1)
+	var verbs = screen.get_active_slot().get_header().get_child(1)
+	for child in verbs.get_children():
+		if child is Control and String((child as Control).get_meta(&"focus_id", "")) == "chronicle_chip":
+			chip = child
 
 	# OPEN x3 + PAGE TURN x3 + CLOSE x3 — one leg per open.
 	for leg: String in ["touch", "kb", "pad"]:
