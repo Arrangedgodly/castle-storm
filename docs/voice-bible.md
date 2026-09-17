@@ -194,7 +194,7 @@ Shape rules, then the numbers (`content/mvp/identity_pools.tres`):
 
 ## 6. The template table (keys, tokens, variants, consumers)
 
-The complete vocabulary is `CopyTable.KEY_TOKENS` (128 keys; content
+The complete vocabulary is `CopyTable.KEY_TOKENS` (131 keys; content
 cannot invent keys the code never reads). The shipped variant counts and
 the surface consuming each key print into the test log as the COPY
 COVERAGE REPORT (`CopyDeck.coverage_report`) — the machine-checked
@@ -241,6 +241,16 @@ answer to "which screens got which templates". Shape of the table:
   clerk's register throughout: the army that won becomes the wall, the
   record says so flat — the joke is the castle now files YOUR paperwork.
   A non-capturing victory prints nothing (the pre-L2-B stream).
+- **The escalation presence, surface half** (`intro_win_veterans`,
+  `intro_regime_veterans`, `garrison_detail` — L2-C): the win-restart
+  reveal's third line becomes the veterans' line when a garrison stands
+  ("Ottilie's veterans hold the walls — cycle 2." — run-number-rotated,
+  2 variants; no garrison: the plain context line, unchanged), the intro
+  regime face card's role line re-faces the ruling regime as the old
+  victor's line ("the regime of Ottilie's veterans — cycle 2" — rotor 0,
+  one voice on the card), and the odds table's second opening row prints
+  the standing garrison's tier mix ("the wall: 9 knights · 3 archers ·
+  12 gear — cycle 2" — rotor 0, composed from the snapshot's roster).
 
 Every key that the sim REPEATS (`CopyTable.ROTATING_KEYS` — arrivals,
 trainings, promotions, suspicion beats, headlines, card phrases) ships
@@ -293,7 +303,7 @@ punished — the copy IS the policy's tone).
 | Artifact | Role |
 |---|---|
 | `content/schema/copy_table.gd` | The key/token vocabulary, variant caps, rotating keys, banned list (validated) |
-| `content/mvp/copy_table.tres` | THE shipped voice — 128 keys, 1–4 variants each |
+| `content/mvp/copy_table.tres` | THE shipped voice — 131 keys, 1–4 variants each |
 | `ui/screens/spread/first_session.gd` | The first session's five printed cues (T-UI-10) |
 | `content/schema/identity_pools.gd` + `content/mvp/identity_pools.tres` | The names (firsts, epithets, tags, recruits, traits) |
 | `sim/copy_deck.gd` | The renderer: variant selection, substitution, fallback floor, coverage report |

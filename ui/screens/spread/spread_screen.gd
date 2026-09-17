@@ -79,6 +79,11 @@
 ## =2 then =3, the short unfold + the while-you-were-away print with the
 ## foreground->actionable measurement printed / a crackdown landing
 ## INSIDE the away window: the print's STRIKE row + signed seizures),
+## with CS_SPREAD_LEGACY=1/2/3 for the growing deck (L1-C: fresh locked /
+## mid-run buys / the full tree), or with CS_SPREAD_ESCALATION=1/2/3 for
+## the L2-C presence (the win-restart reveal over a seeded standing
+## garrison / the odds table vs the cycle-2 veterans / the REAL capture
+## end to end: beat, reveal, chronicle line)
 ## with CS_SPREAD_DAYSHEET=1/2 for the run's own page (finishing
 ## refinement #2: the day-sheet open over a printed history / the
 ## header verbs row itself), with CS_SPREAD_PRESS=1/2 for the press-room
@@ -1752,7 +1757,8 @@ func _bind_header() -> void:
 			header.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			strip.add_child(header)
 		header.bind(_view["leader"], _view["sim_hours"], _view["army_power"],
-			Inks.ground_for(_view["leader"]["regime_id"], _view["phase"]))
+			Inks.ground_for(_view["leader"]["regime_id"], _view["phase"]),
+			_view.get("escalation", {}))
 		# FINISHING #6: the letterhead's name wraps when the pools deal a
 		# long one — the row's height can change BIND TO BIND (a new leader,
 		# a type-scale step), so the topology re-lays on every bind; a
@@ -2125,6 +2131,8 @@ func _capture_hook() -> void:
 		_press_room_then_capture(int(OS.get_environment("CS_SPREAD_PRESS")), settle)
 	elif not OS.get_environment("CS_SPREAD_LEGACY").is_empty():
 		_legacy_then_capture(int(OS.get_environment("CS_SPREAD_LEGACY")), settle)
+	elif not OS.get_environment("CS_SPREAD_ESCALATION").is_empty():
+		_escalation_then_capture(int(OS.get_environment("CS_SPREAD_ESCALATION")), settle)
 	elif OS.get_environment("CS_SPREAD_LOUD") == "1":
 		# The loud/pressure drive owns its prelude (see _unfold_boot_intro):
 		# its captures were among the four veil-contaminated finds.
@@ -2660,6 +2668,176 @@ func _legacy_then_capture(mode: int, settle: float) -> void:
 			int(full_view["runs_recorded"]),
 			"back chip (nothing left to buy)" if get_viewport().gui_get_focus_owner() == _legacy.sheet().back_chip() else "a card"])
 	_settle_then_capture(settle if settle > 0.0 else 0.4)
+
+
+## CS_SPREAD_ESCALATION=1 (L2-C): the WIN-RESTART REVEAL with a standing
+## garrison — a cycle-2 snapshot is seeded through the fixture seam (the
+## bank precedent; the CAPTURE itself is the engine suite's pin, the
+## PRESENCE is this hook's), the hand ends through the real resolve verb
+## (an empty roster captures nothing, so the seeded garrison stands exactly
+## as the ladder's own rule promises), and the intro deals the next hand:
+## the regime face card re-faces to the victor's line, the third print is
+## the escalation voice.
+## =2: the ODDS TABLE against the cycle-2 garrison — the same seeded
+## standing snapshot, the demo driven to the knight floor, the odds open:
+## the veterans' crest + cycle numeral on the castle card, the tier-mix
+## detail row beneath the composition line.
+## =3: THE REAL CAPTURE END TO END — the win through the assault's
+## two-step commit (re-attempting the die), the vignette skipped to its
+## outcome where the CAPTURE BEAT printed beside the seal, then the win
+## reveal the close chip deals, then the chronicle's entry line.
+func _escalation_then_capture(mode: int, settle: float) -> void:
+	host.time_scale = TIME_SCALES[TIME_SCALES.size() - 1]
+	time_scale_index = TIME_SCALES.size() - 1
+	await _unfold_boot_intro()
+	if mode <= 2:
+		_seed_standing_garrison()
+	if mode == 1:
+		host.fast_forward(6 * SimEngine.TICKS_PER_SIM_HOUR)
+		host.submit(&"resolve_victory", &"win", 12)
+		host.fast_forward(2)
+		# The win seam's mount (the assault's close normally owns this; the
+		# resolve verb skipped the vignette, so the drive presses it).
+		_open_intro()
+		for i in 300:
+			await get_tree().process_frame
+			if _intro != null and _intro.is_open():
+				break
+		if _intro == null or not _intro.is_open():
+			print("[spread] escalation capture: the reveal never mounted — capturing as-is")
+			_settle_then_capture(0.3)
+			return
+		var view := _intro.view()
+		var escalation: Dictionary = view.get("escalation", {})
+		print("[spread] escalation capture (reveal): variant '%s', cycle %s under crest '%s', line 3: %s"
+			% [String(view["variant"]), str(escalation.get("cycle", "-")),
+				str(view["regime"].get("veterans_crest", "-")),
+				String((view["lines"] as Array)[2]["text"])])
+		for line: Dictionary in view["lines"]:
+			print("[spread]   print: %s" % String(line["text"]))
+		for i in 60:
+			await get_tree().process_frame
+		_capture_now("win reveal with standing garrison")
+		get_tree().quit(0)
+		return
+	if mode == 2:
+		var assault := host.assault()
+		var waited_hours := 0.0
+		while not assault.floor_met(host.engine) and waited_hours < 220.0:
+			host.fast_forward(SimEngine.TICKS_PER_SIM_HOUR)
+			if demo_policy != null and demo_policy.on_ticks(SimEngine.TICKS_PER_SIM_HOUR):
+				demo_policy.apply(host)
+			waited_hours += 1.0
+		refresh_from_state()
+		var odds := assault.assault_odds(host.engine)
+		print("[spread] escalation capture (odds): floor met after %.0fh — garrison %d in 1000 against; castle card: %s"
+			% [waited_hours, int(odds["win_permille"]),
+				AssaultPresenter.garrison_line(AssaultPresenter.odds_view(odds),
+					Inks.regime_name(host.run().regime_id()))])
+		print("[spread]   detail: %s" % AssaultPresenter.garrison_detail_line(
+			AssaultPresenter.odds_view(odds)))
+		_assault.open(host, get_router())
+		for i in 30:
+			await get_tree().process_frame
+		for row: Dictionary in _assault.stage().printed_lines():
+			print("[spread]   strip: %s" % String(row["text"]))
+		_settle_then_capture(settle if settle > 0.0 else 0.4)
+		return
+	# MODE 3 — the real capture end to end (the restart drive's win loop).
+	var tries := 0
+	while tries < 5 and host.is_run_running():
+		tries += 1
+		var waited_hours := 0.0
+		while not host.assault().floor_met(host.engine) and waited_hours < 220.0:
+			host.fast_forward(SimEngine.TICKS_PER_SIM_HOUR)
+			if demo_policy != null and demo_policy.on_ticks(SimEngine.TICKS_PER_SIM_HOUR):
+				demo_policy.apply(host)
+			waited_hours += 1.0
+		refresh_from_state()
+		_assault.open(host, get_router())
+		await get_tree().process_frame
+		_assault.commit()
+		await get_tree().process_frame
+		_assault.commit()
+		for i in 60:
+			await get_tree().process_frame
+			if _assault.state != AssaultScreenScript.State.ODDS:
+				break
+		if _assault.state == AssaultScreenScript.State.VIGNETTE:
+			_assault.skip()
+		for i in 1200:
+			await get_tree().process_frame
+			if _assault.state == AssaultScreenScript.State.OUTCOME:
+				break
+		print("[spread] escalation capture (storm): try %d after %.0fh — outcome '%s', cycle %d, snapshot leader '%s'"
+			% [tries, waited_hours, String(_assault._script.get("outcome", &"")),
+				host.meta.escalation_cycle, String(host.meta.escalation_garrison.get("leader", ""))])
+		if not host.is_run_running():
+			break
+		_assault.close()
+		for i in 20:
+			await get_tree().process_frame
+	for row: Dictionary in _assault.stage().printed_lines():
+		print("[spread]   strip: %s" % String(row["text"]))
+	for i in 30:
+		await get_tree().process_frame
+	_capture_now("victory capture beat")
+	# The close chip deals the next hand: the reveal carries the REAL
+	# capture's presence (the veterans' line from this very hand).
+	var chips := _assault.stage().chips()
+	if chips.size() > 0:
+		(chips[0] as BaseButton).pressed.emit()
+	for i in 300:
+		await get_tree().process_frame
+		if _intro != null and _intro.is_open():
+			break
+	if _intro != null and _intro.is_open():
+		var view := _intro.view()
+		print("[spread] escalation capture (reveal): variant '%s', cycle %s, line 3: %s"
+			% [String(view["variant"]), str((view.get("escalation", {}) as Dictionary).get("cycle", "-")),
+				String((view["lines"] as Array)[2]["text"])])
+		_capture_now("win reveal of the real capture", ".reveal")
+		_intro.unfold()
+		for i in 400:
+			await get_tree().process_frame
+			if not _intro.is_open():
+				break
+	# The chronicle: the victory entry's escalation line, rendered.
+	_chronicle.open(host, get_router())
+	await get_tree().process_frame
+	await get_tree().process_frame
+	for entry: Dictionary in _chronicle.view()["entries"]:
+		print("[spread]   hand %d %s — escalation: '%s'" % [int(entry["run"]),
+			String(entry["seal"]["mark"]), String(entry["escalation_line"])])
+	for i in 30:
+		await get_tree().process_frame
+	_capture_now("chronicle escalation line", ".chronicle")
+	get_tree().quit(0)
+
+
+## The fixture seam (the legacy full-tree precedent): a realistic cycle-2
+## standing garrison in the shared meta — a 12-knight take with a mixed
+## kit — for the PRESENCE captures (modes 1-2). The engine's own suites
+## pin the real capture; this seeds the state the surfaces read.
+func _seed_standing_garrison() -> void:
+	host.meta.escalation_garrison = {
+		"regime_id": String(host.run().regime_id()),
+		"captured_at_run": 1, "cycle": 2,
+		"leader": "Bartholomew the Unbearable",
+		"crest_id": String(_regime_crest(host.run().regime_id())),
+		"roster": {
+			"knight": {"count": 9, "gear_tiers": {"weapon": {"1": 4, "2": 5}}},
+			"archer": {"count": 3, "gear_tiers": {"weapon": {"1": 3}}},
+		},
+	}
+	host.meta.escalation_cycle = 2
+
+
+func _regime_crest(regime_id: StringName) -> StringName:
+	for regime: RegimeDef in Inks.pack().regimes:
+		if regime.id == regime_id:
+			return regime.crest_id
+	return &""
 
 
 ## CS_SPREAD_CHRONICLE=1: the ledger (T-UI-08) over a FEW real hands —

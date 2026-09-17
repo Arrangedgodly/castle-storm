@@ -302,6 +302,110 @@ func test_escalation_garrison_line_names_the_veterans() -> void:
 	assert_str(AssaultPresenter.garrison_line(plain_view, "The Gilded Crown")).contains("walls")
 
 
+## L2-C: THE ODDS PRESENCE — the snapshot's composition shows DISTINCTLY
+## where the static garrison keeps its single composition line: the view
+## carries the roster/tier mix, the DETAIL ROW composes it, and the castle
+## card re-faces to the veterans (their crest in the slot, the cycle
+## numeral at the crest corner) until the walls fall.
+func test_escalation_odds_presence_paints_the_castle_card() -> void:
+	var host := _test_host(20261201)  # gilded_crown run regime
+	host.meta.escalation_garrison = {
+		# A DIFFERENT flavor's crest, so the pin proves the card follows the
+		# SNAPSHOT, not the run's own regime.
+		"regime_id": "velvet_fist", "captured_at_run": 3, "cycle": 2,
+		"leader": "Bartholomew the Unbearable", "crest_id": "crest_velvet_fist",
+		"roster": {"knight": {"count": 3, "gear_tiers": {"weapon": {"1": 2, "2": 1}}},
+			"archer": {"count": 2, "gear_tiers": {}}},
+	}
+	host.meta.escalation_cycle = 2
+	var view := AssaultPresenter.odds_view(host.assault().assault_odds(host.engine))
+	# The tier mix rides the view (the resolver's transparency set, through).
+	var roster: Dictionary = view["garrison_roster"]
+	assert_int(int((roster["knight"] as Dictionary)["count"])).is_equal(3)
+	# The mix: per-def counts + the gear summed over slots and tiers.
+	assert_str(AssaultPresenter.roster_mix(roster)).is_equal("3 knights · 2 archers · 3 gear")
+	# The detail row — the snapshot's composition, cycle counted; the
+	# static garrison prints nothing (its single composition line stands).
+	assert_str(AssaultPresenter.garrison_detail_line(view)) \
+		.is_equal("the wall: 3 knights · 2 archers · 3 gear — cycle 2")
+	var plain := _test_host(20261200)
+	assert_str(AssaultPresenter.garrison_detail_line(
+		AssaultPresenter.odds_view(plain.assault().assault_odds(plain.engine)))).is_empty()
+	# THE CASTLE CARD: the veterans' crest + the cycle numeral at the crest
+	# corner, held through the battle, dropped when the walls fall.
+	var stage: AssaultStage = (load("res://ui/screens/assault/assault_stage.tscn") as PackedScene).instantiate()
+	add_child(stage)
+	await get_tree().process_frame
+	stage.regime_id = host.run().regime_id()
+	stage.regime_name = Inks.regime_name(host.run().regime_id())
+	stage.bind_odds(view)
+	assert_str(StringName(String(stage._castle._face.get("face_key")))) \
+		.is_equal(&"crest_velvet_fist")
+	assert_int(stage._castle.cycle).is_equal(2)
+	assert_int(int(stage._castle._cycle_plate.get("value"))).is_equal(2)
+	assert_bool(stage._castle._cycle_plate.visible).is_true()
+	# The battle keeps the staged garrison's identity (begin_battle).
+	stage.begin_battle({"beats": [], "outcome": &"win", "initial_army_milli": 0,
+		"casualties": 0}, [])
+	assert_str(StringName(String(stage._castle._face.get("face_key")))) \
+		.is_equal(&"crest_velvet_fist")
+	assert_int(int(stage._castle._cycle_plate.get("value"))).is_equal(2)
+	# The fall swaps the plate bare: the numeral drops with the walls.
+	stage.apply_outcome(true)
+	assert_bool(stage._castle.fallen).is_true()
+	assert_int(int(stage._castle._cycle_plate.get("value"))).is_zero()
+	assert_bool(stage._castle._cycle_plate.visible).is_false()
+	# The static castle prints no numeral at all.
+	var plain_stage: AssaultStage = (load("res://ui/screens/assault/assault_stage.tscn") as PackedScene).instantiate()
+	add_child(plain_stage)
+	await get_tree().process_frame
+	plain_stage.regime_id = plain.run().regime_id()
+	plain_stage.regime_name = Inks.regime_name(plain.run().regime_id())
+	plain_stage.bind_odds(AssaultPresenter.odds_view(plain.assault().assault_odds(plain.engine)))
+	assert_int(plain_stage._castle.cycle).is_zero()
+	assert_bool(plain_stage._castle._cycle_plate.visible).is_false()
+	stage.free()
+	plain_stage.free()
+
+
+## L2-C: THE CAPTURE BEAT LINE — the vignette composes the victory capture
+## row from the CAPTURED EVENT + the standing snapshot (the same key, seq
+## rotor and first-name rule as the spread strip's own beat, so the
+## vignette and the chronicle it becomes tell it in one voice). A
+## non-capturing stream composes nothing.
+func test_capture_beat_line_reads_the_event_and_snapshot() -> void:
+	var host := _test_host(20261207)
+	var events: Array = [
+		{"type": &"assault_beat", "seq": 40, "tick": 90},
+		{"type": &"escalation_captured", "seq": 41, "tick": 90,
+			"subject": &"iron_rotunda", "value": 2, "value2": 30},
+		{"type": &"run_won", "seq": 42, "tick": 90},
+	]
+	assert_str(AssaultPresenter.capture_beat_line(events, host)).is_empty()
+	host.meta.escalation_garrison = {
+		"regime_id": "iron_rotunda", "captured_at_run": 3, "cycle": 2,
+		"leader": "Bartholomew the Unbearable", "crest_id": "crest_iron_rotunda",
+		"roster": {"knight": {"count": 2, "gear_tiers": {}}},
+	}
+	host.meta.escalation_cycle = 2
+	var line := AssaultPresenter.capture_beat_line(events, host)
+	# Rotor 41 lands variant 1 ("The victors file in…") — the facts (the
+	# cycle) print; the leader-naming variant is variant 0's read.
+	assert_str(line).contains("cycle 2")
+	# The same event renders the same line the SPREAD's strip prints (one
+	# voice, one rotor — the two surfaces never disagree).
+	var strip_row: Dictionary = SpreadPresenter.new().chronicle_line_for(
+		{"seq": 41, "tick": 90, "type": &"escalation_captured",
+			"subject": &"iron_rotunda", "value": 2, "value2": 30}, host)
+	assert_str(line).is_equal(String(strip_row["text"]))
+	assert_int(int(strip_row["class"])).is_equal(Inks.LineClass.VICTORY)
+	# Variant 0 (rotor 40) names the victor — the strip's own discipline.
+	var named := AssaultPresenter.capture_beat_line(
+		[{"type": &"escalation_captured", "seq": 40, "tick": 90,
+			"subject": &"iron_rotunda", "value": 2, "value2": 30}], host)
+	assert_str(named).contains("Bartholomew's veterans")
+
+
 ## THE COMPOSITION LINE NEVER DOUBLES THE ARTICLE (the closing critique's
 ## P2, "Against the The Paper Crown"): regime display names carry their own
 ## "The", so the odds screen's opening print composes through the article
@@ -572,6 +676,31 @@ func test_commit_replays_the_beats_and_lands_the_win_seam() -> void:
 	# The aftermath wash settled; the victory print is on the table.
 	assert_float(assault.stage().wash).is_greater(0.99)
 	assert_str(assault.stage()._outcome_quote.text).contains("THE CASTLE FALLS")
+	# THE VICTORY CAPTURE BEAT (L2-C): the win garrisoned the castle (two
+	# knights stood at the wall) — the capture line printed into the beat
+	# sequence in the strip's own voice, BEFORE the outcome's seal row, and
+	# stays visible on the strip beside it (newest first, two rows).
+	assert_int(host.meta.escalation_cycle).is_equal(1)
+	assert_str(String(host.meta.escalation_garrison.get("leader", ""))) \
+		.is_equal(host.meta.chronicle[host.meta.chronicle.size() - 1].get("leader", ""))
+	var capture_idx := -1
+	var seal_idx := -1
+	var printed: Array[Dictionary] = assault.stage().printed_lines()
+	for i in printed.size():
+		var text := String(printed[i]["text"])
+		if text.contains("veterans take the wall") or text.contains("file in as the garrison"):
+			capture_idx = i
+		if text == "The seal changes hands.":
+			seal_idx = i
+	assert_int(capture_idx).is_greater(0)
+	assert_int(int(printed[capture_idx]["class"])).is_equal(Inks.LineClass.VICTORY)
+	assert_str(String(printed[capture_idx]["text"])).contains("cycle 1")
+	assert_int(seal_idx).is_greater(capture_idx)
+	var strip_texts: Array[String] = []
+	for row in assault.stage()._lines:
+		strip_texts.append(String(row.get("text")))
+	assert_bool(strip_texts.any(func(text: String) -> bool:
+		return text.contains("cycle 1"))).is_true()
 	# THE HANDOFF SEAM: the run ended; closing emits finished("win").
 	assert_bool(host.is_run_running()).is_false()
 	var chips := assault.stage().chips()

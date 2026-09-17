@@ -123,7 +123,33 @@ static func build_view(host: GameHost) -> Dictionary:
 		"eye_hours_left": eye_hours_left(host),
 		"sim_hours": host.engine.sim_hours(),
 		"army_power": units.army_power(),
+		# THE ESCALATION PRESENCE (L2-C): the standing garrison block the
+		# run header's cycle mark reads ({} = no snapshot = no mark, the
+		# pre-L2 letterhead unchanged). The odds-side pressure is the
+		# castle's, not the table's — the Spread itself gains NO chrome for
+		# it (the Eye's meter stays the conspiracy's own story).
+		"escalation": escalation_view(run),
 	}
+
+
+## The standing garrison as the spread view's escalation block ({} when no
+## snapshot stands). The header prints only the CYCLE numeral; the fuller
+## presence lives where the castle does (the odds table, the reveal).
+static func escalation_view(run) -> Dictionary:
+	var snapshot: Dictionary = run.escalation_garrison()
+	if snapshot.is_empty():
+		return {}
+	return {
+		"cycle": maxi(1, int(run.escalation_cycle())),
+		"leader_first": _snapshot_first_name(String(snapshot.get("leader", ""))),
+		"crest_key": StringName(String(snapshot.get("crest_id", ""))),
+		"regime_id": String(snapshot.get("regime_id", "")),
+	}
+
+
+static func _snapshot_first_name(leader: String) -> String:
+	var split := leader.find(" ")
+	return leader if split <= 0 else leader.substr(0, split)
 
 
 ## The cards section alone (the targeted path for roster-changing
@@ -178,6 +204,10 @@ static func view_hash(view: Dictionary) -> int:
 	h = _mix(h, int(eye["edge_form"]))
 	h = _mix(h, int(round(eye["inset"] * 1000.0)))
 	h = _mix(h, int(round(eye["scale"] * 1000.0)))
+	var escalation: Dictionary = view.get("escalation", {})
+	if not escalation.is_empty():
+		h = _mix(h, int(escalation["cycle"]))
+		h = _mix(h, String(escalation["leader_first"]).hash())
 	return h
 
 

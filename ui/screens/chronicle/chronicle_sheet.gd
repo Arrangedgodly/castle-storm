@@ -622,6 +622,7 @@ class EntryCard:
 	var _seal_label: Label
 	var _seal_line: Label
 	var _army_label: Label
+	var _escalation_label: Label
 	var _bank_label: Label
 
 	func _ready() -> void:
@@ -716,6 +717,21 @@ class EntryCard:
 		_army_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		column.add_child(_army_label)
 
+		# THE ESCALATION LINE (L2-C, L2-B's presenter field rendered): the
+		# victory that garrisoned the castle carries its own record — the
+		# clerk's italic (ChronicleLine face) at card scale, only when the
+		# entry holds the `escalation_cycle` field (a non-capturing hand
+		# prints nothing). Distinction by FORM (the italic hand + presence),
+		# never hue — the same grammar as every clerk row on the card.
+		_escalation_label = Label.new()
+		_escalation_label.theme_type_variation = &"ChronicleLine"
+		_escalation_label.add_theme_font_size_override("font_size", TypeScale.scaled(15))
+		_escalation_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		_escalation_label.custom_minimum_size = Vector2(200.0, 0.0)
+		_escalation_label.add_theme_color_override("font_color", Inks.INK)
+		_escalation_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		column.add_child(_escalation_label)
+
 		_bank_label = Label.new()
 		_bank_label.theme_type_variation = &"RoleLine"
 		_bank_label.add_theme_color_override("font_color", Inks.INK_SOFT)
@@ -736,8 +752,14 @@ class EntryCard:
 		var name_rows: int = (_model["name_lines"] as Array).size()
 		var role_rows := String(_model["role_line"]).split("\n").size()
 		var army_rows := String(_model.get("army_wrapped", "")).split("\n").size()
+		# The escalation row (L2-C): one row when the entry carries the
+		# capture record (the clerk's line wraps on the plate, but the
+		# budget pin holds it to a single row at card width — deterministic
+		# in the model alone, like every other row arithmetic here).
+		var escalation_rows := 1 if not String(_model.get("escalation_line", "")).is_empty() else 0
 		var head := maxf(CREST_SIZE + 8.0, name_rows * 30.0 + role_rows * 21.0)
-		var height := head + 24.0 + 24.0 + army_rows * 21.0 + 19.0 + 15.0 + 2.0 * PAD + 8.0
+		var height := head + 24.0 + 24.0 + army_rows * 21.0 \
+			+ escalation_rows * 19.0 + 19.0 + 15.0 + 2.0 * PAD + 8.0
 		return Vector2(CARD_MIN_WIDTH, maxf(float(Inks.TOUCH_GRIP_MIN), height))
 
 	func _draw() -> void:
@@ -774,6 +796,7 @@ class EntryCard:
 		_seal_line.text = "%s after %s" % [String(seal["word"]), String(model["duration_line"])]
 		_seal_line.add_theme_color_override("font_color", Inks.INK)
 		_army_label.text = String(_model["army_wrapped"])
+		_escalation_label.text = String(_model.get("escalation_line", ""))
 		_bank_label.text = "%s legacy banked by this hand" % Inks.abbreviate_amount(int(model["score"]))
 		queue_redraw()
 
@@ -789,6 +812,7 @@ class EntryCard:
 		h = _mix(h, _seal_label.text.hash())
 		h = _mix(h, _seal_line.text.hash())
 		h = _mix(h, _army_label.text.hash())
+		h = _mix(h, _escalation_label.text.hash())
 		h = _mix(h, _bank_label.text.hash())
 		return h
 

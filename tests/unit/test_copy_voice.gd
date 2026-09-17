@@ -100,6 +100,14 @@ const KEY_BUDGETS: Dictionary = {
 	&"escalation_captured": STRIP_BUDGET,
 	&"garrison_escalation": STRIP_BUDGET,
 	&"chronicle_escalation": QUOTE_BUDGET,
+	# the L2-C surface keys: the win-restart reveal's veterans line (the
+	# packet's lines band), the regime face card's veterans role line (the
+	# widest single-line budget — the packet pre-wraps it to bounded rows,
+	# the garrison line's own pin discipline), and the odds table's tier-mix
+	# detail row (the stage's wide strip).
+	&"intro_win_veterans": PACKET_BUDGET,
+	&"intro_regime_veterans": STRIP_BUDGET,
+	&"garrison_detail": STRIP_BUDGET,
 	# the first session's printed cues (T-UI-10) — strip rows
 	&"first_gate": STRIP_BUDGET, &"first_assign": STRIP_BUDGET,
 	&"first_build": STRIP_BUDGET, &"first_trickle": STRIP_BUDGET,
@@ -280,7 +288,22 @@ func _worst_case_params() -> Dictionary:
 		# digits is the deep-campaign worst case) — {leader} and {power}
 		# reuse the first-name and assault values above.
 		"cycle": 999,
+		# the L2-C surface tokens: the odds detail row's composed roster
+		# mix — the two longest unit display names at the ladder's widest
+		# sensible counts plus the summed gear (a captured garrison's own
+		# worst case; the composer is AssaultPresenter.roster_mix).
+		"mix": _worst_case_mix(pack),
 	}
+
+
+func _worst_case_mix(pack: ContentPack) -> String:
+	var names := (pack.units as Array).map(
+		func(u: UnitDef) -> String: return u.display_name)
+	names.sort_custom(func(a: String, b: String) -> bool: return a.length() > b.length())
+	while names.size() < 2:
+		names.append("Recruit")
+	return "16 %ss · 16 %ss · 32 gear" % [
+		names[0].to_lower(), names[1].to_lower()]
 
 
 ## The tree's longest node display name (a tree-less pack degrades to a

@@ -100,17 +100,53 @@ static func reveal_view(host: GameHost, p_resumed := false,
 		"ink": Inks.regime_secondary(regime_id),
 		"ground": Inks.ground_for(regime_id, Inks.Phase.RECRUITING),
 	}
+	# THE ESCALATION PRESENCE (L2-C): when a captured garrison stands in the
+	# shared meta, the walls this hand fights are the OLD VICTOR'S OWN ARMY
+	# (the L2 ladder; the snapshot survives every restart form until beaten).
+	# The regime face card reflects it — the ruling regime reads as the old
+	# victor's line: the veterans' crest on the card, the veterans' role line
+	# under the name. Empty block = no snapshot = the pre-L2 card, unchanged.
+	var escalation := escalation_view(run)
+	if not escalation.is_empty():
+		var crest := StringName(String(escalation["crest_key"]))
+		if crest != &"":
+			regime["veterans_crest"] = crest
+		regime["veterans_line"] = CopyDeck.line(Inks.pack().copy,
+			&"intro_regime_veterans", 0, {
+				"leader": String(escalation["leader_first"]),
+				"cycle": int(escalation["cycle"]),
+			})
 	return {
 		"variant": variant,
 		"run_number": host.meta.runs_recorded + 1,
 		"leader": leader,
 		"regime": regime,
 		"previous": previous,
+		"escalation": escalation,
 		"bank": host.meta.legacy_points,
 		"lines": reveal_lines(variant, leader, regime, previous, host.meta.legacy_points,
 			host.is_run_running(), p_catch_up, host.engine.sim_hours(),
-			host.meta.runs_recorded),
+			host.meta.runs_recorded, escalation),
 		"chip": CHIP_LABEL,
+	}
+
+
+## The standing garrison as the reveal's escalation block ({} when no
+## snapshot stands — the zero-impact gate). Pure read off the run system's
+## meta window; the leader prints by FIRST name (the single-line pool rule,
+## the garrison line's own discipline).
+static func escalation_view(run) -> Dictionary:
+	var snapshot: Dictionary = run.escalation_garrison()
+	if snapshot.is_empty():
+		return {}
+	var leader := String(snapshot.get("leader", ""))
+	var split := leader.find(" ")
+	return {
+		"cycle": maxi(1, int(run.escalation_cycle())),
+		"leader_first": leader if split <= 0 else leader.substr(0, split),
+		"crest_key": StringName(String(snapshot.get("crest_id", ""))),
+		"regime_id": String(snapshot.get("regime_id", "")),
+		"captured_at_run": int(snapshot.get("captured_at_run", 0)),
 	}
 
 
@@ -138,9 +174,16 @@ static func variant_for(host: GameHost) -> StringName:
 ## window's facts; the blockquote carries the detail after the sweep).
 ## LINE BUDGET: the packet's lines band (504px at the 720 design) — every
 ## variant shaped to it at the worst pool names (docs/voice-bible.md §4).
+## L2-C: `p_escalation` (the standing garrison block, {} = none) re-voices
+## the win restart's THIRD line — the regime reveal reads as the old
+## victor's line ("{leader}'s veterans hold the walls — cycle {cycle}"),
+## the same hand's context deepened: the previous leader IS the victor
+## whose army now holds the walls. No snapshot: the context line stands,
+## byte-identical.
 static func reveal_lines(variant: StringName, leader: Dictionary, regime: Dictionary,
 		previous: Dictionary, bank: int, run_alive := true,
-		p_catch_up := {}, p_sim_hours := 0, p_rotor := 0) -> Array[Dictionary]:
+		p_catch_up := {}, p_sim_hours := 0, p_rotor := 0,
+		p_escalation := {}) -> Array[Dictionary]:
 	var lines: Array[Dictionary] = []
 	var regime_name := String(regime["name"])
 	var table: CopyTable = Inks.pack().copy
@@ -194,11 +237,21 @@ static func reveal_lines(variant: StringName, leader: Dictionary, regime: Dictio
 				CopyDeck.line(table, &"intro_win_bank", p_rotor,
 					{"points": bank, "hands": ("one hand" if int(previous.get("run", 1)) <= 1
 						else "%d hands" % int(previous.get("run", 1)))})))
-			lines.append(_row(Inks.LineClass.PLAIN,
-				CopyDeck.line(table, &"intro_win_context", p_rotor,
-					{"leader": String(previous.get("leader", "")).split(" ")[0],
-						"hours": _duration_hours(previous),
-						"regime": regime_name})))
+			if not p_escalation.is_empty():
+				# The regime reveal in the escalation voice (L2-C): the walls
+				# this hand fights are the victor's own army — the reveal says
+				# so before the packet ever opens onto the odds.
+				lines.append(_row(Inks.LineClass.PLAIN,
+					CopyDeck.line(table, &"intro_win_veterans", p_rotor, {
+						"leader": String(p_escalation["leader_first"]),
+						"cycle": int(p_escalation["cycle"]),
+					})))
+			else:
+				lines.append(_row(Inks.LineClass.PLAIN,
+					CopyDeck.line(table, &"intro_win_context", p_rotor,
+						{"leader": String(previous.get("leader", "")).split(" ")[0],
+							"hours": _duration_hours(previous),
+							"regime": regime_name})))
 		VARIANT_LOSS_RESTART:
 			# The failure-feel beat (Prof X's contract): the same-crest
 			# REVENGE line first (the regime that crushed the dream deals
@@ -243,6 +296,11 @@ static func view_hash(view: Dictionary) -> int:
 	var regime: Dictionary = view["regime"]
 	h = _mix(h, String(regime["id"]).hash())
 	h = _mix(h, String(regime["name"]).hash())
+	var escalation: Dictionary = view.get("escalation", {})
+	if not escalation.is_empty():
+		h = _mix(h, int(escalation["cycle"]))
+		h = _mix(h, String(escalation["leader_first"]).hash())
+		h = _mix(h, StringName(String(escalation["crest_key"])).hash())
 	for line: Dictionary in view["lines"]:
 		h = _mix(h, int(line["class"]))
 		h = _mix(h, String(line["text"]).hash())

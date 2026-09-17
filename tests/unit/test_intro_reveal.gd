@@ -245,6 +245,100 @@ func test_win_restart_swap_beat_reads_the_actual_chronicle() -> void:
 	assert_str(String(previous["outcome"])).is_equal("victory")
 
 
+## L2-C: THE ESCALATION HANDOFF — when a captured garrison stands in the
+## meta, the reveal carries it on both plates: the REGIME FACE CARD
+## re-faces to the old victor's line (the veterans' crest in the slot, the
+## veterans' role line under the name), and the win restart's THIRD line
+## becomes the CopyDeck escalation voice — the same leader the context
+## line named, now holding the walls. No snapshot: the pre-L2 reveal,
+## byte-identical (the escalation block empty, the context line stands).
+func test_win_restart_reads_the_standing_garrison() -> void:
+	var host := _test_host()
+	# A STANDING snapshot (cycle 2, an older hand's victor — the fixture
+	# seam; the capture itself is the engine suite's pin). The empty-roster
+	# victory below captures NOTHING, so the standing garrison survives it
+	# exactly as the ladder's own rule promises.
+	host.meta.escalation_garrison = {
+		"regime_id": "gilded_crown", "captured_at_run": 1, "cycle": 2,
+		"leader": "Bartholomew the Unbearable", "crest_id": "crest_gilded_crown",
+		"roster": {"knight": {"count": 3, "gear_tiers": {"weapon": {"1": 3}}}},
+	}
+	host.meta.escalation_cycle = 2
+	_win_a_hand(host)
+	var view := IntroPresenter.reveal_view(host)
+	# The escalation block: the standing garrison's own facts, first name only.
+	var escalation: Dictionary = view["escalation"]
+	assert_int(int(escalation["cycle"])).is_equal(2)
+	assert_str(String(escalation["leader_first"])).is_equal("Bartholomew")
+	assert_str(StringName(String(escalation["crest_key"]))).is_equal(&"crest_gilded_crown")
+	assert_str(String(escalation["regime_id"])).is_equal("gilded_crown")
+	assert_int(int(escalation["captured_at_run"])).is_equal(1)
+	# The regime card: the veterans' crest + the veterans' role line — the
+	# ruling regime reads as the old victor's line.
+	var regime: Dictionary = view["regime"]
+	assert_str(StringName(String(regime["veterans_crest"]))).is_equal(&"crest_gilded_crown")
+	assert_str(String(regime["veterans_line"])) \
+		.is_equal("the regime of Bartholomew's veterans — cycle 2")
+	# The win reveal's third line: the escalation voice — the victor named,
+	# the cycle counted (the packet's band budget, pinned in test_copy_voice).
+	var lines: Array = view["lines"]
+	assert_int(lines.size()).is_equal(3)
+	var third := String(lines[2]["text"])
+	assert_bool(third.contains("Bartholomew's veterans")).is_true()
+	assert_bool(third.to_lower().contains("cycle 2")).is_true()
+	assert_int(int(lines[2]["class"])).is_equal(Inks.LineClass.PLAIN)
+	# The view hash is seed-sensitive to the escalation block (the reveal
+	# is a function of the meta, never of UI history).
+	var bare_host := _test_host()
+	_win_a_hand(bare_host)
+	var bare := IntroPresenter.reveal_view(bare_host)
+	assert_bool((bare["escalation"] as Dictionary).is_empty()).is_true()
+	assert_bool(not (bare["regime"] as Dictionary).has("veterans_line")).is_true()
+	assert_str(String((bare["lines"] as Array)[2]["text"])).contains("took the castle")
+	assert_int(IntroPresenter.view_hash(view)) \
+		.is_not_equal(IntroPresenter.view_hash(bare))
+
+
+## L2-C: THE PACKET RENDERS THE HANDOFF — bound from the win-restart view
+## above, the regime face card's crest slot prints the VETERANS' crest and
+## its role plate the veterans' line (wrapped on the plate like every
+## long flavor); the leader card and the lines print as before. The render
+## oracle (snapshot_hash) separates the two reveals.
+func test_packet_renders_the_veterans_face_card() -> void:
+	var host := _test_host()
+	host.meta.escalation_garrison = {
+		"regime_id": "gilded_crown", "captured_at_run": 1, "cycle": 2,
+		"leader": "Bartholomew the Unbearable", "crest_id": "crest_gilded_crown",
+		"roster": {"knight": {"count": 3, "gear_tiers": {"weapon": {"1": 3}}}},
+	}
+	host.meta.escalation_cycle = 2
+	_win_a_hand(host)
+	var packet := IntroPacket.new()
+	packet.size = Vector2(720, 720)
+	add_child(packet)
+	await get_tree().process_frame
+	packet.bind(IntroPresenter.reveal_view(host))
+	assert_str(StringName(String(packet._regime_face.get("face_key")))) \
+		.is_equal(&"crest_gilded_crown")
+	# The role plate PRE-WRAPS to bounded rows (the packet's own plate rule)
+	# — the veterans line reads whole across its wrap.
+	var role := String(packet._regime_face.get("role_line")).replace("\n", " ")
+	assert_str(role).contains("Bartholomew's veterans")
+	assert_str(role).contains("cycle 2")
+	# The regime's NAME plate stays the run's own regime (the reveal never
+	# lies about which regime the new leader serves).
+	assert_str(String(packet._regime_face.get("card_name"))) \
+		.is_equal(String(Inks.regime_name(host.run().regime_id())).to_upper())
+	var with_garrison := packet.snapshot_hash()
+	var bare_host := _test_host()
+	_win_a_hand(bare_host)
+	packet.bind(IntroPresenter.reveal_view(bare_host))
+	assert_bool(String(packet._regime_face.get("role_line")).replace("\n", " ") \
+		.contains("Bartholomew's veterans")).is_false()
+	assert_int(packet.snapshot_hash()).is_not_equal(with_garrison)
+	packet.free()
+
+
 func test_loss_restart_keeps_the_regime_and_remembers() -> void:
 	var host := _test_host()
 	var regime_before := host.run().regime_id()

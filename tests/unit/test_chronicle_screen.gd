@@ -376,6 +376,55 @@ func test_escalation_line_reads_the_entries_own_record() -> void:
 	assert_str(String(quiet["escalation_line"])).is_equal("")
 
 
+## L2-C: THE LEDGER RENDERS THE LINE — the entry card prints the clerk's
+## italic row when (and only when) the entry carries the capture record;
+## the card's row arithmetic and render oracle follow it; and the line
+## fits its plate in the real italic face at the card's render size (the
+## no-clip discipline, measured not assumed).
+func test_entry_card_renders_the_escalation_line() -> void:
+	var entry := {"run": 2, "leader": "Bran the Unbearable", "outcome": "victory",
+		"regime": "gilded_crown", "escalation_cycle": 2,
+		"duration_ticks": 38 * SimEngine.TICKS_PER_SIM_HOUR,
+		"army": {"knight": 3}, "army_power": 34, "score": 88,
+		"tags": [], "trait": ""}
+	var card: ChronicleSheet.EntryCard = ChronicleSheet.EntryCard.new()
+	add_child(card)
+	await get_tree().process_frame
+	card.bind(ChroniclePresenter.entry_view(entry))
+	assert_str(card._escalation_label.text) \
+		.is_equal("this army holds the castle — cycle 2 opens")
+	var with_line := card.snapshot_hash()
+	# The row arithmetic (the pure minimum override — deterministic in the
+	# model alone; the live combined cache is the sheet's layout business).
+	var height_with: Vector2 = card._get_minimum_size()
+	# A non-capturing hand prints no row: empty plate, smaller minimum,
+	# different render oracle.
+	card.bind(ChroniclePresenter.entry_view({"run": 3, "leader": "Ida the Quiet",
+		"outcome": "defeat", "regime": "paper_crown",
+		"duration_ticks": 38 * SimEngine.TICKS_PER_SIM_HOUR,
+		"army": {"knight": 3}, "army_power": 34, "score": 88,
+		"tags": [], "trait": ""}))
+	assert_str(card._escalation_label.text).is_empty()
+	assert_int(card.snapshot_hash()).is_not_equal(with_line)
+	assert_float(card._get_minimum_size().y).is_less(height_with.y)
+	# The no-clip budget: every shipped escalation variant fits the card's
+	# inner plate (CARD_MIN_WIDTH 380 - 2x pad 10 = 360) in the REAL italic
+	# face at the card's render size, one row — measured headless-exact
+	# against the plate budget, never a laid-out rect (the suite's node
+	# carries no canvas layout).
+	card.bind(ChroniclePresenter.entry_view(entry))
+	await get_tree().process_frame
+	var font: Font = card._escalation_label.get_theme_font(&"font")
+	var font_size := card._escalation_label.get_theme_font_size(&"font_size")
+	assert_int(font_size).is_equal(15)
+	for variant in CopyDeck.variants(Inks.pack().copy, &"chronicle_escalation"):
+		var text := String(variant).replace("{cycle}", "999")
+		var measured := font.get_string_size(text,
+			HORIZONTAL_ALIGNMENT_LEFT, -1.0, font_size).x
+		assert_float(measured).is_less(360.0)
+	card.free()
+
+
 func test_view_hash_deterministic_and_meta_sensitive() -> void:
 	var host_a := _test_host()
 	var host_b := _test_host()

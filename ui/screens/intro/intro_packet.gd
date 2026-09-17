@@ -203,8 +203,18 @@ func bind(view: Dictionary) -> void:
 	_regime_frame.set("regime_id", regime["id"])
 	_regime_frame.set("misprint_seed", absi(String(regime["id"]).hash() % 9973))
 	_regime_face.set("card_name", String(regime["name"]).to_upper())
-	_regime_face.set("role_line", _wrapped(String(regime["flavor"]), 30, 3))
-	_regime_face.set("face_key", regime["crest_key"])
+	# THE ESCALATION PRESENCE (L2-C): a standing garrison re-faces the card
+	# — the OLD VICTOR'S crest in the slot, the veterans' line under the
+	# name ("the regime of <leader>'s veterans — cycle N"); the ruling
+	# regime reads as the old victor's line. No snapshot: the drawn
+	# regime's own crest + flavor, unchanged.
+	var veterans_line := String(regime.get("veterans_line", ""))
+	if not veterans_line.is_empty():
+		_regime_face.set("role_line", _wrapped(veterans_line, 30, 3))
+		_regime_face.set("face_key", regime.get("veterans_crest", regime["crest_key"]))
+	else:
+		_regime_face.set("role_line", _wrapped(String(regime["flavor"]), 30, 3))
+		_regime_face.set("face_key", regime["crest_key"])
 	var ground: Color = regime["ground"]
 	_veil_ground = ground
 	# THE PRINT RULE (the T-UI-03 header find): the title prints on the

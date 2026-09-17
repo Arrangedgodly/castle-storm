@@ -32,6 +32,7 @@ const SPREAD_SCENE := "res://ui/screens/spread/spread_screen.tscn"
 const SpreadScreen := preload("res://ui/screens/spread/spread_screen.gd")
 const WatchfulEyeScript := preload("res://ui/screens/spread/watchful_eye.gd")
 const CardMotion := preload("res://ui/screens/spread/card_motion.gd")
+const RunHeaderScript := preload("res://ui/screens/spread/run_header.gd")
 const LOUD_SEED := 20261103  # spread_screen.DEFAULT_SEED — the screenshot seed
 
 const TEST_SIZES: Array[Vector2i] = [
@@ -299,6 +300,51 @@ func test_escalation_captured_beat_prints_from_the_standing_snapshot() -> void:
 	# The beat refreshes the full view (a run-boundary-class event).
 	assert_int(SpreadPresenter.refresh_targets_for(&"escalation_captured").size()).is_greater(0)
 	assert_str(",".join(SpreadPresenter.refresh_targets_for(&"escalation_captured"))).is_equal("full")
+
+
+## L2-C: THE LETTERHEAD'S CYCLE MARK — the view carries the standing
+## garrison (hash-sensitive), and the header prints the cycle numeral at
+## the row's crest corner ONLY while a garrison stands: hidden, the row's
+## layout is the pre-L2 letterhead exactly (the containers skip hidden
+## children); visible, the wrap re-fits deterministically and the mark
+## reads the print rule against the live ground.
+func test_header_cycle_mark_follows_the_standing_garrison() -> void:
+	var host := _test_host()
+	var plain := SpreadPresenter.build_view(host)
+	assert_bool((plain["escalation"] as Dictionary).is_empty()).is_true()
+	host.meta.escalation_garrison = {
+		"regime_id": "gilded_crown", "captured_at_run": 1, "cycle": 2,
+		"leader": "Bartholomew the Unbearable", "crest_id": "crest_gilded_crown",
+		"roster": {"knight": {"count": 1, "gear_tiers": {"weapon": {"1": 1}}}},
+	}
+	host.meta.escalation_cycle = 2
+	var armed := SpreadPresenter.build_view(host)
+	var escalation: Dictionary = armed["escalation"]
+	assert_int(int(escalation["cycle"])).is_equal(2)
+	assert_str(String(escalation["leader_first"])).is_equal("Bartholomew")
+	assert_int(SpreadPresenter.view_hash(armed)).is_not_equal(SpreadPresenter.view_hash(plain))
+	# The header: hidden without the block, printing with it.
+	var header: Control = RunHeaderScript.new()
+	add_child(header)
+	await get_tree().process_frame
+	var ground := Inks.ground_for(host.run().regime_id(), Inks.Phase.RECRUITING)
+	header.bind(plain["leader"], 12.0, 30, ground, plain["escalation"])
+	assert_bool(header._cycle_mark.visible).is_false()
+	var quiet_minimum: Vector2 = header.get_combined_minimum_size()
+	header.bind(armed["leader"], 12.0, 30, ground, armed["escalation"])
+	assert_bool(header._cycle_mark.visible).is_true()
+	assert_int(int(header._cycle_mark.get("value"))).is_equal(2)
+	# The mark costs width (the name plate cedes it, the wrap re-fits) —
+	# deterministically: two binds of the same state, same minimum.
+	assert_float(header.get_combined_minimum_size().x).is_greater(quiet_minimum.x)
+	header.bind(armed["leader"], 12.0, 30, ground, armed["escalation"])
+	var m1: Vector2 = header.get_combined_minimum_size()
+	header.bind(armed["leader"], 12.0, 30, ground, armed["escalation"])
+	assert_bool(m1.is_equal_approx(header.get_combined_minimum_size())).is_true()
+	# The numeral survives the slot's own refit pass (the layout authority).
+	header.refit(640.0)
+	assert_int(int(header._cycle_mark.get("value"))).is_equal(2)
+	header.free()
 
 
 func test_new_event_kinds_have_line_classes() -> void:

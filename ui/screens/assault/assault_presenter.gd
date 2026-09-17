@@ -75,6 +75,7 @@ static func odds_view(odds: Dictionary) -> Dictionary:
 		view["garrison_regime_id"] = String(garrison["regime_id"])
 		view["garrison_crest_id"] = String(garrison["crest_id"])
 		view["garrison_captured_at_run"] = int(garrison["captured_at_run"])
+		view["garrison_roster"] = (garrison.get("roster", {}) as Dictionary).duplicate(true)
 	return view
 
 
@@ -121,6 +122,69 @@ static func garrison_line(view: Dictionary, regime_name: String) -> String:
 	# own "The" — compose through Inks, never a literal "the %s".
 	return "garrison of %s — %d strong" % [
 		Inks.regime_with_article(regime_name), int(view["garrison_base"])]
+
+
+## The odds table's ESCALATION DETAIL ROW (L2-C): the standing garrison's
+## tier mix, printed as the table's second opening row — the snapshot's
+## composition shown DISTINCTLY (whose wall it is, what holds it) where the
+## static garrison prints only its one composition line. "" when the static
+## garrison stands (that case keeps its pre-L2 print, byte-identical).
+## Rotor 0 — a static composition surface, like the castle card's line.
+static func garrison_detail_line(view: Dictionary) -> String:
+	if String(view.get("garrison_source", "")) != "escalation":
+		return ""
+	return CopyDeck.line(Inks.pack().copy, &"garrison_detail", 0, {
+		"mix": roster_mix(view.get("garrison_roster", {})),
+		"cycle": int(view.get("garrison_cycle", 1)),
+	})
+
+
+## The snapshot roster as the printed mix: per-def counts in the snapshot's
+## stored order (display names, lowercased + pluralized — the chronicle
+## army line's own arithmetic) plus the gear count summed over slots and
+## tiers ("12 knights · 9 archers · 14 gear"). Ids that left the pack print
+## verbatim (a historical document keeps its own words, the army-line rule).
+static func roster_mix(roster: Dictionary) -> String:
+	if roster.is_empty():
+		return "no army stood"
+	var parts: Array[String] = []
+	for def_id in roster.keys():
+		var count := int((roster.get(def_id, {}) as Dictionary).get("count", 0))
+		if count <= 0:
+			continue
+		var name := _def_display_name(StringName(String(def_id))).to_lower()
+		parts.append("%d %s" % [count, name + ("s" if count != 1 else "")])
+	var gear := 0
+	for def_id in roster.keys():
+		var tiers: Dictionary = (roster.get(def_id, {}) as Dictionary).get("gear_tiers", {})
+		for slot in tiers.keys():
+			for tier in (tiers.get(slot, {}) as Dictionary).keys():
+				gear += int((tiers.get(slot, {}) as Dictionary).get(tier, 0))
+	if gear > 0:
+		parts.append("%d gear" % gear)
+	return " · ".join(parts)
+
+
+## The vignette's VICTORY CAPTURE BEAT (L2-C): when the win garrisoned the
+## castle, the outcome sequence prints the capture line — the same key,
+## rotor (event seq) and first-name rule as the spread strip's own beat, so
+## the vignette and the history it becomes tell it in one voice. "" when
+## the win captured nothing (the pre-L2 outcome print, byte-identical).
+static func capture_beat_line(battle_events: Array, host: GameHost) -> String:
+	for event: Dictionary in battle_events:
+		if event.get("type", &"") != &"escalation_captured":
+			continue
+		var snapshot: Dictionary = host.run().escalation_garrison()
+		if snapshot.is_empty():
+			return ""  # the capture never left its snapshot (a defensive gate)
+		var leader := String(snapshot.get("leader", ""))
+		var split := leader.find(" ")
+		return CopyDeck.line(Inks.pack().copy, &"escalation_captured",
+			int(event.get("seq", 0)), {
+				"leader": leader if split <= 0 else leader.substr(0, split),
+				"cycle": int(event.get("value", 1)),
+			})
+	return ""
 
 
 ## The knight floor's printed gate (the commit refusal below floor).

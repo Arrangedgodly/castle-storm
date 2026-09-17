@@ -445,6 +445,20 @@ const DEFAULTS: Dictionary = {
 		"this army holds the castle — cycle {cycle} opens",
 		"the castle garrisons this army — cycle {cycle}",
 	],
+	# --- the L2-C surface keys: the win-restart reveal's veterans line
+	# (run-number-rotated like every reveal beat), the regime face card's
+	# veterans role line (rotor 0 — one voice on the card), and the odds
+	# table's tier-mix detail row (rotor 0 — a static composition). ---
+	&"intro_win_veterans": [
+		"{leader}'s veterans hold the walls — cycle {cycle}.",
+		"Cycle {cycle}: the walls are {leader}'s veterans.",
+	],
+	&"intro_regime_veterans": [
+		"the regime of {leader}'s veterans — cycle {cycle}",
+	],
+	&"garrison_detail": [
+		"the wall: {mix} — cycle {cycle}",
+	],
 	# --- the legacy deck screen (L1-C, the tree UI) ---
 	&"legacy_empty_1": [
 		"the deck is still wrapped — no legacy earned yet",
@@ -588,6 +602,9 @@ const CONSUMERS: Dictionary = {
 	&"garrison_escalation": "assault odds castle card (a captured garrison stands) — AssaultPresenter.garrison_line",
 	&"escalation_captured": "strip victory beat (the capture) — SpreadPresenter.chronicle_line_for",
 	&"chronicle_escalation": "chronicle entry's escalation line — ChroniclePresenter.entry_view",
+	&"intro_win_veterans": "win-restart reveal's veterans line (a garrison stands) — IntroPresenter.reveal_lines",
+	&"intro_regime_veterans": "regime face card's veterans role line (a garrison stands) — IntroPresenter.reveal_view",
+	&"garrison_detail": "odds table's tier-mix detail row (a captured garrison stands) — AssaultPresenter.garrison_detail_line",
 	&"unlock_branch_old_guard": "legacy tree branch plate — the L1-C tree UI (content ships in L1-B)",
 	&"unlock_branch_workshop": "legacy tree branch plate — the L1-C tree UI (content ships in L1-B)",
 	&"unlock_branch_yard": "legacy tree branch plate — the L1-C tree UI (content ships in L1-B)",

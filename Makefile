@@ -113,6 +113,14 @@ run-game:
 #                                                               # presses buy nodes, the mount note + the purchase print
 #   CS_SPREAD_SHOT=/path.png CS_SPREAD_LEGACY=3 make run-demo   # L1-C: the FULL TREE — every node bought through the real
 #                                                               # command (bank seeded via the fixture seam), all cards solid
+#   CS_SPREAD_SHOT=/path.png CS_SPREAD_ESCALATION=1 make run-demo  # L2-C: the win-restart REVEAL over a seeded standing garrison —
+#                                                                # the regime face card re-faces (old victor's crest + veterans
+#                                                                # line) and the reveal's third print is the escalation voice
+#   CS_SPREAD_SHOT=/path.png CS_SPREAD_ESCALATION=2 make run-demo  # L2-C: the ODDS TABLE vs the cycle-2 veterans — the castle card
+#                                                                # (veterans' crest + cycle numeral) + the tier-mix detail row
+#   CS_SPREAD_SHOT=/path.png CS_SPREAD_ESCALATION=3 make run-demo  # L2-C: the REAL capture end to end — the storm's victory
+#                                                                # capture beat, the win reveal it deals (.reveal.png), and the
+#                                                                # chronicle entry's escalation line
 #   CS_SPREAD_SHOT=/path.png CS_SPREAD_FIRST=1 make run-demo    # the first session, moment 1: the EMPTY SPREAD (staked plots)
 #                                                               # + the first gate hint at the 7-minute arrival (T-UI-10)
 #   CS_SPREAD_SHOT=/path.png CS_SPREAD_FIRST=2 make run-demo    # moment 2: the assignment + build-order hints, focus on the plot

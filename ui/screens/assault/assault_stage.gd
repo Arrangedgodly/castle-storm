@@ -108,6 +108,12 @@ var _chips: HBoxContainer
 ## The staged script (set by begin_battle) + the commit-time roster view.
 var _script := {}
 var _roster: Array[Dictionary] = []
+## The staged garrison's identity (L2-C): when the odds bind carried a
+## captured garrison, the castle keeps the VETERANS' crest + cycle numeral
+## through the whole battle — the walls do not change hands until they
+## fall (apply_outcome's swap rebinds the fallen castle bare, cycle 0).
+var _garrison_crest := &""  # "" = the run regime's own crest
+var _garrison_cycle := 0
 ## Per-beat settled hashes (the authored visual sequence).
 var _sequence: Array[int] = []
 ## Layout rects (from lane_layout, the pure statics below).
@@ -211,9 +217,10 @@ func bind_odds(view: Dictionary) -> void:
 	_sequence.clear()
 	_printed.clear()
 	_history.clear()
-	_castle.bind(regime_name, _crest_key(),
+	_bind_garrison_identity(view)
+	_castle.bind(regime_name, _garrison_crest_key(),
 		AssaultPresenter.garrison_line(view, regime_name),
-		regime_id, Inks.EdgeForm.SOLID, false)
+		regime_id, Inks.EdgeForm.SOLID, false, _garrison_cycle)
 	_castle.snap_home()
 	for rank in _ranks:
 		rank.queue_free()
@@ -304,8 +311,8 @@ func begin_battle(script: Dictionary, roster: Array[Dictionary]) -> void:
 	_sequence.clear()
 	_printed.clear()
 	_history.clear()
-	_castle.bind(regime_name, _crest_key(), _castle.role_line,
-		regime_id, Inks.EdgeForm.SOLID, false)
+	_castle.bind(regime_name, _garrison_crest_key(), _castle.role_line,
+		regime_id, Inks.EdgeForm.SOLID, false, _garrison_cycle)
 	_castle.snap_home()
 	# The ranks build from the COMMIT-TIME ROSTER alone (not from whatever
 	# the odds screen left): (script, roster) is the whole staging input —
@@ -442,7 +449,9 @@ func print_line(line_class: int, text: String) -> void:
 
 ## Print the outcome BLOCKQUOTE — the wide print the strip never carries
 ## (the loss lands as the chronicle's own record of the rout; the win as
-## the victory double rule).
+## the victory double rule). The screen owns the outcome SEQUENCE — under
+## L2-C the victory prints its CAPTURE BEAT through print_line just before
+## this, so the capture line stays visible beside the seal row.
 func print_outcome(text: String, victory: bool) -> void:
 	_outcome_quote.text = text
 	_outcome_quote.visible = true
@@ -513,6 +522,23 @@ func _crest_key() -> StringName:
 		if regime.id == regime_id:
 			return regime.crest_id
 	return &""
+
+
+## Remember whose crest + which cycle the odds bind staged (L2-C): the
+## captured garrison's own crest when escalation stands, else the run
+## regime's (the pre-L2 castle, unchanged). Read back by every battle-path
+## castle bind until the walls fall.
+func _bind_garrison_identity(view: Dictionary) -> void:
+	if String(view.get("garrison_source", "")) == "escalation":
+		_garrison_crest = StringName(String(view.get("garrison_crest_id", "")))
+		_garrison_cycle = int(view.get("garrison_cycle", 0))
+	else:
+		_garrison_crest = &""
+		_garrison_cycle = 0
+
+
+func _garrison_crest_key() -> StringName:
+	return _garrison_crest if _garrison_crest != &"" else _crest_key()
 
 
 ## Cards fallen through beat `beat_index` (inclusive): the milli
@@ -1004,18 +1030,26 @@ class ContributionPips:
 
 ## SiegeCard — the castle: the regime's own face card on the table (crest
 ## art slot, garrison composition line, regime hairline; NO red seal —
-## the seal is the revolution's stamp and lands only when it FALLS). The
-## fall plays the CardFrame flip seam — the world's one card turn, the
-## promotion flip's rhyme at payoff scale.
+## the seal is the revolution's stamp and lands only when it FALLS). Under
+## L2 a CAPTURED garrison re-faces it: the veterans' crest in the slot, the
+## escalation garrison line on the plate, and the CYCLE NUMERAL at the
+## crest corner (top-right — mirroring the revolution's seal corner; the
+## ladder's count, in the world's numeral grammar). The fall plays the
+## CardFrame flip seam — the world's one card turn, the promotion flip's
+## rhyme at payoff scale — and drops the numeral (the walls changed hands).
 class SiegeCard:
 	extends Control
 
 	var fallen := false
 	var edge_form: int = Inks.EdgeForm.SOLID
 	var role_line := ""
+	## The escalation cycle the staged garrison opens (0 = no numeral — the
+	## static castle, or the fallen one).
+	var cycle := 0
 
 	var _frame: Control
 	var _face: BoxContainer
+	var _cycle_plate: Control
 
 
 	func _init() -> void:
@@ -1041,6 +1075,12 @@ class SiegeCard:
 		_face.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		_face.size_flags_vertical = Control.SIZE_EXPAND_FILL
 		inset.add_child(_face)
+		# The cycle numeral plate rides ABOVE the frame (the world's corner
+		# mark grammar; see CyclePlate) — placed at the crest corner on
+		# every resize + bind, deterministic in size alone.
+		_cycle_plate = CyclePlate.new()
+		add_child(_cycle_plate)
+		_place_cycle_plate()
 		# The castle's title plate prints one size down: full display
 		# scale clips regime names at card width ("he Paper Crow" — the
 		# capture find), and a clipped name on the castle reads broken.
@@ -1049,17 +1089,34 @@ class SiegeCard:
 				(plate as Label).add_theme_font_size_override("font_size", TypeScale.scaled(22))
 
 
+	func _notification(what: int) -> void:
+		if what == NOTIFICATION_RESIZED:
+			_place_cycle_plate()
+
+
+	func _place_cycle_plate() -> void:
+		if _cycle_plate == null:
+			return
+		var plate_size := Vector2(30.0, 22.0)
+		_cycle_plate.size = plate_size
+		_cycle_plate.position = Vector2(size.x - 13.0 - plate_size.x, 13.0)
+
+
 	func bind(title: String, crest_key: StringName, p_role_line: String,
-			p_regime_id: StringName, form: int, stamp_seal: bool) -> void:
+			p_regime_id: StringName, form: int, stamp_seal: bool,
+			p_cycle := 0) -> void:
 		edge_form = form
 		fallen = stamp_seal
 		role_line = p_role_line
+		cycle = p_cycle
 		_frame.set("edge_form", form)
 		_frame.set("regime_id", p_regime_id)
 		_frame.set("show_seal", stamp_seal)
 		_face.set("card_name", title)
 		_face.set("role_line", _wrapped_role())
 		_face.set("face_key", crest_key)
+		if _cycle_plate != null:
+			_cycle_plate.set("value", 0 if fallen else cycle)
 
 
 	func _wrapped_role() -> String:
@@ -1095,3 +1152,55 @@ class SiegeCard:
 		fallen = true
 		swap.call()
 		_frame.scale = Vector2.ONE
+
+
+## CyclePlate — the escalation cycle's numeral at the castle card's crest
+## corner (L2-C): a small paper quad with an ink outline and the numeral in
+## the Numerals face — the ladder's count in the world's own numeral
+## grammar (the armed Eye's countdown plate family). Line-form consistent:
+## a printed plate carrying a NUMBER, never a hue; hidden when value is 0
+## (the static castle) or when the walls fall.
+class CyclePlate:
+	extends Control
+
+	var value := 0:
+		set(new_value):
+			if value == new_value:
+				return
+			value = new_value
+			_sync_label()
+			queue_redraw()
+
+	var _label: Label
+
+	const PLATE_SIZE := Vector2(30.0, 22.0)
+
+	func _init() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		custom_minimum_size = PLATE_SIZE
+
+	func _ready() -> void:
+		_label = Label.new()
+		_label.theme_type_variation = &"Numerals"
+		_label.add_theme_font_size_override("font_size", TypeScale.scaled(15))
+		_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(_label)
+		_sync_label()
+
+	func _sync_label() -> void:
+		visible = value > 0
+		if _label != null:
+			# The baked size re-applies on every value change — the
+			# press-room's live type-scale step re-flows a card composed at
+			# another factor the next time the numeral reprints.
+			_label.add_theme_font_size_override("font_size", TypeScale.scaled(15))
+			_label.text = str(value)
+
+	func _draw() -> void:
+		if value <= 0:
+			return
+		var rect := Rect2(Vector2.ZERO, size)
+		draw_rect(rect, Inks.PAPER)
+		draw_rect(rect.grow(-1.0), Inks.INK, false, 1.5)

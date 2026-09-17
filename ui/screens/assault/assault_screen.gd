@@ -137,8 +137,13 @@ func open(p_host: GameHost, p_router: LayoutRouter) -> void:
 	_bind_odds()
 	# The strip opens with the composition line — the table is set, and
 	# the print says what stands against what (an empty strip reads
-	# unfinished, the capture find).
+	# unfinished, the capture find). Under L2 a CAPTURED garrison adds its
+	# own detail row — the snapshot's tier mix, shown DISTINCTLY where the
+	# static garrison keeps its single composition line.
 	_stage.print_line(Inks.LineClass.PLAIN, _composition_line())
+	var detail := AssaultPresenter.garrison_detail_line(_view)
+	if not detail.is_empty():
+		_stage.print_line(Inks.LineClass.PLAIN, detail)
 	# The safe seed: RETREAT (the free verb) holds focus on open — the
 	# run-deciding verb is two presses away, never one mispress.
 	_focus_chip("retreat")
@@ -437,6 +442,16 @@ func _finish_outcome(instant: bool) -> void:
 			return  # closed (or re-opened) mid-wash
 		_stage.wash = 1.0
 	var regime_name := Inks.regime_name(host.run().regime_id())
+	# THE VICTORY CAPTURE BEAT (L2-C): a win that garrisoned the castle
+	# prints its capture line into the beat sequence — before the outcome
+	# blockquote and the restart reveal it hands off to, in the strip's
+	# own voice (same key, same seq rotor as the spread's history row, so
+	# the vignette and the chronicle tell it in one breath). A
+	# non-capturing win prints nothing here (the pre-L2 sequence).
+	if victory:
+		var capture := AssaultPresenter.capture_beat_line(_battle_events, host)
+		if not capture.is_empty():
+			_stage.print_line(Inks.LineClass.VICTORY, capture)
 	_stage.print_outcome(
 		AssaultPresenter.outcome_block(_script, regime_name, _banked_points), victory)
 	_stage.set_chips([{

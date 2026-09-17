@@ -7,6 +7,16 @@
 ## Chrome, not a control: nothing here is interactive, so it carries no
 ## focus (grips apply to interactive targets only).
 ##
+## THE ESCALATION MARK (L2-C): when a captured garrison stands in the meta
+## (the walls are the player's own old army), the letterhead carries a
+## subtle CYCLE NUMERAL at the row's crest corner — a short double rule
+## (the victory line-form; every cycle is a wall taken) + the numeral in
+## the Numerals face, ink by the print rule. It is the ONLY escalation
+## chrome the Spread gains: the escalation is ODDS-side pressure, and the
+## Watchful Eye's meter stays the conspiracy's own story. No snapshot: the
+## mark is hidden and the row's layout is the pre-L2 letterhead exactly
+## (the containers skip hidden children — nothing shifts).
+##
 ## THE LINE BUDGET (finishing refinement #6, the closing critique's caveat):
 ## the letterhead prints on one row at the table's full width, and the name
 ## WRAPS at word boundaries when the pools deal a long name (the epithet
@@ -14,7 +24,7 @@
 ## other print surface in this world already uses; the old clip-at-the-plate
 ## fail-safe cut names like "…the Heavily Record" mid-word at 1.0x, and at
 ## 1.3x even mid-length names). The regime and clock plates never clip:
-## their minimums fit their own measured text (the plate grows, the text
+## their minimums fit their own measured text (a plate grows, its print
 ## stays whole — "THE GILDED CROWN" measured 209px on a 195px plate at
 ## 1.3x). The strip's minimum width never exceeds the table: the name's
 ## minimum is its granted plate (the refit below), never the unwrapped name.
@@ -39,6 +49,7 @@ var _name_label: Label
 var _rule: Control
 var _regime_label: Label
 var _time_label: Label
+var _cycle_mark: Control
 
 
 func _ready() -> void:
@@ -91,6 +102,10 @@ func _ready() -> void:
 	_time_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	_time_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_time_label)
+	_cycle_mark = CycleMark.new()
+	_cycle_mark.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_cycle_mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_cycle_mark)
 	_fit_plates()
 
 
@@ -117,7 +132,9 @@ func _text_width(label: Label) -> float:
 ## plate never clips its print ("THE GILDED CROWN" measured 209px at 1.3x;
 ## the old fixed plate was 195px). Measured on every bind so a longer
 ## regime name or clock simply widens its plate and the name cedes the
-## difference (wrapping another line if it must).
+## difference (wrapping another line if it must). The escalation mark's
+## width counts only while it is VISIBLE (the deterministic wrap is a
+## function of text + factor + strip width + the mark's state).
 func _fit_plates() -> void:
 	if _regime_label == null:
 		return
@@ -142,6 +159,8 @@ func refit(strip_w: float) -> void:
 		+ _regime_label.custom_minimum_size.x \
 		+ _time_label.custom_minimum_size.x \
 		+ 3.0 * PLATE_SEPARATION
+	if _cycle_mark != null and _cycle_mark.visible:
+		others += _cycle_mark.get_combined_minimum_size().x + PLATE_SEPARATION
 	var avail := maxf(160.0, strip_w - others)
 	var font: Font = _name_label.get_theme_font(&"font")
 	var size_now: int = _name_label.get_theme_font_size(&"font_size")
@@ -159,8 +178,12 @@ func refit(strip_w: float) -> void:
 ## strip prints on. THE PRINT RULE (screenshot-inspection find): the
 ## header sits on the dark TABLE, so its text follows the same
 ## ink-per-stock rule as the chronicle — paper-bright on dark grounds,
-## ink on the pale aftermath. Ink-on-dark was illegible.
-func bind(leader: Dictionary, sim_hours: float, army_power: int, ground: Color) -> void:
+## ink on the pale aftermath. Ink-on-dark was illegible. `escalation`
+## (the presenter's standing-garrison block, {} = none) sets the cycle
+## mark — additive; an empty block hides it and the row is the pre-L2
+## letterhead exactly.
+func bind(leader: Dictionary, sim_hours: float, army_power: int, ground: Color,
+		escalation := {}) -> void:
 	if _name_label == null:
 		return
 	var text_ink := Inks.ground_text_ink(ground)
@@ -171,4 +194,73 @@ func bind(leader: Dictionary, sim_hours: float, army_power: int, ground: Color) 
 	_rule.set("rule_ink", Inks.regime_secondary(leader["regime_id"]))
 	_time_label.text = "%dh · power %d" % [int(sim_hours), army_power]
 	_time_label.add_theme_color_override("font_color", text_ink)
+	if _cycle_mark != null:
+		_cycle_mark.set("value", int(escalation.get("cycle", 0)))
+		_cycle_mark.set("ink", text_ink)
 	_fit_plates()
+
+
+## CycleMark — the escalation cycle's numeral at the letterhead's crest
+## corner (L2-C): a short DOUBLE rule (the victory line-form — every cycle
+## is a wall the player's own army took) beside the numeral in the Numerals
+## face, ink by the print rule against the live ground. Line-form
+## consistent: a printed mark carrying a count, never a hue. Hidden (value
+## 0) = no standing garrison = the pre-L2 letterhead, layout and all.
+class CycleMark:
+	extends Control
+
+	var value := 0:
+		set(new_value):
+			if value == new_value:
+				return
+			value = new_value
+			_sync_label()
+			queue_redraw()
+
+	var ink := Inks.PAPER:
+		set(new_ink):
+			if ink != new_ink:
+				ink = new_ink
+				queue_redraw()
+
+	var _label: Label
+
+	const RULE_W := 8.0
+	const RULE_GAP := 3.0
+	const LABEL_W := 26.0
+	const MARK_H := 22.0
+
+	func _init() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		custom_minimum_size = Vector2(RULE_W + RULE_GAP + LABEL_W, MARK_H)
+
+	func _ready() -> void:
+		_label = Label.new()
+		_label.theme_type_variation = &"Numerals"
+		_label.add_theme_font_size_override("font_size", TypeScale.scaled(15))
+		_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		_label.clip_text = true
+		_label.position = Vector2(RULE_W + RULE_GAP, 0.0)
+		_label.size = Vector2(LABEL_W, MARK_H)
+		_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(_label)
+		_sync_label()
+
+	func _sync_label() -> void:
+		visible = value > 0
+		if _label != null:
+			# Re-apply the baked size each reprint — the press-room's live
+			# type-scale step re-flows a letterhead composed at another
+			# factor the next time a hand binds.
+			_label.add_theme_font_size_override("font_size", TypeScale.scaled(15))
+			_label.text = str(value)
+
+	func _draw() -> void:
+		if value <= 0:
+			return
+		# The double rule (victory form) at the mark's lead edge, vertically
+		# centered — the numeral reads as a COUNT of taken walls.
+		var mid := size.y * 0.5
+		draw_line(Vector2(0.0, mid - 2.0), Vector2(RULE_W, mid - 2.0), ink, 1.6, true)
+		draw_line(Vector2(0.0, mid + 2.0), Vector2(RULE_W, mid + 2.0), ink, 1.6, true)

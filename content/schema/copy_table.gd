@@ -43,6 +43,7 @@ const ROTATING_KEYS: Array[StringName] = [
 	&"card_warn_line", &"card_telegraph_line",
 	&"autosave_filed",
 	&"escalation_captured", &"chronicle_escalation",
+	&"intro_win_veterans",
 ]
 
 ## The complete key vocabulary + each key's allowed `{tokens}` (empty list =
@@ -104,6 +105,7 @@ const KEY_TOKENS: Dictionary = {
 	&"intro_win_kept": [&"regime"],
 	&"intro_win_bank": [&"points", &"hands"],
 	&"intro_win_context": [&"leader", &"hours", &"regime"],
+	&"intro_win_veterans": [&"leader", &"cycle"],
 	&"intro_resumed_hold": [&"first", &"hours"],
 	&"intro_resumed_tail": [],
 	&"intro_resumed_ended": [],
@@ -202,6 +204,13 @@ const KEY_TOKENS: Dictionary = {
 	&"garrison_escalation": [&"power", &"leader", &"cycle"],
 	&"escalation_captured": [&"leader", &"cycle"],
 	&"chronicle_escalation": [&"cycle"],
+	# --- the L2 escalation presence, surface half (L2-C): the win-restart
+	# reveal's veterans line + the regime face card's veterans role line
+	# (rotor 0, a static composition surface), and the odds table's tier-mix
+	# detail row (rotor 0). {mix} is the composed roster mix ("12 knights ·
+	# 9 archers · 8 gear" — caller-composed from the snapshot's roster). ---
+	&"intro_regime_veterans": [&"leader", &"cycle"],
+	&"garrison_detail": [&"mix", &"cycle"],
 	# --- the legacy deck screen (L1-C, the tree UI): the empty bank's two
 	# lines, the mid-run mount-discipline note, the one-step purchase
 	# confirmation and its refusal reasons. {node} is the node's display
