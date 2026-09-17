@@ -30,9 +30,11 @@
 ##
 ## Input parity (the T-UI-02 foundation): focus chains follow card order
 ## in both slots (the router restores place across swaps); every
-## interactive card keeps the 48-unit grip. `debug_fast_forward` cycles
-## the demo's time scale (1x -> 60x -> 600x); `pause` freezes the world
-## through the host seam. CARD INTERACTIONS (T-UI-04) live on this table:
+## interactive card keeps the 48-unit grip. The dev accel verbs —
+## `debug_fast_forward` (time scale 1x -> 60x -> 600x) and `pause` (the
+## world-freeze seam) — are gated behind CS_DEBUG_CHROME=1 (the
+## boot-shell fix: a table mounted from the front door runs real, no
+## autopilot keys); CARD INTERACTIONS (T-UI-04) live on this table:
 ## pressing a focused card or tapping one fans its contextual actions
 ## (CardActions -> ActionFan); the PROMOTE action's command, when it
 ## lands, turns the trainee card over — CardFrame.play_promotion_flip,
@@ -156,6 +158,26 @@ var stats := {
 ## suite owns the opening flow both ways.
 var intro_enabled := true
 
+## How this mount ENTERS the game (the boot shell sets it BEFORE adding
+## the screen to the tree; the self-hosted demo and test mounts leave it
+## auto):
+##   auto      — today's rule: the fresh first deal opens T-UI-05's
+##               reveal, every other session opens T-UI-09's check-in;
+##   new_hand  — the boot shell's NEW-RUN path (a confirmed abandon) and
+##               the ended-meta BEGIN: the reveal derives from the ACTUAL
+##               chronicle (win/loss restart) and the intro itself deals
+##               the new hand — never a check-in re-deal of a dead hand.
+const ENTRY_AUTO := &"auto"
+const ENTRY_NEW_HAND := &"new_hand"
+var entry_mode: StringName = ENTRY_AUTO
+
+## Dev accel gate (the boot-shell fix): the F/P time-scale + freeze verbs
+## are demo/debug chrome — available only under CS_DEBUG_CHROME=1. A
+## table mounted from the boot shell runs at 1x wall pace with no
+## autopilot keys; the capture drives fast_forward programmatically and
+## never needs them.
+var debug_accel := false
+
 var _view := {}
 var _scale_chip: Label
 var _fan: ActionFan
@@ -232,6 +254,11 @@ func _ready() -> void:
 	# tree; the demo builds its own otherwise.
 	if host == null:
 		host = build_demo_host()
+	# THE BOOT-SHELL ACCEL GATE (the F5 fix): F/P are demo/debug verbs —
+	# a table mounted from the real front door runs at 1x with no
+	# autopilot keys unless CS_DEBUG_CHROME=1 asks for the dev chip's
+	# world (the invisible actions ride the same gate as their chip).
+	debug_accel = OS.get_environment("CS_DEBUG_CHROME") == "1"
 	# THE PLATFORM BOUNDARY (T-PERF-01): this screen IS the platform host —
 	# `_notification` forwards the OS lifecycle moments (application
 	# paused/resumed, window close) into the AppLifecycle policy:
@@ -906,6 +933,13 @@ func _maybe_open_resumed_intro() -> void:
 		return
 	if host.meta.runs_recorded == 0 and host.engine.tick_count <= 1:
 		return  # the fresh first deal — T-UI-05's reveal owns this entry
+	if entry_mode == ENTRY_NEW_HAND and not host.is_run_running():
+		# THE BOOT SHELL'S NEW HAND (a confirmed abandon, or an ended meta
+		# behind BEGIN): the reveal derives from the ACTUAL chronicle and
+		# the intro restarts the run itself — a dead hand is never
+		# "resumed" (the check-in variant would refuse the restart).
+		_open_intro()
+		return
 	_pending_catch_up = host.last_catch_up_report
 	stats[&"intros_opened"] += 1
 	_intro.open(host, get_router(), IntroPresenter.VARIANT_RESUMED, _pending_catch_up)
@@ -1933,11 +1967,11 @@ func _unhandled_input(event: InputEvent) -> void:
 			open_fan_for_card(focus)
 			get_viewport().set_input_as_handled()
 		return
-	if event.is_action_pressed(&"debug_fast_forward"):
+	if event.is_action_pressed(&"debug_fast_forward") and debug_accel:
 		time_scale_index = (time_scale_index + 1) % TIME_SCALES.size()
 		host.time_scale = TIME_SCALES[time_scale_index]
 		_refresh_chip()
-	elif event.is_action_pressed(&"pause"):
+	elif event.is_action_pressed(&"pause") and debug_accel:
 		host.set_driving(not host.driving)
 		_refresh_chip()
 

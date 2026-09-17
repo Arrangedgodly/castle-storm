@@ -342,6 +342,36 @@ const DEFAULTS: Dictionary = {
 	&"prefs_motion_steady": [
 		"Steady hand",
 	],
+	# --- the boot title card (the front door) ---
+	&"title_flavor": [
+		"One press, one conspiracy. The castle will not storm itself.",
+		"The press is warm; the table is bare. Someone goes first.",
+	],
+	&"title_flavor_return": [
+		"The table is cleared. The next hand waits.",
+		"The press remembers every hand. Deal another.",
+	],
+	&"title_hold": [
+		"{first} keeps the standard — hour {hours}.",
+	],
+	&"title_begin": [
+		"Deal the first hand",
+	],
+	&"title_next": [
+		"Deal the next hand",
+	],
+	&"title_continue": [
+		"Continue the hand",
+	],
+	&"title_new_run": [
+		"Deal a new hand",
+	],
+	&"title_new_run_armed": [
+		"Bury the live hand",
+	],
+	&"title_new_run_caution": [
+		"The hand ends where it stands; the bank keeps its points.",
+	],
 }
 
 
@@ -451,6 +481,15 @@ const CONSUMERS: Dictionary = {
 	&"prefs_motion_note": "press-room presswork-row note — PressRoomScreen.view_for",
 	&"prefs_motion_full": "press-room presswork step (full motion) — PressRoomScreen",
 	&"prefs_motion_steady": "press-room presswork step (reduced motion) — PressRoomScreen",
+	&"title_flavor": "title card flavor line (fresh install) — MainShell title card",
+	&"title_flavor_return": "title card flavor line (a hand ended last session) — MainShell title card",
+	&"title_hold": "title card live-hand line — MainShell title card",
+	&"title_begin": "title card primary chip (fresh install) — MainShell title card",
+	&"title_next": "title card primary chip (ended meta) — MainShell title card",
+	&"title_continue": "title card primary chip (live run) — MainShell title card",
+	&"title_new_run": "title card secondary chip (live run) — MainShell title card",
+	&"title_new_run_armed": "title card secondary chip armed (the two-step confirm) — MainShell title card",
+	&"title_new_run_caution": "title card caution line (the two-step confirm) — MainShell title card",
 }
 
 

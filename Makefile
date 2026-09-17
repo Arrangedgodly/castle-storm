@@ -48,57 +48,71 @@ run-gallery:
 run-responsive:
 	$(GODOT_BIN) --path . res://ui/layout/responsive_lab.tscn
 
-# The Spread — THE GAME (T-UI-03): the home screen wired to a real
-# engine host (canonical composition, seeded demo run, live pips/cards/
-# chronicle/Watchful Eye). Debug accel: F (or pad R5, the
-# debug_fast_forward action) cycles the time scale 1x -> 60x -> 600x; P
-# freezes the world. Card interactions (T-UI-04): press a focused card
-# (enter / pad A) or tap one to fan its contextual actions; esc / pad B
-# folds the fan; the PROMOTE action's landing turns the trainee card
-# over (the signature moment). CS_DEMO_RESET=0 continues the previous
-# session (default: each run starts the same seeded fresh demo);
-# CS_SEED=<int> overrides the seed. The demo debug chip (time scale /
-# sim hours / paused) is OPT-IN dev chrome, off in normal runs and every
-# capture so the table stays diegetic:
-#   CS_DEBUG_CHROME=1 make run-game                        # show the debug chip
-# Screenshot hooks (windowed):
-#   CS_SPREAD_SHOT=/path.png make run-game                # quiet state
-#   CS_SPREAD_SHOT=/p.png CS_SPREAD_LOUD=1 make run-game  # pressured (telegraph)
-#   CS_SPREAD_SHOT=/p.png CS_SPREAD_PROMOTE=1 make run-game  # promote, mid-flip
-#   CS_SPREAD_SHOT=/p.png CS_SPREAD_PROMOTE=2 make run-game  # promote, landed (flourish)
-#   CS_SPREAD_SHOT=/p.png CS_SPREAD_FAN=1 make run-game      # an open action fan
-#   CS_SPREAD_SHOT=/p.png CS_SPREAD_ASSAULT=1 make run-game  # assault odds table (T-UI-07)
-#   CS_SPREAD_SHOT=/p.png CS_SPREAD_ASSAULT=2 make run-game  # a beat mid-vignette (the storm)
-#   CS_SPREAD_SHOT=/p.png CS_SPREAD_INTRO=1 make run-game    # the first-hand reveal (T-UI-05)
-#   CS_SPREAD_SHOT=/p.png CS_SPREAD_INTRO=2 make run-game    # reveal + mid-unfold (.mid.png)
-#   CS_SPREAD_SHOT=/p.png CS_SPREAD_RESTART=win make run-game   # full win-restart session captures
-#   CS_SPREAD_SHOT=/p.png CS_SPREAD_RESTART=loss make run-game  # the crush -> loss-restart captures
-#   CS_SPREAD_SHOT=/p.png CS_SPREAD_SUSPICION=1 make run-game  # the telegraph CHOICE CARD (T-UI-06)
-#   CS_SPREAD_SHOT=/p.png CS_SPREAD_SUSPICION=2 make run-game  # the landed-crackdown BLOCKQUOTE
-#   CS_SPREAD_SHOT=/p.png CS_SPREAD_SUSPICION=3 make run-game  # the CRUSHED beat over the swept table
-#   CS_SPREAD_SHOT=/p.png CS_SPREAD_CHRONICLE=1 make run-game  # the ledger over three real hands (T-UI-08)
-#   CS_SPREAD_SHOT=/p.png CS_SPREAD_CHRONICLE=2 make run-game  # 50-hand ring: newest + mid-ring tall page (.turn.png) + oldest (.old.png)
-#   CS_SPREAD_SHOT=/p.png CS_SPREAD_CATCHUP=1 make run-game    # mid-session away window -> the print on the LIVE table (T-UI-09)
-#   CS_SPREAD_SHOT=/p.png CS_SPREAD_CATCHUP=2 make run-game    # SEED: play 6h, background (anchor+save), quit (prints the =3 command)
-#   CS_SPREAD_SHOT=/p.png CS_DEMO_RESET=0 CS_DEMO_NOW=<epoch> CS_SPREAD_CATCHUP=3 make run-game
+# The front door (post-acceptance boot fix): `make run-game` runs THE
+# PROJECT — the main scene, exactly what Play/F5 and the exported builds
+# run. The boot shell (ui/main.gd) constructs the REAL GameHost against
+# user://saves: fresh install -> the CASTLE STORM title card + BEGIN ->
+# the first-deal reveal -> the spread; live run save -> CONTINUE (the
+# away window resolves at the press; T-UI-09's resumed unfold + the
+# while-you-were-away print) or NEW RUN (two-step confirm; the abandon
+# banks the hand and the chronicle records it honestly). No autopilot,
+# no accel keys — the table runs real at 1x (autosave on background +
+# hourly, as wired).
+run-game:
+	$(GODOT_BIN) --path .
+
+# The direct-spread DEMO drive (the old run-game): boots the spread
+# scene itself through the seeded demo policy (sensible-play autopilot,
+# CS_DEMO_RESET=1 wipes the demo save root by default so every drive is
+# the same seeded fresh run; CS_DEMO_RESET=0 continues the session;
+# CS_SEED=<int> overrides the seed; CS_DEMO_NOW=<epoch> injects the
+# platform now for the catch-up capture paths). The dev accel verbs —
+# F (pad R5, debug_fast_forward) cycling 1x -> 60x -> 600x and P (L3)
+# freezing the world — are gated behind CS_DEBUG_CHROME=1 (the boot-shell
+# fix: the demo table AND the front door run real until the flag asks
+# for dev chrome), whose chip prints time scale / sim hours / paused:
+#   CS_DEBUG_CHROME=1 make run-demo                        # accel keys + chip
+# Card interactions (T-UI-04): press a focused card (enter / pad A) or
+# tap one to fan its contextual actions; esc / pad B folds the fan; the
+# PROMOTE action's landing turns the trainee card over (the signature
+# moment). Screenshot hooks (windowed — every hook runs run-demo):
+#   CS_SPREAD_SHOT=/path.png make run-demo                # quiet state
+#   CS_SPREAD_SHOT=/p.png CS_SPREAD_LOUD=1 make run-demo  # pressured (telegraph)
+#   CS_SPREAD_SHOT=/p.png CS_SPREAD_PROMOTE=1 make run-demo  # promote, mid-flip
+#   CS_SPREAD_SHOT=/p.png CS_SPREAD_PROMOTE=2 make run-demo  # promote, landed (flourish)
+#   CS_SPREAD_SHOT=/p.png CS_SPREAD_FAN=1 make run-demo      # an open action fan
+#   CS_SPREAD_SHOT=/p.png CS_SPREAD_ASSAULT=1 make run-demo  # assault odds table (T-UI-07)
+#   CS_SPREAD_SHOT=/p.png CS_SPREAD_ASSAULT=2 make run-demo  # a beat mid-vignette (the storm)
+#   CS_SPREAD_SHOT=/p.png CS_SPREAD_INTRO=1 make run-demo    # the first-hand reveal (T-UI-05)
+#   CS_SPREAD_SHOT=/p.png CS_SPREAD_INTRO=2 make run-demo    # reveal + mid-unfold (.mid.png)
+#   CS_SPREAD_SHOT=/p.png CS_SPREAD_RESTART=win make run-demo   # full win-restart session captures
+#   CS_SPREAD_SHOT=/p.png CS_SPREAD_RESTART=loss make run-demo  # the crush -> loss-restart captures
+#   CS_SPREAD_SHOT=/p.png CS_SPREAD_SUSPICION=1 make run-demo  # the telegraph CHOICE CARD (T-UI-06)
+#   CS_SPREAD_SHOT=/p.png CS_SPREAD_SUSPICION=2 make run-demo  # the landed-crackdown BLOCKQUOTE
+#   CS_SPREAD_SHOT=/p.png CS_SPREAD_SUSPICION=3 make run-demo  # the CRUSHED beat over the swept table
+#   CS_SPREAD_SHOT=/p.png CS_SPREAD_CHRONICLE=1 make run-demo  # the ledger over three real hands (T-UI-08)
+#   CS_SPREAD_SHOT=/p.png CS_SPREAD_CHRONICLE=2 make run-demo  # 50-hand ring: newest + mid-ring tall page (.turn.png) + oldest (.old.png)
+#   CS_SPREAD_SHOT=/path.png CS_SPREAD_CATCHUP=1 make run-demo  # mid-session away window -> the print on the LIVE table (T-UI-09)
+#   CS_SPREAD_SHOT=/path.png CS_SPREAD_CATCHUP=2 make run-demo  # SEED: play 6h, background (anchor+save), quit (prints the =3 command)
+#   CS_SPREAD_SHOT=/p.png CS_DEMO_RESET=0 CS_DEMO_NOW=<epoch> CS_SPREAD_CATCHUP=3 make run-demo
 #                                                               # RESUME: boots through the real save — the check-in
 #                                                               # unfold + the while-you-were-away print + the
 #                                                               # foreground->actionable wall measurement
-#   CS_SPREAD_SHOT=/p.png CS_SPREAD_CATCHUP=4 make run-game    # crackdown landing INSIDE the away window — the print's STRIKE
+#   CS_SPREAD_SHOT=/path.png CS_SPREAD_CATCHUP=4 make run-demo  # crackdown landing INSIDE the away window — the print's STRIKE
 #                                                               # row + the signed seizure losses, from a real resolved window
-#   CS_SPREAD_SHOT=/p.png CS_SPREAD_DAYSHEET=1 make run-game   # the run's own page open over a printed history (finishing #2:
+#   CS_SPREAD_SHOT=/path.png CS_SPREAD_DAYSHEET=1 make run-demo # the run's own page open over a printed history (finishing #2:
 #                                                               # the day-sheet — 14h of prints, newest first, dashed count rule)
-#   CS_SPREAD_SHOT=/p.png CS_SPREAD_DAYSHEET=2 make run-game   # the header verbs row itself (letterhead + both ledger chips)
-#   CS_SPREAD_SHOT=/p.png CS_SPREAD_PRESS=1 make run-game      # the press-room card — the settings surface (finishing #5: the
+#   CS_SPREAD_SHOT=/path.png CS_SPREAD_DAYSHEET=2 make run-demo # the header verbs row itself (letterhead + both ledger chips)
+#   CS_SPREAD_SHOT=/path.png CS_SPREAD_PRESS=1 make run-demo    # the press-room card — the settings surface (finishing #5: the
 #                                                               # type-scale + motion steps, the kept rule, the back verb)
-#   CS_SPREAD_SHOT=/p.png CS_SPREAD_PRESS=2 make run-game      # the same card after the 1.3x step is pressed through the real
+#   CS_SPREAD_SHOT=/path.png CS_SPREAD_PRESS=2 make run-demo    # the same card after the 1.3x step is pressed through the real
 #                                                               # chip — the LIVE re-flow (card + veiled table at the larger hand)
-#   CS_SPREAD_SHOT=/p.png CS_SPREAD_FIRST=1 make run-game      # the first session, moment 1: the EMPTY SPREAD (staked plots)
+#   CS_SPREAD_SHOT=/path.png CS_SPREAD_FIRST=1 make run-demo    # the first session, moment 1: the EMPTY SPREAD (staked plots)
 #                                                               # + the first gate hint at the 7-minute arrival (T-UI-10)
-#   CS_SPREAD_SHOT=/p.png CS_SPREAD_FIRST=2 make run-game      # moment 2: the assignment + build-order hints, focus on the plot
-#   CS_SPREAD_SHOT=/p.png CS_SPREAD_FIRST=3 make run-game      # moment 3: the arc to the TRICKLE print + the honest pacing
+#   CS_SPREAD_SHOT=/path.png CS_SPREAD_FIRST=2 make run-demo    # moment 2: the assignment + build-order hints, focus on the plot
+#   CS_SPREAD_SHOT=/path.png CS_SPREAD_FIRST=3 make run-demo    # moment 3: the arc to the TRICKLE print + the honest pacing
 #                                                               # report (each beat's sim tick = wall minute at 1x)
-run-game:
+run-demo:
 	$(GODOT_BIN) --path . res://ui/screens/spread/spread_screen.tscn
 
 # Boundary validation (T-ARCH-01 acceptance):
@@ -110,10 +124,10 @@ run-game:
 GODOT_BIN ?= tools/godot/godot
 
 .DEFAULT_GOAL := help
-.PHONY: help version import check run test save-debug perf-probe deck-perf balance-sweep vendor-assets run-gallery run-responsive run-game export export-windows export-macos export-linux
+.PHONY: help version import check run run-game run-demo run-gallery run-responsive test save-debug perf-probe deck-perf balance-sweep vendor-assets export export-windows export-macos export-linux
 
 help:
-	@echo "Targets: version | import | check | run | run-game | run-gallery | run-responsive | test | save-debug | perf-probe | deck-perf | balance-sweep | vendor-assets | export | export-windows | export-macos | export-linux  (GODOT_BIN defaults to tools/godot/godot; exports need scripts/fetch_templates.sh once)"
+	@echo "Targets: version | import | check | run | run-game | run-demo | run-gallery | run-responsive | test | save-debug | perf-probe | deck-perf | balance-sweep | vendor-assets | export | export-windows | export-macos | export-linux  (GODOT_BIN defaults to tools/godot/godot; exports need scripts/fetch_templates.sh once)"
 
 version:
 	@$(GODOT_BIN) --version

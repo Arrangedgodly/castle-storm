@@ -104,6 +104,15 @@ templates = Dictionary[StringName, PackedStringArray]({
 &"telegraph_context": PackedStringArray("Thin the crowd.", "Let the ink dry."),
 &"training_complete": PackedStringArray("{name} finishes the {rank} drills.", "The {rank} drills are done. {name} stands straighter."),
 &"training_started": PackedStringArray("{name} begins training as {rank}.", "{name} reports for {rank} drills, sober-ish."),
+&"title_begin": PackedStringArray("Deal the first hand"),
+&"title_continue": PackedStringArray("Continue the hand"),
+&"title_flavor": PackedStringArray("One press, one conspiracy. The castle will not storm itself.", "The press is warm; the table is bare. Someone goes first."),
+&"title_flavor_return": PackedStringArray("The table is cleared. The next hand waits.", "The press remembers every hand. Deal another."),
+&"title_hold": PackedStringArray("{first} keeps the standard — hour {hours}.", "The hand lives: {first}, hour {hours}."),
+&"title_new_run": PackedStringArray("Deal a new hand"),
+&"title_new_run_armed": PackedStringArray("Bury the live hand"),
+&"title_new_run_caution": PackedStringArray("The hand ends where it stands; the bank keeps its points.", "Ending it banks what it earned. The chronicle will say so."),
+&"title_next": PackedStringArray("Deal the next hand"),
 &"unit_promoted": PackedStringArray("{name} is struck off the rolls as {rank} — {count} now.", "{name} turns over: a {rank}. The count reads {count}."),
 &"warn_context": PackedStringArray("Keep hands quiet.", "Nothing to see here.")
 })

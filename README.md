@@ -55,13 +55,13 @@ Then:
 ```sh
 make version    # expect: 4.7.2.stable.official.ed1daf0bf
 make import     # one-time asset import (also after adding assets)
-make run-game   # play: the seeded Spread demo on the real engine host
+make run-game   # play: the front door (title / continue / new run) — exactly what F5 runs
 make check      # headless load check, exit 0 = project imports clean
 make test       # full CI battery (see Testing below)
 ```
 
 > [!NOTE]
-> `make run` opens the project's stub main scene by design; the game itself is `make run-game`. While it runs, `F` cycles the time scale (1x / 60x / 600x) and `P` freezes the world. `CS_SEED=<int>` picks the run seed; `CS_DEMO_RESET=0` continues the previous session.
+> `make run-game` (and `make run`, and pressing F5 in the editor) boots the real game: a fresh install opens the CASTLE STORM title card, a saved run offers CONTINUE (offline time resolves at the press) or NEW RUN (a two-step confirm — abandoning banks the hand and the chronicle records it). `make run-demo` is the developer's seeded Spread demo drive (sensible-play autopilot, `CS_SEED=<int>` picks the seed, `CS_DEMO_RESET=0` continues the session); its debug accel — `F` cycling the time scale (1x / 60x / 600x) and `P` freezing the world — is gated behind `CS_DEBUG_CHROME=1`.
 
 ### Exporting desktop builds
 
@@ -83,8 +83,8 @@ Every verb works three ways, at parity:
 | Confirm / press focused card | Enter, Space, Left click | A | Tap |
 | Back / fold | Esc | B | Tap the table |
 | Secondary | E | X | — |
-| Pause | P | L3 | — |
-| Fast-forward (dev) | F | R1 | — |
+| Pause (dev, `CS_DEBUG_CHROME=1`) | P | L3 | — |
+| Fast-forward (dev, `CS_DEBUG_CHROME=1`) | F | R1 | — |
 
 D-pad and sticks drive focus navigation. Touch targets are at least 48dp, state is carried by line form (solid / dashed / struck) rather than color, and a type-scale setting (1.0–1.3x) lives in the in-game press-room.
 
@@ -106,7 +106,7 @@ D-pad and sticks drive focus navigation. Touch targets are at least 48dp, state 
 ## Testing
 
 ```sh
-make test    # ~60s: 608 gdUnit4 unit/property cases + 1,321 acceptance checks
+make test    # ~59s: 618 gdUnit4 unit/property cases + 1,331 acceptance checks
 ```
 
 `make test` runs `scripts/ci.sh`: the gdUnit4 suites, then a SceneTree-based acceptance runner built for marathon suites with no framework timeout. What the suites pin:

@@ -142,8 +142,8 @@ input on the Deck. All five actions comply (pinned by
 | **A** (bottom face) | 0 | `primary` — confirm / press focused card | Enter, Space, left click |
 | **B** (right face) | 1 | `back` — back / fold / cancel | Esc |
 | **X** (left face) | 2 | `secondary` | E |
-| **R1** (right shoulder) | 5 | `debug_fast_forward` — time-scale ladder (dev) | F |
-| **L3** (left stick click) | 6 | `pause` — freeze the world | P |
+| **R1** (right shoulder) | 5 | `debug_fast_forward` — time-scale ladder (dev; acts only under `CS_DEBUG_CHROME=1`) | F |
+| **L3** (left stick click) | 6 | `pause` — freeze the world (dev; acts only under `CS_DEBUG_CHROME=1`) | P |
 
 Deliberately unbound: Menu (9) — the conventional future "settings/pause"
 home; D-pad/sticks drive focus navigation via the engine's `ui_*` actions on
@@ -156,7 +156,7 @@ Changing any binding is a product decision: update this table and
 | Path | Purpose |
 |---|---|
 | `project.godot` | Engine pin, renderer, R3 root content-scale settings, InputMap action stubs |
-| `ui/` | Screens and components (main scene: `ui/main.tscn`) |
+| `ui/` | Screens and components (main scene: `ui/main.tscn` — the boot shell that Play/F5 and `make run-game` run) |
 | `sim/` | Deterministic economy engine — headless-first, no UI imports |
 | `content/` | Declarative content packs: schema classes in `content/schema/`, load-time validator `content/content_validator.gd`, worked examples `content/examples/` (schema: T-DATA-01, see `docs/content-schema.md`) |
 | `saves/` | Save architecture: versioned, atomic writes (T-ARCH-03) |

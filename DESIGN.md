@@ -505,8 +505,16 @@ button chips, 5px on paper panels (theme styleboxes).
 
 ### The Screens (paper over the table)
 
-All screens compose the same grammar; none fork a component:
+All screens compose the same grammar; none forks a component:
 
+- **The Boot Shell / title card** (`ui/main.gd`, the main scene): the front door —
+  the game's name as a print card on the neutral table ground (display-face
+  letterpress, one revolution-red rule, one flavor line from the copy deck);
+  one gesture into the game (BEGIN, or CONTINUE seeded primary + NEW RUN
+  secondary behind the odds-COMMIT two-step confirm — the armed chip re-labels
+  and the clerk's caution prints in red on the card). Abandoning a live hand
+  goes through the real run-end verb: the chronicle records it, the bank keeps
+  it. No menu chrome anywhere: the boot is paper, the routes are chips.
 - **The Spread** (`ui/screens/spread/spread_screen.gd`): the home screen — live cards,
   pips, chronicle strip (2 rows, newest first), Eye, ground, header; event-driven
   targeted refresh (no whole-state polling); deterministic view/layout hashes.

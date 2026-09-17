@@ -159,6 +159,16 @@ const KEY_TOKENS: Dictionary = {
 	&"prefs_motion_note": [],
 	&"prefs_motion_full": [],
 	&"prefs_motion_steady": [],
+	# --- the boot title card (the front door) ---
+	&"title_flavor": [],
+	&"title_flavor_return": [],
+	&"title_hold": [&"first", &"hours"],
+	&"title_begin": [],
+	&"title_next": [],
+	&"title_continue": [],
+	&"title_new_run": [],
+	&"title_new_run_armed": [],
+	&"title_new_run_caution": [],
 }
 
 ## Automated register floor: whole WORDS that BREAK the voice (modern
