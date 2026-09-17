@@ -238,6 +238,7 @@ stipend_run
 | `last_score` | int | score banked by the last ended run (0 while running) |
 | `stipend_run` | int | run_index that already took its starting stipend (0 = none). Serialized + hashed so a restore cannot double-pay the `grant_resources` stipend |
 | `legacy_stipend_milli` | int | OPTIONAL (L1, emit-when-non-identity — absent from every no-unlocks save, hence not in the `save-keys` block): the run's APPLIED legacy stipend multiplier in milli (1000 = identity). Resolved from the purchased unlock set at the fold that opened this run; hashed + restored verbatim (no post-restore drain re-resolves it). Absent key = a pre-L1 (or no-unlocks) save = the exact content stipend |
+| `legacy_veterans_milli` | int | OPTIONAL (L1-B2, same emit-when-non-identity rule): the run's APPLIED veterans multiplier in milli — the assault resolver's army-side odds hop (§15), read through the run system exactly like `current_regime()`. Hashed + restored verbatim; absent key = identity odds |
 
 The meta bank and chronicle are DELIBERATELY ABSENT from this sub-dict
 (rule §3.6): they live only in the meta domain (§5).
@@ -553,7 +554,7 @@ exists for rewrites, not for growth.
 
 | Change | Bump? | Mechanism | Shipped precedent |
 |---|---|---|---|
-| Add an optional payload key; readers use `.get()` defaults (absent key = documented fallback) | **no** | nothing — old files load with the fallback, new files load everywhere | `regime_quirks` (§4.6), `stipend_run` (§4.4), `unlocks` + the three L1 emit-when-non-identity modifier keys (§4.4/§4.5/§4.6/§5); `escalation_garrison` when L2 lands (§6) |
+| Add an optional payload key; readers use `.get()` defaults (absent key = documented fallback) | **no** | nothing — old files load with the fallback, new files load everywhere | `regime_quirks` (§4.6), `stipend_run` (§4.4), `unlocks` + the five L1/B2 emit-when-non-identity modifier keys (`legacy_stipend_milli` + `legacy_veterans_milli` §4.4; `units.legacy_modifiers` §4.5; `production.legacy_cost_milli` §4.6; `suspicion.legacy_decay_milli` — sim-engine.md §14; `unlocks` §5); `escalation_garrison` when L2 lands (§6) |
 | Add an envelope field | **no** | envelope readers use `.get()` | — |
 | Change `state_hash()` composition (mix more state) | **no** (disk untouched) | recorded hash VALUES migrate; every reproducibility assertion stays twin-based, never absolute-hash-pinned | the quirks-hash fix (T-ARCH-03 re-dispatch) |
 | Rename / move / retype / remove an existing payload field | **envelope `schema_version` + registered migration** (and the payload's own `format_version` when the run/meta payload's shape changed — §7's interlock) | migration rewrites old files on load | none yet — §7 is the template for the first one |

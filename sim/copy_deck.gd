@@ -383,6 +383,9 @@ const DEFAULTS: Dictionary = {
 	&"unlock_branch_yard": [
 		"The Yard",
 	],
+	&"unlock_branch_survivors": [
+		"The Survivors",
+	],
 	&"unlock_flavor_grandmas_recipes": [
 		"Boots march on pickled eggs, banners or no.",
 	],
@@ -418,6 +421,15 @@ const DEFAULTS: Dictionary = {
 	],
 	&"unlock_flavor_war_games_on_sundays": [
 		"The crown rests on Sundays. The drills do not.",
+	],
+	&"unlock_flavor_quiet_boots": [
+		"Soft soles, short memories, fewer questions.",
+	],
+	&"unlock_flavor_scarred_banners": [
+		"Patched cloth; the hands under it are not.",
+	],
+	&"unlock_flavor_the_night_watch": [
+		"They watch the roads till the roads forget.",
 	],
 }
 
@@ -552,6 +564,10 @@ const CONSUMERS: Dictionary = {
 	&"unlock_flavor_the_drill_song_book": "legacy tree node card flavor row — the L1-C tree UI (content ships in L1-B)",
 	&"unlock_flavor_the_sand_yard": "legacy tree node card flavor row — the L1-C tree UI (content ships in L1-B)",
 	&"unlock_flavor_war_games_on_sundays": "legacy tree node card flavor row — the L1-C tree UI (content ships in L1-B)",
+	&"unlock_branch_survivors": "legacy tree branch plate — the L1-C tree UI (content ships in L1-B2)",
+	&"unlock_flavor_quiet_boots": "legacy tree node card flavor row — the L1-C tree UI (content ships in L1-B2)",
+	&"unlock_flavor_scarred_banners": "legacy tree node card flavor row — the L1-C tree UI (content ships in L1-B2)",
+	&"unlock_flavor_the_night_watch": "legacy tree node card flavor row — the L1-C tree UI (content ships in L1-B2)",
 }
 
 

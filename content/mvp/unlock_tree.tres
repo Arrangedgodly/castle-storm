@@ -64,6 +64,21 @@ script = ExtResource("1_eff")
 kind = &"training_time_multiplier"
 value = 0.96
 
+[sub_resource type="Resource" id="UnlockEffect_quiet_boots"]
+script = ExtResource("1_eff")
+kind = &"suspicion_decay"
+value = 1.05
+
+[sub_resource type="Resource" id="UnlockEffect_scarred_banners"]
+script = ExtResource("1_eff")
+kind = &"veterans"
+value = 1.08
+
+[sub_resource type="Resource" id="UnlockEffect_the_night_watch"]
+script = ExtResource("1_eff")
+kind = &"suspicion_decay"
+value = 1.1
+
 [sub_resource type="Resource" id="UnlockNode_grandmas_recipes"]
 script = ExtResource("2_node")
 id = &"grandmas_recipes"
@@ -168,12 +183,39 @@ cost = 230
 prerequisites = Array[StringName]([&"the_drill_song_book", &"the_sand_yard"])
 effect = SubResource("UnlockEffect_war_games_on_sundays")
 
+[sub_resource type="Resource" id="UnlockNode_quiet_boots"]
+script = ExtResource("2_node")
+id = &"quiet_boots"
+display_name = "Quiet Boots"
+branch = &"survivors"
+cost = 110
+effect = SubResource("UnlockEffect_quiet_boots")
+
+[sub_resource type="Resource" id="UnlockNode_scarred_banners"]
+script = ExtResource("2_node")
+id = &"scarred_banners"
+display_name = "Scarred Banners"
+branch = &"survivors"
+cost = 250
+prerequisites = Array[StringName]([&"quiet_boots"])
+effect = SubResource("UnlockEffect_scarred_banners")
+
+[sub_resource type="Resource" id="UnlockNode_the_night_watch"]
+script = ExtResource("2_node")
+id = &"the_night_watch"
+display_name = "The Night Watch"
+branch = &"survivors"
+cost = 330
+prerequisites = Array[StringName]([&"scarred_banners"])
+effect = SubResource("UnlockEffect_the_night_watch")
+
 [resource]
 script = ExtResource("3_tree")
 version = 1
-nodes = Array[ExtResource("2_node")]([SubResource("UnlockNode_grandmas_recipes"), SubResource("UnlockNode_the_seed_drawer"), SubResource("UnlockNode_the_emergency_cheese"), SubResource("UnlockNode_unpaid_artisans"), SubResource("UnlockNode_cousin_ironmonger"), SubResource("UnlockNode_the_masons_secret"), SubResource("UnlockNode_the_smiths_signature"), SubResource("UnlockNode_the_salvage_charter"), SubResource("UnlockNode_the_sergeants_primer"), SubResource("UnlockNode_the_drill_song_book"), SubResource("UnlockNode_the_sand_yard"), SubResource("UnlockNode_war_games_on_sundays")])
+nodes = Array[ExtResource("2_node")]([SubResource("UnlockNode_grandmas_recipes"), SubResource("UnlockNode_the_seed_drawer"), SubResource("UnlockNode_the_emergency_cheese"), SubResource("UnlockNode_unpaid_artisans"), SubResource("UnlockNode_cousin_ironmonger"), SubResource("UnlockNode_the_masons_secret"), SubResource("UnlockNode_the_smiths_signature"), SubResource("UnlockNode_the_salvage_charter"), SubResource("UnlockNode_the_sergeants_primer"), SubResource("UnlockNode_the_drill_song_book"), SubResource("UnlockNode_the_sand_yard"), SubResource("UnlockNode_war_games_on_sundays"), SubResource("UnlockNode_quiet_boots"), SubResource("UnlockNode_scarred_banners"), SubResource("UnlockNode_the_night_watch")])
 branch_crests = Dictionary[StringName, StringName]({
 &"old_guard": &"crest_old_guard",
 &"workshop": &"crest_workshop",
-&"yard": &"crest_yard"
+&"yard": &"crest_yard",
+&"survivors": &"crest_survivors"
 })

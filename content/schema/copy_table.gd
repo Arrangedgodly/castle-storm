@@ -190,6 +190,10 @@ const KEY_TOKENS: Dictionary = {
 	&"unlock_flavor_the_drill_song_book": [],
 	&"unlock_flavor_the_sand_yard": [],
 	&"unlock_flavor_war_games_on_sundays": [],
+	&"unlock_branch_survivors": [],
+	&"unlock_flavor_quiet_boots": [],
+	&"unlock_flavor_scarred_banners": [],
+	&"unlock_flavor_the_night_watch": [],
 }
 
 ## Automated register floor: whole WORDS that BREAK the voice (modern

@@ -112,6 +112,11 @@ var _starting_grants: Dictionary = {}  # StringName resource id -> int amount (b
 var _stipend_run := 0  # run_index that already took its stipend (0 = none; serialized + hashed)
 var _legacy: LegacySystem = null  # the L1 unlock-tree provider (null = identity modifiers)
 var _legacy_stipend_milli := SimFixed.MILLI  # the run's APPLIED stipend multiplier (serialized + hashed when non-identity)
+## The run's APPLIED veterans multiplier (L1-B2): the assault resolver
+## reads it through `legacy_veterans_milli()` — the stateless resolver's
+## window onto run-scoped legacy config, exactly the way it reads
+## `current_regime()`. Serialized + hashed when non-identity.
+var _legacy_veterans_milli := SimFixed.MILLI
 
 
 func _init(
@@ -224,6 +229,15 @@ func current_regime() -> RegimeDef:
 
 func regime_id() -> StringName:
 	return &"" if _regime == null else _regime.id
+
+
+## The run's APPLIED veterans multiplier (milli; 1000 = identity), resolved
+## at the fold that opened this run. The assault resolver multiplies it
+## into the army side of the odds math ONLY — the commit floor and this
+## system's score banking read the RAW army_power (a veterans bonus must
+## not fake the knight floor or inflate the lp bank).
+func legacy_veterans_milli() -> int:
+	return _legacy_veterans_milli
 
 
 # --- Victory / failure entry point -----------------------------------------
@@ -433,19 +447,25 @@ func _fold_new_run(engine: SimEngine, draw_regime: bool) -> void:
 	# The L1 legacy handoff (docs/sim-engine.md §18, the same drain-time
 	# pattern): resolve ONE modifier bundle from the purchased unlock set
 	# and apply it to the siblings the moment the run opens — so purchases
-	# land at the NEXT run start, never mid-run. The stipend field is baked
-	# below (this system owns the grant verb); production/units carry their
-	# own applied multipliers as serialized + hashed state (the regime-
-	# quirks precedent — a restore resumes them verbatim, and an engine
-	# with NO unlocks serializes nothing and hashes byte-identically to the
-	# pre-L1 build).
+	# land at the NEXT run start, never mid-run. The stipend and veterans
+	# fields are baked below (this system owns the grant verb and carries
+	# the veterans read the stateless assault resolver queries, exactly the
+	# current_regime shape); production/units/suspicion carry their own
+	# applied multipliers as serialized + hashed state (the regime-quirks
+	# precedent — a restore resumes them verbatim, and an engine with NO
+	# unlocks serializes nothing and hashes byte-identically to the pre-L1
+	# build).
 	var mods := _legacy.modifiers() if _legacy != null else LegacyModifiers.identity()
 	_legacy_stipend_milli = mods.stipend_milli
+	_legacy_veterans_milli = mods.veterans_milli
 	if production != null and production.has_method("set_legacy_modifiers"):
 		production.set_legacy_modifiers(mods)
 	var units := engine.get_system(&"units")
 	if units != null and units.has_method("set_legacy_modifiers"):
 		units.set_legacy_modifiers(mods)
+	var suspicion := engine.get_system(&"suspicion")
+	if suspicion != null and suspicion.has_method("set_legacy_modifiers"):
+		suspicion.set_legacy_modifiers(mods)
 
 
 ## Closes the running run: banks the score into RunMeta (win OR loss),
@@ -560,8 +580,12 @@ func state_hash() -> int:
 	# non-identity, so engines with no unlocks hash byte-identically to the
 	# pre-L1 build (an oracle blind to it could call a lost multiplier
 	# "identical" and diverge on the next grant — the T-ARCH-03 lesson).
+	# Same discipline for the L1-B2 veterans multiplier (the next odds read
+	# would diverge on a lost value).
 	if _legacy_stipend_milli != SimFixed.MILLI:
 		hash_value = _mix(hash_value, _legacy_stipend_milli)
+	if _legacy_veterans_milli != SimFixed.MILLI:
+		hash_value = _mix(hash_value, _legacy_veterans_milli)
 	return hash_value
 
 
@@ -587,9 +611,12 @@ func to_dict() -> Dictionary:
 	# (additive-optional, the escalation_garrison emit-when-non-null
 	# discipline): a no-unlocks engine saves byte-identically to pre-L1, a
 	# modulated one restores its stipend verbatim (no run_start drain runs
-	# post-restore to re-resolve it).
+	# post-restore to re-resolve it). The L1-B2 veterans multiplier follows
+	# the same rule (the resolver's odds read must not silently reset).
 	if _legacy_stipend_milli != SimFixed.MILLI:
 		state["legacy_stipend_milli"] = _legacy_stipend_milli
+	if _legacy_veterans_milli != SimFixed.MILLI:
+		state["legacy_veterans_milli"] = _legacy_veterans_milli
 	return state
 
 
@@ -620,8 +647,10 @@ func from_dict(state: Dictionary) -> void:
 	_stipend_run = int(state.get("stipend_run", 0))
 	# Tolerant read of the applied L1 stipend multiplier: absent key = a
 	# pre-L1 (or no-unlocks) save = identity — the next fold re-resolves
-	# from the live provider anyway.
+	# from the live provider anyway. The L1-B2 veterans multiplier reads
+	# the same way.
 	_legacy_stipend_milli = int(state.get("legacy_stipend_milli", SimFixed.MILLI))
+	_legacy_veterans_milli = int(state.get("legacy_veterans_milli", SimFixed.MILLI))
 
 
 ## FNV-flavored 32-bit-safe mix (same shape as SimEngine._mix —

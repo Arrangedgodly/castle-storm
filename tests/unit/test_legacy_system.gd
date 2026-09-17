@@ -211,6 +211,23 @@ func test_nonpositive_effect_value_is_an_error() -> void:
 	assert_array(_errors_of(tree)).is_equal(["unlock '%s': effect value must be > 0 (got %s)" % [tree.nodes[0].id, tree.nodes[0].effect.value]])
 
 
+func test_pressure_kinds_are_validated_kinds_and_still_value_gated() -> void:
+	## The L1-B2 kinds are registry members on BOTH sides (resolution engine
+	## + validator mirror), and their values keep the positive gate: a
+	## decay/veterans node at 0 is a validator error with the same grammar.
+	assert_bool(LegacyModifiers.EFFECT_KINDS.has(&"suspicion_decay")).is_true()
+	assert_bool(LegacyModifiers.EFFECT_KINDS.has(&"veterans")).is_true()
+	assert_bool(ContentValidator.LEGACY_EFFECT_KINDS.has(&"suspicion_decay")).is_true()
+	assert_bool(ContentValidator.LEGACY_EFFECT_KINDS.has(&"veterans")).is_true()
+	var tree := UnlockTreeDef.new()
+	var decay := _node(&"free_decay", &"x", 10, [], &"suspicion_decay", 0.0)
+	var vets := _node(&"free_veterans", &"x", 10, [], &"veterans", -1.5)
+	tree.nodes = [decay, vets]
+	var errors := _errors_of(tree)
+	assert_bool(errors.has("unlock 'free_decay': effect value must be > 0 (got 0.0)")).is_true()
+	assert_bool(errors.has("unlock 'free_veterans': effect value must be > 0 (got -1.5)")).is_true()
+
+
 # --- LegacyModifiers resolution ---------------------------------------------------
 
 
@@ -222,6 +239,8 @@ func test_identity_bundle_is_all_1000s() -> void:
 	assert_int(mods.training_time_milli).is_equal(1000)
 	assert_int(mods.gear_cost_milli).is_equal(1000)
 	assert_int(mods.stipend_milli).is_equal(1000)
+	assert_int(mods.suspicion_decay_milli).is_equal(1000)
+	assert_int(mods.veterans_milli).is_equal(1000)
 
 
 func test_no_nodes_resolve_to_identity() -> void:
@@ -236,6 +255,8 @@ func test_each_kind_lands_in_its_own_field() -> void:
 		_node(&"c", &"x", 1, [], &"training_time_multiplier", 0.7),
 		_node(&"d", &"x", 1, [], &"gear_cost_multiplier", 0.6),
 		_node(&"e", &"x", 1, [], &"stipend_bonus", 1.25),
+		_node(&"f", &"x", 1, [], &"suspicion_decay", 1.5),
+		_node(&"g", &"x", 1, [], &"veterans", 1.25),
 	]
 	var mods := LegacyModifiers.from_nodes(tree.nodes)
 	assert_int(mods.recruit_arrival_interval_milli).is_equal(900)
@@ -243,7 +264,31 @@ func test_each_kind_lands_in_its_own_field() -> void:
 	assert_int(mods.training_time_milli).is_equal(700)
 	assert_int(mods.gear_cost_milli).is_equal(600)
 	assert_int(mods.stipend_milli).is_equal(1250)
+	assert_int(mods.suspicion_decay_milli).is_equal(1500)
+	assert_int(mods.veterans_milli).is_equal(1250)
 	assert_bool(mods.is_identity()).is_false()
+
+
+func test_pressure_kinds_compound_and_round_trip_through_dict() -> void:
+	## The L1-B2 kinds compound like every other field (exact int chains)
+	## and survive to_dict/from_dict verbatim; a pre-L1-B2 payload (no
+	## keys) restores identity for them (tolerant reader).
+	var tree := UnlockTreeDef.new()
+	tree.nodes = [
+		_node(&"a", &"x", 1, [], &"suspicion_decay", 1.15),
+		_node(&"b", &"x", 1, [], &"suspicion_decay", 1.25),
+		_node(&"c", &"x", 1, [], &"veterans", 1.2),
+	]
+	var mods := LegacyModifiers.from_nodes(tree.nodes)
+	assert_int(mods.suspicion_decay_milli).is_equal(1437)  # 1150 x 1250 / 1000
+	assert_int(mods.veterans_milli).is_equal(1200)
+	var restored := LegacyModifiers.from_dict(mods.to_dict())
+	assert_int(restored.suspicion_decay_milli).is_equal(1437)
+	assert_int(restored.veterans_milli).is_equal(1200)
+	var legacy_payload := {"stipend_milli": 1250, "building_cost_milli": 900}
+	var old := LegacyModifiers.from_dict(legacy_payload)
+	assert_int(old.suspicion_decay_milli).is_equal(1000)
+	assert_int(old.veterans_milli).is_equal(1000)
 
 
 func test_same_kind_compounds_and_order_does_not_matter() -> void:

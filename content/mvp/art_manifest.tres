@@ -161,6 +161,13 @@ source_path = "res://assets/vendor/armorial/crests/spears_paled.svg"
 license = "commercial"
 pending = true
 
+[sub_resource type="Resource" id="ArtAssetDef_24"]
+script = ExtResource("1_g")
+id = &"crest_survivors"
+source_path = "res://assets/vendor/armorial/crests/torch_shielded.svg"
+license = "commercial"
+pending = true
+
 [resource]
 script = ExtResource("2_g")
-assets = Array[ExtResource("1_g")]([SubResource("ArtAssetDef_1"), SubResource("ArtAssetDef_2"), SubResource("ArtAssetDef_3"), SubResource("ArtAssetDef_4"), SubResource("ArtAssetDef_5"), SubResource("ArtAssetDef_6"), SubResource("ArtAssetDef_7"), SubResource("ArtAssetDef_8"), SubResource("ArtAssetDef_9"), SubResource("ArtAssetDef_10"), SubResource("ArtAssetDef_11"), SubResource("ArtAssetDef_12"), SubResource("ArtAssetDef_13"), SubResource("ArtAssetDef_14"), SubResource("ArtAssetDef_15"), SubResource("ArtAssetDef_16"), SubResource("ArtAssetDef_17"), SubResource("ArtAssetDef_18"), SubResource("ArtAssetDef_19"), SubResource("ArtAssetDef_20"), SubResource("ArtAssetDef_21"), SubResource("ArtAssetDef_22"), SubResource("ArtAssetDef_23")])
+assets = Array[ExtResource("1_g")]([SubResource("ArtAssetDef_1"), SubResource("ArtAssetDef_2"), SubResource("ArtAssetDef_3"), SubResource("ArtAssetDef_4"), SubResource("ArtAssetDef_5"), SubResource("ArtAssetDef_6"), SubResource("ArtAssetDef_7"), SubResource("ArtAssetDef_8"), SubResource("ArtAssetDef_9"), SubResource("ArtAssetDef_10"), SubResource("ArtAssetDef_11"), SubResource("ArtAssetDef_12"), SubResource("ArtAssetDef_13"), SubResource("ArtAssetDef_14"), SubResource("ArtAssetDef_15"), SubResource("ArtAssetDef_16"), SubResource("ArtAssetDef_17"), SubResource("ArtAssetDef_18"), SubResource("ArtAssetDef_19"), SubResource("ArtAssetDef_20"), SubResource("ArtAssetDef_21"), SubResource("ArtAssetDef_22"), SubResource("ArtAssetDef_23"), SubResource("ArtAssetDef_24")])

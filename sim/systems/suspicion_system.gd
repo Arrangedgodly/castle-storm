@@ -103,6 +103,11 @@ var _w_offer_milli := 0
 var _recruit_tolerance := 0
 var _post_crackdown_points_value := 0
 var _crush_fired := false
+## The run's APPLIED legacy suspicion-decay multiplier (L1-B2; serialized +
+## hashed when non-identity). Scales the PASSIVE drift decay only — act
+## bumps, presence weights, the pause rule and every threshold are
+## untouched (the meter still moves only through the heat profile).
+var _legacy_decay_milli := SimFixed.MILLI
 
 # Last-seen sibling counters (the audit scan's baseline). Serialized +
 # hashed: a restore without them would diff against zeroed counters and
@@ -382,6 +387,11 @@ func _apply_drift(engine: SimEngine, scan: Dictionary) -> void:
 	for id in scan["levels"].keys():
 		presence += _w_building_milli * int(scan["levels"][id])
 	var decay := _decay_high_milli if suspicion * SimFixed.MILLI >= _crackdown_milli else _decay_milli
+	# The L1-B2 legacy seam: the applied decay multiplier scales BOTH tiers
+	# proportionally (one exact int division; the high-tier compromise keeps
+	# its slower rate), never the presence side — a quieter meter, not a
+	# quieter conspiracy.
+	decay = decay * _legacy_decay_milli / SimFixed.MILLI
 	if engine.tick_count < decay_paused_until_tick:
 		decay = 0
 	var net := presence - decay
@@ -526,6 +536,11 @@ func state_hash() -> int:
 	uids.sort()
 	for uid in uids:
 		hash_value = _mix(hash_value, int(uid))
+	# The APPLIED L1-B2 decay multiplier is hashed state — but only when
+	# non-identity, so engines with no unlocks hash byte-identically to the
+	# pre-L1 build (the stipend-multiplier precedent).
+	if _legacy_decay_milli != SimFixed.MILLI:
+		hash_value = _mix(hash_value, _legacy_decay_milli)
 	return hash_value
 
 
@@ -537,7 +552,7 @@ func to_dict() -> Dictionary:
 	for uid in _watch_training.keys():
 		training.append(int(uid))
 	training.sort()
-	return {
+	var state := {
 		"suspicion": suspicion,
 		"accum": accum,
 		"warned": warned,
@@ -554,6 +569,13 @@ func to_dict() -> Dictionary:
 		"watch_building_levels": levels,
 		"watch_training_uids": training,
 	}
+	# The applied L1-B2 decay multiplier rides along ONLY when non-identity
+	# (additive-optional, the emit-when-non-null discipline): a no-unlocks
+	# engine saves byte-identically to pre-L1, a modulated one restores its
+	# decay verbatim (no run_start drain runs post-restore to re-resolve it).
+	if _legacy_decay_milli != SimFixed.MILLI:
+		state["legacy_decay_milli"] = _legacy_decay_milli
+	return state
 
 
 func from_dict(state: Dictionary) -> void:
@@ -577,6 +599,22 @@ func from_dict(state: Dictionary) -> void:
 	_watch_training.clear()
 	for uid in state.get("watch_training_uids", []):
 		_watch_training[int(uid)] = true
+	# Tolerant read of the applied L1-B2 decay multiplier: absent key = a
+	# pre-L1 (or no-unlocks) save = identity — the next fold re-resolves
+	# from the live provider anyway.
+	_legacy_decay_milli = int(state.get("legacy_decay_milli", SimFixed.MILLI))
+
+
+## Public legacy seam (L1-B2, docs/sim-engine.md §18): apply the resolved
+## unlock-tree bundle's suspicion-decay field. RunLifecycleSystem calls this
+## synchronously at the run_start/run_restart drains (the same drain-time
+## pattern as production's set_regime), so purchases land at the next run
+## start — never mid-run. NOT part of reset_run: the multiplier is
+## engine-session config re-applied by the fold that follows the reset, and
+## a restore reloads it verbatim from the run payload (the regime-quirks
+## discipline).
+func set_legacy_modifiers(mods: LegacyModifiers) -> void:
+	_legacy_decay_milli = SimFixed.MILLI if mods == null else mods.suspicion_decay_milli
 
 
 ## Run-reset seam (T-SIM-04 reset contract, docs/sim-engine.md §12): the

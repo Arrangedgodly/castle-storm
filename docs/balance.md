@@ -179,18 +179,20 @@ LegacySystem -> run-start modifier path — `_full_stack.session` gained the
 optional legacy provider exactly as GameHost wires it).
 
 **The shipped tree** (`content/mvp/unlock_tree.tres`, attached to the MVP
-pack; CopyDeck-voiced per docs/voice-bible.md): 12 nodes, 3 branches —
+pack; CopyDeck-voiced per docs/voice-bible.md): 15 nodes, 4 branches —
+the L1-B comfort tree plus L1-B2's pressure-model branch:
 
 | branch | nodes (costs) | effects (compound) |
 |---|---|---|
 | The Old Guard — the pantry ladder | Grandma's Recipes 60 -> The Seed Drawer 140 -> The Emergency Cheese 260 | stipend x1.10 / x1.10 / x1.08 = **x1.306** |
 | The Workshop — the makers | The Union of Unpaid Artisans 80 -> The Mason's Secret 180 -> The Salvage Charter 310 (the charter also gated by The Smith's Signature 220 <- A Cousin in Ironmongery 120) | building x0.95 / x0.93 / x0.91 = **x0.803**; gear x0.95 / x0.90 = **x0.855** |
 | The Yard — the drills | The Sergeant's Primer 100 -> The Drill-Song Book 140 + The Sand Yard 170 -> War Games on Sundays 230 | training x0.98 / x0.97 / x0.97 / x0.96 = **x0.884** |
+| The Survivors — the ones who came back (L1-B2) | Quiet Boots 110 -> Scarred Banners 250 -> The Night Watch 330 | suspicion decay x1.05 / x1.10 = **x1.155**; veterans x1.08 |
 
 The **arrival lever is deliberately absent** (the one L1-A effect kind the
 tree does not use — measured dead above x1.0 and harmful below; evidence
 below). Exact compounds are pinned in `tests/unit/test_mvp_unlock_tree.gd`
-(milli: 1306 / 803 / 855 / 884 / identity).
+(milli: 1306 / 803 / 855 / 884 / 1155 / 1080 / identity).
 
 **The cost curve, against the measured earn rates.** Score = duration +
 army power + 100 win bonus -> the recorded ~150-260 lp/run band: a 79 h
@@ -198,31 +200,35 @@ first win banks ~230-260; an early loss/crush ~150. The curve:
 
 | tier | nodes | costs | buyable from |
 |---|---|---|---|
-| 1 (ungated) | 4 | 60 / 80 / 100 / 120 | run 1's bank (even a losing run) |
-| 2 (one gate) | 5 | 140 / 140 / 170 / 180 / 220 | runs 2-4 |
-| 3 (capstones) | 3 | 230 / 260 / 310 | runs 5-10 |
+| 1 (ungated) | 5 | 60 / 80 / 100 / 110 / 120 | run 1's bank (even a losing run) |
+| 2 (one gate) | 6 | 140 / 140 / 170 / 180 / 220 / 250 | runs 2-4 |
+| 3 (capstones) | 4 | 230 / 260 / 310 / 330 | runs 5-10 |
 
-- **Total 2010 lp = ~8-12 runs** at the mean ~205 lp/run (wins ~240,
-  losses ~150) — the L1-B contract band; pinned [1600, 2400] so a node-add
-  cannot silently halve or double the campaign.
+- **Total 2700 lp = ~8-12 runs** at the measured band (the full-tree
+  player trends toward the rich end: compressed ~70 h wins bank ~200-240,
+  losses ~150) — the L1-B2 contract band; pinned [2400, 3000] so a
+  node-add cannot silently halve or double the campaign.
 - Rationale: tier-1 is cheap and plural (R5's Rogue-Legacy finding:
   breadth-first economy nodes first, something visible per early run);
   costs strictly increase along every prerequisite edge (one rising curve
   per branch, never a cheap capstone behind an expensive approach — the
   monotonic pin); each branch rises ~2.3-4x gate -> capstone.
 
-**The full-tree probe** (12 seeds, 20261201+, recorded 2026-09-17):
+**The full-tree probe** (12 seeds, 20261201+; the L1-B rows recorded
+2026-09-15, re-run 2026-09-17; the L1-B2 rows recorded 2026-09-17 on the
+15-node tree):
 
-| config | won | win mean | slowest | losses |
-|---|---|---|---|---|
-| baseline (zero purchases) | 12/12 | **79 h** | 127 h | 11 |
-| full tree (all 12 nodes) | 12/12 | **83 h** | 175 h | 13 |
+| config | won | win mean | slowest | losses | crushed |
+|---|---|---|---|---|---|
+| baseline (zero purchases) | 12/12 | **79 h** | 127 h | 11 | 0 |
+| L1-B tree (the 12 economy nodes) | 12/12 | **83 h** | 175 h | 13 | 0 |
+| **full tree (all 15 nodes, L1-B2)** | 12/12 | **70 h** | 115 h | 9 | 0 |
 
-(24-seed confirmation: baseline 85 h / 24/24, full tree 87 h — the +2-4 h
-delta is inside the band's seed noise; every run still winning either way.
-Pressure at full tree — the 1000 h sensible stream, T-QA-02 seed:
-**0 crushes / 0 strikes / 0 warns, suspicion peak 27** (< warn 35): the
-suspicion model is intact under the whole tree.)
+(L1-B's 24-seed confirmation: baseline 85 h / 24/24, full tree 87 h — the
++2-4 h delta was inside the band's seed noise; every run still winning
+either way. Pressure at full tree — the 1000 h sensible stream, T-QA-02
+seed: **0 crushes / 0 strikes / 0 warns, suspicion peak 22** (< warn 35):
+the suspicion model is intact under the whole tree.)
 
 **The honest finding: the first-win band is act-rate-limited, not
 resource-limited — no L1-A effect composition compresses it.** The L1-B
@@ -256,8 +262,54 @@ without ratcheting the meter). The BASELINE band is untouched (the CI band
 suite runs zero purchases and passes unchanged); the full tree stays
 inside the band's noise with every run still winning.
 
-**If real band compression (the 20-35% hope) is wanted**, it needs an
-L1-A vocabulary EXTENSION — an effect kind that touches the pressure model
-or the odds curve (e.g. a suspicion-decay or garrison modifier), which is
-an engine/registry decision (L1-A owns `LegacyModifiers.EFFECT_KINDS`),
-not a content retune. This section is the measured evidence for that call.
+### 6b. L1-B2 — the pressure-model extension (2026-09-17): suspicion_decay + veterans
+
+Worker: Iron Man lane (effects + tree), Hawkeye lane (the balance truth).
+The L1-B finding above asked for an L1-A vocabulary extension into the
+pressure model or the odds curve. L1-B2 shipped exactly two kinds —
+`suspicion_decay` (a multiplier on the passive −5/h decay, both tiers
+proportionally, applied at the run-start fold through the same
+legacy-modifier seam) and `veterans` (a multiplier on the army side of
+the assault odds math only — `raw_power x regime x veterans`; the commit
+floor and score banking read the RAW power) — plus the tree's 4th branch,
+**The Survivors** (Quiet Boots / Scarred Banners / The Night Watch).
+
+**The honest measurement (12-seed isolation probes, one lever at a time
+on the 15-node tree):**
+
+| probe | win mean | reading |
+|---|---|---|
+| L1-B 12-node tree (control) | 83 h | the act-rate-limited baseline of §6 |
+| **veterans x1.08 alone** | **70 h** (12/12, losses 13 -> 9) | **the compression lever**: the 450-permille commit line is crossed one pipeline batch earlier — the odds hop, not the meter |
+| veterans x1.10 / x1.12 | 70 h — identical to the digit | the plateau is QUANTIZED by the check-in cadence: no batch to skip, no gain |
+| veterans x1.15 / x1.20 | 71 h, **11/12 won**, losses 15 | the cliff: committing at thinner rosters trades wins for speed — rejected |
+| suspicion decay x1.4375 alone | 82 h | decay is COMPRESSION-INERT in this policy (the modeled player's meter rides below warn either way) — and at the task's example magnitude it still buys 0 h of win time while breaking the greed line (below) |
+| decay x1.155 … x1.4375 ON TOP of veterans x1.08 | 70 h — identical to veterans alone at every magnitude probed | the meter was never the stall in this policy; the odds line was |
+
+**The plateau is structural, not tunable**: at the sensible cadence the
+commit line lands at check-in granularity, so 79 h -> 70 h (~11%, the
+12-seed mean) is everything the two kinds can buy without starting to
+lose runs. The 12-seed full-tree target band "~62-70 h" is met at its
+edge (70 h, 12/12 won, slowest 115 h vs baseline 127 h, losses 11 -> 9);
+the ~12-22% hope above ~12% needs a cadence/commit-line change (the
+player model), not more multiplier.
+
+**The pressure retune (Hawkeye's line): the decay node magnitudes were
+cut from the task's examples (x1.15/x1.25) to x1.05/x1.10 — the greed
+crush demanded it.** At compound x1.4375 the failure-mode probe ERODED
+seed by seed: seed 20261201 survived 400 h of military-24 /
+never-lay-low (11 warns, 6 strikes, no crush; baseline crushes it at
+~28 h). At x1.265 a different seed survived. The shipped x1.155 keeps
+the teeth: the harness's greed probe crushes at **27 h on both recorded
+seeds** (baseline 28 h), and the 1000 h sensible stream stays quiet
+(peak 22 < warn 35). Greed's net presence is ~+0.8/h over even a x1.4
+decay — the failure mode survives on margins that thin, which is exactly
+why the compound is pinned under x1.25 in test_mvp_unlock_tree.
+
+**What The Survivors therefore sells**: the commit line arrives one
+batch earlier (veterans x1.08 — felt every run), and the meter cools
+~15% faster (decay x1.155 — felt in the telegraph-cancel window, the
+lay-low recovery and the post-crackdown dip; deliberately small so the
+Crown keeps its bite). Baseline digests: byte-identical (every existing
+marathon suite green, unchanged); the zero-impact proof extends to both
+new seams (serialized + hashed only when non-identity).

@@ -23,6 +23,12 @@
 ##   data contract, displayed BEFORE commit):
 ##     army_score    = units.army_power() (def + gear tiers, incl. archer
 ##                     support values) x army_score_multiplier (regime)
+##                     x veterans_multiplier (the run's APPLIED legacy
+##                     bundle — L1-B2, read from the run system exactly
+##                     the way the regime is; 1000 = identity. The floor
+##                     and score banking read the RAW army_power: a
+##                     veterans bonus raises the odds line, never the
+##                     commit gate or the banked lp)
 ##     garrison      = tunables.assault_garrison_base_power
 ##                     x garrison_multiplier (regime)
 ##     win_permille  = army_milli * 1000 / (army_milli + garrison_milli)
@@ -34,7 +40,10 @@
 ##     (garrison_multiplier scales the castle, army_score_multiplier the
 ##     army — the schema allots one combat modifier per flavor). A
 ##     regime-less run (restore edge, warned loudly by the run system) uses
-##     neutral x1.000 multipliers on both sides.
+##     neutral x1.000 multipliers on both sides. The veterans multiplier
+##     compounds on the ARMY side after the regime multiplier (one exact
+##     int division per hop) — a veteran roster under a strong-leader
+##     regime fights with both.
 ##
 ##   commit (`commit_assault` command, resolved AT the drain):
 ##     guards   -> `assault_denied` (value = reason, value2 = live army
@@ -193,7 +202,10 @@ func assault_odds(engine: SimEngine) -> Dictionary:
 	var army_power := def_power_sum + gear_power_sum
 	var army_mult := _army_multiplier_milli(engine)
 	var garrison_mult := _garrison_multiplier_milli(engine)
-	var army_milli := army_power * army_mult
+	# The L1-B2 veterans hop (one exact int division): army side of the
+	# odds math only — `power` and `floor_met` above stay RAW.
+	var veterans_mult := _veterans_multiplier_milli(engine)
+	var army_milli := army_power * army_mult * veterans_mult / SimFixed.MILLI
 	var garrison_milli := _garrison_base * garrison_mult
 	return {
 		"floor_power": _floor_power,
@@ -205,6 +217,7 @@ func assault_odds(engine: SimEngine) -> Dictionary:
 			"def_power_sum": def_power_sum,
 			"gear_power_sum": gear_power_sum,
 			"regime_multiplier_milli": army_mult,
+			"veterans_multiplier_milli": veterans_mult,
 			"score_milli": army_milli,
 			"per_unit": per_unit,
 		},
@@ -297,7 +310,8 @@ func _resolve(engine: SimEngine) -> void:
 	var army_units := int(army["units"])
 	var losses := (army_units * _loss_milli + SimFixed.MILLI - 1) / SimFixed.MILLI  # ceil
 	var removed: Array = units.apply_army_losses(losses)
-	var survivors_milli := int(units.army_power()) * int(army["regime_multiplier_milli"])
+	var survivors_milli := int(units.army_power()) * int(army["regime_multiplier_milli"]) \
+		* _veterans_multiplier_milli(engine) / SimFixed.MILLI
 	_narrate_loss(engine, army_milli, garrison_milli, survivors_milli)
 	if not removed.is_empty():
 		engine.events.record(
@@ -385,6 +399,18 @@ func _garrison_multiplier_milli(engine: SimEngine) -> int:
 	if regime.combat_modifier.kind != &"garrison_multiplier":
 		return SimFixed.MILLI
 	return SimFixed.milli_from_float(regime.combat_modifier.value)
+
+
+## The run's APPLIED veterans multiplier (L1-B2), read through the run
+## system — the stateless resolver's window onto run-scoped legacy config,
+## exactly the `_regime` shape. Identity (1000) for regime-less runs, runs
+## without a legacy provider, and any run whose bundle bought no veterans
+## node — the pre-L1-B2 odds to the digit.
+func _veterans_multiplier_milli(engine: SimEngine) -> int:
+	var run: Variant = engine.get_system(&"run")
+	if run == null or not run.has_method("legacy_veterans_milli"):
+		return SimFixed.MILLI
+	return int(run.legacy_veterans_milli())
 
 
 func _regime(engine: SimEngine) -> RegimeDef:

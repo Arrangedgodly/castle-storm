@@ -297,8 +297,11 @@ func measure_stability(tunables: EconomyTunables, seed: int, policy: Dictionary,
 ## The greedy player: accepts everyone (population 40), builds the biggest
 ## army the policy allows (military 24), and NEVER lays low — no dismissal,
 ## no standing down. The crush MUST be reachable on this side of the line.
-func measure_greed(tunables: EconomyTunables, seed: int, hours: int) -> Dictionary:
-	var session: Variant = HOST.session(seed, {}, tunables)
+## `legacy` (L1-B2 probe) wires the unlock-tree provider in exactly the way
+## GameHost does — the full tree's decay multiplier must NOT neuter the
+## failure mode.
+func measure_greed(tunables: EconomyTunables, seed: int, hours: int, legacy: LegacySystem = null) -> Dictionary:
+	var session: Variant = HOST.session(seed, {}, tunables, legacy)
 	var engine: SimEngine = session.engine
 	var run := engine.get_system(&"run") as RunLifecycleSystem
 	var suspicion := engine.get_system(&"suspicion") as SuspicionSystem
@@ -546,10 +549,11 @@ func _sweep_legacy_tree(seed_count: int) -> void:
 	var mods := _legacy_full_tree().modifiers()
 	print("== L1 full-tree probe (the shipped tree: %d nodes, %d lp total; earn rates ~150-260 lp/run) ==" % [
 		tree.nodes.size(), total])
-	print("[legacy] resolved full-tree bundle: arrivals x%.3f · building x%.3f · training x%.3f · gear x%.3f · stipend x%.3f" % [
+	print("[legacy] resolved full-tree bundle: arrivals x%.3f · building x%.3f · training x%.3f · gear x%.3f · stipend x%.3f · suspicion decay x%.3f · veterans x%.3f" % [
 		mods.recruit_arrival_interval_milli / 1000.0, mods.building_cost_milli / 1000.0,
 		mods.training_time_milli / 1000.0, mods.gear_cost_milli / 1000.0,
-		mods.stipend_milli / 1000.0])
+		mods.stipend_milli / 1000.0, mods.suspicion_decay_milli / 1000.0,
+		mods.veterans_milli / 1000.0])
 	print("| config | won | win mean | slowest | losses | crushed |")
 	print("|---|---|---|---|---|---|")
 	for config in [
@@ -581,6 +585,15 @@ func _sweep_legacy_tree(seed_count: int) -> void:
 	print("[legacy pressure] 1000h sensible-play at full tree: crushes %d, strikes %d, telegraphs %d, cancels %d, warns %d, suspicion peak %d, alive %s" % [
 		pressure["crushes"], pressure["strikes"], pressure["telegraphs"], pressure["cancels"],
 		pressure["warns"], pressure["suspicion_peak"], pressure["alive_at_end"]])
+	print()
+	# ...and the greed probe under the SAME bundle (L1-B2): the decay
+	# multiplier must not neuter the failure mode — a loud policy still
+	# dies. Both the honest seed (20261201) and the T-QA-02 seed (20261001).
+	for greed_seed in [20261201, 20261001]:
+		var greed := measure_greed(_tunables({}), greed_seed, 400, _legacy_full_tree())
+		print("[legacy greed] full-tree failure-mode probe (military 24, population 40, never lay low, seed %d): crushed %s at hour %.0f, strikes %d, warns %d" % [
+			greed_seed, "YES" if greed["crushes"] > 0 else "no",
+			greed["crush_tick"] / 60.0, greed["strikes"], greed["warns"]])
 	print()
 
 

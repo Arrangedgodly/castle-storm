@@ -182,9 +182,10 @@ garrison ×1.2 (archers on the walls) + timber ×0.85 (timber tax).
 The persistent meta-progression layer (post-MVP Layer 1; R5's Rogue
 Legacy manor pattern — always-on, fed by every run win or lose). The tree
 attaches to the pack **additively-optional** (`unlock_tree`); the MVP pack
-ships the L1-B tree (`content/mvp/unlock_tree.tres`: 12 nodes, 3 branches
-— The Old Guard / The Workshop / The Yard, CopyDeck-voiced, cost-curved
-against docs/balance.md §6), and absence remains legal everywhere.
+ships the L1-B/B2 tree (`content/mvp/unlock_tree.tres`: 15 nodes, 4
+branches — The Old Guard / The Workshop / The Yard / The Survivors,
+CopyDeck-voiced, cost-curved against docs/balance.md §6), and absence
+remains legal everywhere.
 
 | Field | Type | Constraint | Meaning |
 |---|---|---|---|
@@ -214,6 +215,12 @@ regime kinds):
   zero-hour trainings stay zero-hour)
 - `gear_cost_multiplier` — gear recipe payments (floored lines, min 1)
 - `stipend_bonus` — the run-start `grant_resources` stipend (1.25 = +25%)
+- `suspicion_decay` — the suspicion system's PASSIVE decay, both tiers
+  proportionally (L1-B2, the pressure-model extension; 1.05 = the meter
+  cools 5% faster — act bumps, presence and thresholds are untouched)
+- `veterans` — the army's score in the assault odds math ONLY (L1-B2:
+  1.08 = the same roster fights 8% above raw power; the commit floor and
+  run-score banking read the RAW `army_power`)
 
 Validator: `ContentValidator.validate_unlock_tree(tree)` (pure, also
 called by `validate_pack` for an attached tree; error grammar
@@ -431,19 +438,22 @@ truth — no suite carries its own content copy):
   names × 52 epithets (2,392 full-name permutations — thousands), 20
   personality tags, 72 recruit names, 10 leader trait labels — medieval
   farce, no anachronisms (banned-register scanned by test).
-- **Copy table** (T-COPY-01, additive + the L1-B unlock family): 125
+- **Copy table** (T-COPY-01, additive + the L1-B/B2 unlock family): 129
   template keys × 1–4 variants
   each — the shipped voice for every repeating printed line, sized to
   the 476px/22px line-budget standard with seeded variant rotation
   (docs/voice-bible.md).
-- **Unlock tree** (L1-B): `unlock_tree.tres` — 12 nodes, 3 branches
+- **Unlock tree** (L1-B/B2): `unlock_tree.tres` — 15 nodes, 4 branches
   (The Old Guard pantry ladder: stipend ×1.306 compound; The Workshop:
-  building ×0.803 / gear ×0.855; The Yard: training ×0.884; the arrival
-  lever deliberately absent — measured dead/harmful, docs/balance.md §6),
-  branch crests `crest_old_guard/workshop/yard` (pending Armorial), tier-1
-  costs 60–120 lp against the ~150–260 lp/run earn band, total 2010 lp ≈
-  8–12 runs. Voice through `unlock_branch_*` / `unlock_flavor_*` copy keys;
-  cost curve + full-tree balance probe recorded in docs/balance.md §6.
+  building ×0.803 / gear ×0.855; The Yard: training ×0.884; The Survivors
+  — L1-B2's pressure-model branch: suspicion decay ×1.155 / veterans
+  ×1.08; the arrival lever deliberately absent — measured dead/harmful,
+  docs/balance.md §6),
+  branch crests `crest_old_guard/workshop/yard/survivors` (pending
+  Armorial), tier-1 costs 60–120 lp against the ~150–260 lp/run earn
+  band, total 2700 lp ≈ 8–12 runs. Voice through `unlock_branch_*` /
+  `unlock_flavor_*` copy keys; cost curve + full-tree balance probe
+  recorded in docs/balance.md §6.
 - **starting_grants**: `{food 50, timber 80}` — affords building all four
   buildings at identity costs with a thin spare buffer; paid once per run
   by the `grant_resources` command (docs/sim-engine.md §12, F1).

@@ -1,5 +1,5 @@
-## Unit tests for the SHIPPED legacy unlock tree (L1-B, the tree content —
-## Mr Fantastic authoring + Prof X feel lane). Mirrors
+## Unit tests for the SHIPPED legacy unlock tree (L1-B/B2, the tree content
+## — Mr Fantastic authoring + Prof X feel lane). Mirrors
 ## content/mvp/unlock_tree.tres + content/mvp/pack.tres (the wiring) +
 ## content/mvp/copy_table.tres + sim/copy_deck.gd (the voice seam) +
 ## content/mvp/art_manifest.tres (the branch crests) + the cost curve
@@ -7,17 +7,21 @@
 ## pinned:
 ##   - the pack loads with the tree attached and validates clean through
 ##     the loud gate (including the branch-crest manifest cross-check);
-##   - SHAPE: 12 nodes across 3 branches (R5: 2-4 node families, one
+##   - SHAPE: 15 nodes across 4 branches (R5: 2-4 node families, one
 ##     effect per node — the RegimeModifier discipline; the arrival lever
-##     is deliberately ABSENT, the measured dead/harmful kind);
+##     is deliberately ABSENT, the measured dead/harmful kind; L1-B2's
+##     Survivors branch carries the two pressure-model kinds);
 ##   - the COST CURVE: tier-1 nodes affordable from run 1's bank, the full
 ##     tree across ~8-12 measured runs, and cost strictly increasing along
 ##     every prerequisite edge (monotonic within branch tiers);
 ##   - FEEL BOUNDS: per-node effect values and the FULL-TREE compounds —
 ##     the training compound may not cross the measured-and-rejected 0.75
 ##     retune line (docs/balance.md 2026-09-17: 2h->1.5h drills pushed the
-##     first-win tail to 169h), the other multipliers keep the same order
-##     of restraint, and the stipend stays under x1.6;
+##     first-win tail to 169h), the economy multipliers keep the same
+##     order of restraint, the stipend stays under x1.6, and the pressure
+##     kinds are capped where the pressure model keeps its teeth (decay
+##     compound under the greed line's net presence; veterans a nudge on
+##     the odds, never a rewrite);
 ##   - the COPYDECK SEAM: every branch and node carries its
 ##     unlock_branch_*/unlock_flavor_* key through KEY_TOKENS + DEFAULTS +
 ##     CONSUMERS + the shipped table (one voice, no orphans, literal lines)
@@ -75,18 +79,19 @@ func test_pack_loads_with_the_tree_attached_and_validates_clean() -> void:
 	assert_array(ContentValidator.validate_unlock_tree(pack.unlock_tree, pack.art)).is_empty()
 
 
-func test_tree_shape_is_twelve_nodes_across_three_branches() -> void:
+func test_tree_shape_is_fifteen_nodes_across_four_branches() -> void:
 	var tree := _tree()
 	assert_int(tree.version).is_equal(1)
-	assert_int(tree.nodes.size()).is_equal(12)
+	assert_int(tree.nodes.size()).is_equal(15)
 	var branches := {}
 	for node in tree.nodes:
 		branches[node.branch] = true
-	assert_int(branches.size()).is_equal(3)
-	for branch in [&"old_guard", &"workshop", &"yard"]:
+	assert_int(branches.size()).is_equal(4)
+	for branch in [&"old_guard", &"workshop", &"yard", &"survivors"]:
 		assert_bool(branches.has(branch)).is_true()
 	# R5: 2-4 node families per layer — every branch carries 3-5 nodes
-	# (the Old Guard's pantry ladder is 3; the Workshop's maker families 5).
+	# (the Old Guard's pantry ladder is 3; the Workshop's maker families 5;
+	# the Survivors' pressure ladder 3).
 	for branch in branches.keys():
 		var count := 0
 		for node in tree.nodes:
@@ -131,14 +136,15 @@ func test_tier_one_nodes_are_affordable_from_run_one() -> void:
 
 
 func test_full_tree_costs_eight_to_twelve_measured_runs() -> void:
-	## The curve of record: 2010 lp total vs the ~150-260 lp/run earn band
-	## (mean ~205) = the full tree lands across ~8-12 runs, inside the
-	## L1-B contract; the bounds keep a future node-add from silently
+	## The curve of record: 2700 lp total vs the ~150-260 lp/run earn band
+	## (mean ~205 baseline, wins trending richer as the Survivors branch
+	## compresses runs) = the full tree lands across ~8-12 runs, inside the
+	## L1-B2 contract; the bounds keep a future node-add from silently
 	## halving or doubling the campaign length.
 	var total := _total_cost()
-	assert_int(total).is_greater_equal(1600)
-	assert_int(total).is_less_equal(2400)
-	assert_int(total).is_equal(2010)
+	assert_int(total).is_greater_equal(2400)
+	assert_int(total).is_less_equal(3000)
+	assert_int(total).is_equal(2700)
 
 
 func test_costs_strictly_increase_along_prerequisite_edges() -> void:
@@ -160,14 +166,24 @@ func test_costs_strictly_increase_along_prerequisite_edges() -> void:
 
 func test_every_effect_value_is_felt_but_restrained() -> void:
 	## Per-node bounds: every multiplier is a nudge a player can feel
-	## (>= 5% per node) without any single node rewriting the economy
-	## (<= 15% off a cost/time, <= +20% stipend).
+	## (>= 5% per node) without any single node rewriting the economy or
+	## the pressure model (<= 15% off a cost/time, <= +20% stipend; the
+	## pressure kinds are capped where the L1-B2 probe measured their
+	## failure lines — decay <= +20%/node with the compound under x1.25
+	## (the greed crush erodes above it), veterans <= +10% (the
+	## compression plateau's cliff sits at x1.15)).
 	for node in tree_nodes():
 		var value: float = node.effect.value
 		match node.effect.kind:
 			&"stipend_bonus":
 				assert_float(value).is_greater_equal(1.05)
 				assert_float(value).is_less_equal(1.20)
+			&"suspicion_decay":
+				assert_float(value).is_greater_equal(1.05)
+				assert_float(value).is_less_equal(1.20)
+			&"veterans":
+				assert_float(value).is_greater_equal(1.03)
+				assert_float(value).is_less_equal(1.10)
 			_:
 				assert_float(value).is_greater_equal(0.85)
 				assert_float(value).is_less_equal(0.98)
@@ -184,13 +200,20 @@ func test_full_tree_purchase_and_compound_bounds() -> void:
 	for id in legacy.node_ids():
 		assert_bool(legacy.purchase(id)).is_true()
 	assert_int(legacy.bank()).is_equal(0)
-	assert_int(legacy.owned_count()).is_equal(12)
+	assert_int(legacy.owned_count()).is_equal(15)
 	# The resolved bundle — the full-tree modifiers the balance probe
 	# drives, pinned EXACTLY (the balance doc's numbers live here) and
 	# bounded. The training compound may not cross the measured-and-
 	# rejected 0.75 retune line (docs/balance.md 2026-09-17: faster base
 	# drills pushed the first-win tail to 169h past the 132h bound); the
-	# other fields keep the same order of restraint; the stipend is capped.
+	# economy fields keep the same order of restraint; the stipend is
+	# capped; the decay compound stays under x1.25 (the L1-B2 probe
+	# measured the greed crush ERODING seed-by-seed from ~x1.27 up — at
+	# x1.4375 one probe seed survived 400h of never-lay-low; the shipped
+	# x1.155 crushes all three probe seeds at 26h, the baseline hour) and
+	# the veterans compound is a nudge (<= x1.10 — the compression
+	# plateau's measured cliff: >= x1.15 starts losing seeds to early
+	# commits), never an odds rewrite.
 	var mods := legacy.modifiers()
 	assert_bool(mods.is_identity()).is_false()
 	assert_int(mods.recruit_arrival_interval_milli).is_equal(SimFixed.MILLI)
@@ -198,12 +221,16 @@ func test_full_tree_purchase_and_compound_bounds() -> void:
 	assert_int(mods.gear_cost_milli).is_equal(855)
 	assert_int(mods.training_time_milli).is_equal(884)
 	assert_int(mods.stipend_milli).is_equal(1306)
+	assert_int(mods.suspicion_decay_milli).is_equal(1155)  # 1.05 x 1.10
+	assert_int(mods.veterans_milli).is_equal(1080)
 	assert_int(mods.recruit_arrival_interval_milli).is_greater_equal(800)
 	assert_int(mods.building_cost_milli).is_greater_equal(700)
 	assert_int(mods.gear_cost_milli).is_greater_equal(800)
 	assert_int(mods.training_time_milli).is_greater_equal(750)
 	assert_int(mods.stipend_milli).is_less_equal(1600)
-	# Four of the five effect kinds are in play; the ARRIVAL lever is
+	assert_int(mods.suspicion_decay_milli).is_less_equal(1250)
+	assert_int(mods.veterans_milli).is_less_equal(1100)
+	# Six of the seven effect kinds are in play; the ARRIVAL lever is
 	# deliberately absent — the balance probe measured it dead above 1.0
 	# (arrivals are acceptance-gated by the road's capacity pause, so a
 	# quieter road changes nothing) and net-harmful below 1.0 (faster
@@ -213,9 +240,9 @@ func test_full_tree_purchase_and_compound_bounds() -> void:
 	var kinds := {}
 	for node in tree_nodes():
 		kinds[node.effect.kind] = true
-	assert_int(kinds.size()).is_equal(4)
+	assert_int(kinds.size()).is_equal(6)
 	assert_bool(kinds.has(&"recruit_arrival_interval_multiplier")).is_false()
-	for kind in [&"stipend_bonus", &"building_cost_multiplier", &"gear_cost_multiplier", &"training_time_multiplier"]:
+	for kind in [&"stipend_bonus", &"building_cost_multiplier", &"gear_cost_multiplier", &"training_time_multiplier", &"suspicion_decay", &"veterans"]:
 		assert_bool(kinds.has(kind)).is_true()
 
 
@@ -287,7 +314,7 @@ func test_copy_lines_fit_their_surface_budgets_in_real_font_metrics() -> void:
 			worst = width - (budget - CLIP_MARGIN)
 			worst_key = key
 	assert_float(worst).is_less_equal(0.0)
-	assert_int(measured).is_equal(15)
+	assert_int(measured).is_equal(19)
 	print("[unlock-copy] tightest line: %s at %.0fpx inside its budget-margin" % [String(worst_key), -worst])
 	line.queue_free()
 

@@ -38,6 +38,8 @@ func _effect_tree() -> UnlockTreeDef:
 	add.call(&"drills_50", &"training_time_multiplier", 0.5)
 	add.call(&"road_50", &"recruit_arrival_interval_multiplier", 0.5)
 	add.call(&"kit_50", &"gear_cost_multiplier", 0.5)
+	add.call(&"decay_150", &"suspicion_decay", 1.5)
+	add.call(&"veterans_125", &"veterans", 1.25)
 	return tree
 
 
@@ -289,6 +291,236 @@ func _drive_and_equip(legacy: LegacySystem, iron: int, timber: int) -> int:
 	return engine.get_resource(&"iron") + 1000 * engine.get_resource(&"timber")
 
 
+# --- Suspicion decay (L1-B2, the pressure-model seam) ------------------------------
+
+
+## Tunables that isolate the decay path: zero presence (the meter moves
+## ONLY through passive decay), honest 5/h + 2.5/h decay tiers.
+func _decay_tunables() -> EconomyTunables:
+	var tunables := EconomyTunables.new()
+	tunables.recruit_arrival_interval_hours = 2.0
+	tunables.recruit_arrival_jitter_hours = 0.0
+	tunables.recruit_arrival_early_count = 0
+	tunables.suspicion_presence_army_per_hour = 0.0
+	tunables.suspicion_presence_follower_per_hour = 0.0
+	tunables.suspicion_presence_building_per_hour = 0.0
+	tunables.suspicion_presence_offer_per_hour = 0.0
+	return tunables
+
+
+## Heartbeat + run + suspicion (units/production deliberately absent — the
+## fold's has_method guards skip them, and the drift path never reads them
+## when presence is zero). The run system wires the legacy provider, so the
+## fold applies the decay multiplier exactly as in the canonical stack.
+func _decay_engine(legacy: LegacySystem) -> SimEngine:
+	var pack := MVP.load_mvp()
+	var engine := SimEngine.new(SEED)
+	engine.register_system(HeartbeatSystem.new())
+	engine.register_system(RunLifecycleSystem.new(pack.regimes, pack.identity, legacy.meta if legacy != null else RunMeta.new(), {}, legacy))
+	engine.register_system(SuspicionSystem.new(_decay_tunables(), pack.units, null))
+	engine.submit_command(&"run_start")
+	engine.fast_forward(1)
+	return engine
+
+
+func test_suspicion_decay_multiplier_scales_both_drift_tiers() -> void:
+	## Zero presence, meter below warn: passive decay 5/h drops 1 point per
+	## 12 ticks at identity; the x1.5 bundle drops 1 per 8 (5 x 1.5 = 7.5/h
+	## — one exact int division on the milli rate). Above the crackdown
+	## threshold the high tier (2.5/h -> 3.75/h) scales by the SAME factor:
+	## 1 point per 24 ticks -> per 16.
+	var plain := _decay_engine(null)
+	var boosted := _decay_engine(_legacy_all_purchased())
+	var plain_suspicion := plain.get_system(&"suspicion") as SuspicionSystem
+	var boosted_suspicion := boosted.get_system(&"suspicion") as SuspicionSystem
+	plain_suspicion.set_suspicion(20)
+	boosted_suspicion.set_suspicion(20)
+	plain.fast_forward(24)
+	boosted.fast_forward(24)
+	assert_int(plain_suspicion.suspicion_points()).is_equal(18)  # 2 points at 12 ticks/point
+	assert_int(boosted_suspicion.suspicion_points()).is_equal(17)  # 3 points at 8 ticks/point
+	plain_suspicion.set_suspicion(80)
+	boosted_suspicion.set_suspicion(80)
+	plain.fast_forward(48)
+	boosted.fast_forward(48)
+	assert_int(plain_suspicion.suspicion_points()).is_equal(78)  # high tier: 24 ticks/point
+	assert_int(boosted_suspicion.suspicion_points()).is_equal(77)  # 16 ticks/point
+
+
+func test_decay_multiplier_is_serialized_hashed_and_round_trips() -> void:
+	## The applied decay multiplier is suspicion-system state: serialized +
+	## hash-visible when non-identity, absent + invisible at identity, and
+	## a restore resumes it verbatim (the stipend-multiplier discipline).
+	var tunables := _decay_tunables()
+	var plain := SuspicionSystem.new(tunables)
+	var boosted := SuspicionSystem.new(tunables)
+	var mods := LegacyModifiers.identity()
+	mods.suspicion_decay_milli = 1500
+	boosted.set_legacy_modifiers(mods)
+	for system in [plain, boosted]:
+		system.set_suspicion(10)
+	assert_bool(plain.to_dict().has("legacy_decay_milli")).is_false()
+	assert_int(int(boosted.to_dict()["legacy_decay_milli"])).is_equal(1500)
+	assert_int(boosted.state_hash()).is_not_equal(plain.state_hash())
+	var restored := SuspicionSystem.new(tunables)
+	restored.from_dict(boosted.to_dict())
+	assert_int(int(restored.to_dict()["legacy_decay_milli"])).is_equal(1500)
+	assert_int(restored.state_hash()).is_equal(boosted.state_hash())
+	restored.set_legacy_modifiers(LegacyModifiers.identity())
+	assert_bool(restored.to_dict().has("legacy_decay_milli")).is_false()
+
+
+# --- Veterans (L1-B2, the odds-math seam) -------------------------------------------
+
+
+## A neutral regime (both combat multipliers x1.0) so the odds assert the
+## veterans hop alone.
+func _neutral_regime() -> RegimeDef:
+	var regime := RegimeDef.new()
+	regime.id = &"neutral_probe"
+	regime.display_name = "Neutral Probe"
+	var combat := RegimeModifier.new()
+	combat.kind = &"garrison_multiplier"
+	combat.value = 1.0
+	regime.combat_modifier = combat
+	return regime
+
+
+func _identity_pools() -> IdentityPools:
+	var pools := IdentityPools.new()
+	pools.leader_first_names = ["Bran", "Ottilie", "Wick", "Mabel"]
+	pools.leader_epithets = ["the Unbearable", "the Almost Wise", "of the Leaky Barn"]
+	pools.personality_tags = [&"ambitious", &"pious", &"gluttonous"]
+	pools.recruit_names = ["Tom", "Hob", "Nell"]
+	return pools
+
+
+## Fast chain: peasant -> soldier in 6 ticks, power 10, no gear — the odds
+## probe's roster reaches 30 power quickly and exactly.
+func _fast_unit_defs() -> Array[UnitDef]:
+	var defs: Array[UnitDef] = []
+	var peasant := UnitDef.new()
+	peasant.id = &"peasant"
+	peasant.display_name = "Peasant"
+	peasant.promotion_paths.append(&"soldier")
+	defs.append(peasant)
+	var soldier := UnitDef.new()
+	soldier.id = &"soldier"
+	soldier.display_name = "Soldier"
+	soldier.training_time_hours = 0.1  # exactly 6 ticks
+	soldier.combat_power = 10
+	defs.append(soldier)
+	return defs
+
+
+## A legacy provider owning ONLY a veterans node (x1.25) — the probe's one
+## intervention.
+func _veterans_legacy() -> LegacySystem:
+	var tree := UnlockTreeDef.new()
+	var node := UnlockNodeDef.new()
+	node.id = &"veterans_probe"
+	node.display_name = "Veterans Probe"
+	node.branch = &"test"
+	node.cost = 10
+	var effect := UnlockEffect.new()
+	effect.kind = &"veterans"
+	effect.value = 1.25
+	node.effect = effect
+	tree.nodes.append(node)
+	var meta := RunMeta.new()
+	meta.legacy_points = 100
+	var legacy := LegacySystem.new(tree, meta)
+	assert_bool(legacy.purchase(&"veterans_probe")).is_true()
+	return legacy
+
+
+## Heartbeat + run + units + assault, metronome arrivals (zero draws), a
+## neutral regime: the odds read the veterans multiplier through the run
+## system and NOTHING else.
+func _odds_engine(legacy: LegacySystem) -> SimEngine:
+	var tunables := EconomyTunables.new()
+	tunables.recruit_arrival_interval_hours = 0.05
+	tunables.recruit_arrival_jitter_hours = 0.0
+	tunables.recruit_arrival_early_count = 0
+	tunables.suspicion_presence_army_per_hour = 0.0
+	tunables.suspicion_presence_follower_per_hour = 0.0
+	tunables.suspicion_presence_building_per_hour = 0.0
+	tunables.suspicion_presence_offer_per_hour = 0.0
+	tunables.assault_garrison_base_power = 60
+	tunables.assault_knight_floor_power = 23
+	var engine := SimEngine.new(SEED)
+	engine.register_system(HeartbeatSystem.new())
+	engine.register_system(RunLifecycleSystem.new([_neutral_regime()], _identity_pools(), legacy.meta if legacy != null else RunMeta.new(), {}, legacy))
+	engine.register_system(UnitLifecycleSystem.new(_fast_unit_defs(), [], tunables))
+	engine.register_system(AssaultResolver.new(tunables))
+	engine.submit_command(&"run_start")
+	engine.fast_forward(1)
+	return engine
+
+
+## Marches one peasant into the fast army (the test_assault pattern: drain
+## the gate, assign ONE idle, wait out the 6-tick training).
+func _field_soldier(engine: SimEngine) -> void:
+	var units := engine.get_system(&"units") as UnitLifecycleSystem
+	var before := units.unit_count(&"soldier")
+	while units.unit_count(&"soldier") <= before:
+		for uid in units.offer_ids():
+			engine.submit_command(&"recruit_accept", &"", uid)
+		engine.fast_forward(1)
+		var idle := units.idle_units(&"peasant")
+		if not idle.is_empty():
+			engine.submit_command(&"assign_role", &"soldier", idle[0])
+			engine.fast_forward(7)
+		else:
+			engine.fast_forward(3)
+
+
+func test_veterans_multiplier_lands_in_the_odds_math_only() -> void:
+	## Same seed, same driver, one engine at identity and one owning the
+	## x1.25 veterans node: the army side of the odds compounds by exactly
+	## 1250/1000 (30 power -> 37500 milli vs 30000; 333 -> 384 permille vs
+	## garrison 60000), while the RAW reads — army power, the knight floor,
+	## the run's banking input — stay byte-equal. The multiplier is odds
+	## math, not a fake roster.
+	var plain := _odds_engine(null)
+	var boosted := _odds_engine(_veterans_legacy())
+	_field_soldiers(plain, 3)
+	_field_soldiers(boosted, 3)
+	var plain_units := plain.get_system(&"units") as UnitLifecycleSystem
+	var boosted_units := boosted.get_system(&"units") as UnitLifecycleSystem
+	assert_int(plain_units.army_power()).is_equal(30)
+	assert_int(boosted_units.army_power()).is_equal(30)
+	var plain_resolver := plain.get_system(&"assault") as AssaultResolver
+	var boosted_resolver := boosted.get_system(&"assault") as AssaultResolver
+	var plain_odds := plain_resolver.assault_odds(plain)
+	var boosted_odds := boosted_resolver.assault_odds(boosted)
+	var plain_army: Dictionary = plain_odds["army"]
+	var boosted_army: Dictionary = boosted_odds["army"]
+	assert_int(int(plain_army["veterans_multiplier_milli"])).is_equal(1000)
+	assert_int(int(boosted_army["veterans_multiplier_milli"])).is_equal(1250)
+	assert_int(int(plain_army["score_milli"])).is_equal(30000)
+	assert_int(int(boosted_army["score_milli"])).is_equal(37500)  # 30 x 1000 x 1250 / 1000
+	assert_int(int(plain_odds["win_permille"])).is_equal(333)  # 30000 x 1000 / 90000
+	assert_int(int(boosted_odds["win_permille"])).is_equal(384)  # 37500 x 1000 / 97500
+	# The floor gate reads the RAW roster: met at 30 both ways, and the
+	# floor itself is content (23).
+	assert_bool(bool(plain_odds["floor_met"])).is_true()
+	assert_bool(bool(boosted_odds["floor_met"])).is_true()
+	assert_int(int(plain_odds["floor_power"])).is_equal(23)
+	# The run system carries the applied multiplier for the resolver and
+	# serializes it (hash visibility is pinned below).
+	var boosted_run := boosted.get_system(&"run") as RunLifecycleSystem
+	assert_int(boosted_run.legacy_veterans_milli()).is_equal(1250)
+	var run_state: Dictionary = boosted.to_dict()["systems"]["run"]
+	assert_int(int(run_state["legacy_veterans_milli"])).is_equal(1250)
+	assert_bool((plain.to_dict()["systems"]["run"] as Dictionary).has("legacy_veterans_milli")).is_false()
+
+
+func _field_soldiers(engine: SimEngine, count: int) -> void:
+	for _i in count:
+		_field_soldier(engine)
+
+
 # --- Hash visibility + serialization ----------------------------------------------
 
 
@@ -334,6 +566,7 @@ func test_round_trip_lockstep_with_unlocks_active() -> void:
 	var production_state: Dictionary = state["systems"]["production"]
 	var units_state: Dictionary = state["systems"]["units"]
 	assert_int(int(run_state["legacy_stipend_milli"])).is_equal(1250)
+	assert_int(int(run_state["legacy_veterans_milli"])).is_equal(1250)
 	assert_int(int(production_state["legacy_cost_milli"])).is_equal(900)
 	var units_mods: Dictionary = units_state["legacy_modifiers"]
 	assert_int(int(units_mods["training_milli"])).is_equal(500)
@@ -436,6 +669,7 @@ func test_host_exposes_legacy_reads_and_the_purchase_command() -> void:
 	var host := _host_with_tree(SEED, "user://cs_legacy_host_tests/a")
 	assert_array(host.unlock_tree_nodes()).is_equal([
 		&"stipend_25", &"walls_90", &"drills_50", &"road_50", &"kit_50",
+		&"decay_150", &"veterans_125",
 	])
 	assert_int(host.unlock_bank()).is_zero()
 	assert_array(host.unlock_owned()).is_empty()
@@ -444,9 +678,10 @@ func test_host_exposes_legacy_reads_and_the_purchase_command() -> void:
 	# Seed the bank (the meta instance the host shares with every engine)
 	# and buy: the command validates, mutates, and PERSISTS the meta domain.
 	host.meta.legacy_points = 25
-	# Every node costs 10 and none is gated: all five are affordable.
+	# Every node costs 10 and none is gated: all seven are affordable.
 	assert_array(host.unlock_affordable()).is_equal([
 		&"stipend_25", &"walls_90", &"drills_50", &"road_50", &"kit_50",
+		&"decay_150", &"veterans_125",
 	])
 	assert_bool(host.unlock_purchase(&"stipend_25")).is_true()
 	assert_int(host.unlock_bank()).is_equal(15)

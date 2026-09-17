@@ -782,8 +782,11 @@ without the baseline a restore would diff against zeroed counters and
 spawn phantom rises on the first post-restore tick. `state_hash()` mixes
 all of it (the countdown and windows are hashed state — an oracle blind
 to them could call a lost telegraph "identical", the T-ARCH-03 lesson).
-`reset_run(regime)` returns everything to constructed state at the
-`run_restart` drain (§12 reset contract). The system consumes no
+L1-B2 adds `legacy_decay_milli` with the same emit-when-non-identity
+discipline as the other applied legacy multipliers (§18): serialized +
+hashed only when the run's bundle bought decay, absent + invisible at
+identity. `reset_run(regime)` returns everything to constructed state at
+the `run_restart` drain (§12 reset contract). The system consumes no
 commands (`on_command` always false — a future lay-low verb would land
 there); while no run is RUNNING it is dormant but keeps the audit
 baseline current (arrivals do not stop for your defeat).
@@ -1089,24 +1092,43 @@ docs/ultron/research/r5-revolution-idol-cadence.md). Three pieces:
    `building_cost_multiplier` (a fourth milli factor in the §10 upgrade
    curve), `training_time_multiplier` (§11 durations; zero-hour stays
    zero-hour), `gear_cost_multiplier` (§11 recipe lines, floored, min 1),
-   `stipend_bonus` (the `grant_resources` verb, floored, min 1).
+   `stipend_bonus` (the `grant_resources` verb, floored, min 1),
+   `suspicion_decay` (L1-B2: the §14 passive drift decay, BOTH tiers
+   proportionally — one exact int division on the milli rate; act bumps,
+   presence weights, the pause rule and every threshold untouched), and
+   `veterans` (L1-B2: the army side of the §15 assault odds math ONLY —
+   see below).
 
 ### Application — the regime-quirk pattern, one drain later
 
 `RunLifecycleSystem` (constructed with the optional `p_legacy` provider —
 `GameHost` and any host wires it) resolves ONE bundle at EVERY
 `run_start`/`run_restart` drain and applies it synchronously, exactly the
-way the regime economy quirk lands (`set_regime`): production and units
-take `set_legacy_modifiers(bundle)` at the same drain, and the run system
-applies the stipend field inside `grant_resources`. Consequences, all
-deliberate:
+way the regime economy quirk lands (`set_regime`): production, units and
+suspicion take `set_legacy_modifiers(bundle)` at the same drain, the run
+system applies the stipend field inside `grant_resources`, and it bakes
+the veterans field into its own run state (`run.legacy_veterans_milli`)
+for the stateless assault resolver to read — the `_regime` shape: the
+resolver queries the run system at odds time, so it keeps its ZERO state
+between commands by construction. Consequences, all deliberate:
+
+- **The veterans multiplier lands in the odds math only**: the resolver
+  compounds it on the army side AFTER the regime multiplier
+  (`army_milli = raw_power x regime_mult x veterans_milli / 1000`, one
+  exact int division per hop; the loss-path survivor narration carries it
+  identically so the beat chain stays monotone at the true survivors).
+  The commit floor (`floor_met`), the run's score banking and the
+  `resolve_victory` army-power override all read the RAW
+  `units.army_power()` — a veterans bonus raises the odds line, never the
+  knight gate or the banked lp.
 
 - **Purchases land at the NEXT run start, never mid-run** — the tree is a
   between-runs verb; the reset contract's clean-tick property is intact.
 - **Hash-visible, round-trip exact** (the T-ARCH-03 lesson): each
   consumer carries its APPLIED multipliers as serialized + hashed state —
-  `run.legacy_stipend_milli`, `production.legacy_cost_milli`,
-  `units.legacy_modifiers` — emitted ONLY when non-identity (the
+  `run.legacy_stipend_milli`, `run.legacy_veterans_milli`,
+  `production.legacy_cost_milli`, `units.legacy_modifiers`,
+  `suspicion.legacy_decay_milli` — emitted ONLY when non-identity (the
   escalation_garrison emit-when-non-null discipline). An engine with NO
   unlocks serializes nothing and hashes byte-identically to the pre-L1
   build (unit-proven: same seed, provider vs no provider -> identical

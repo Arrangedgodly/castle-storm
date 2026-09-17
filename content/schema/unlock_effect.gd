@@ -9,7 +9,7 @@
 ## are forward-compatible exactly like the regime modifier registry
 ## (docs/content-schema.md §6): append to the registry, no format bump.
 ##
-## Kinds (all multipliers on the run's boot economy; value > 0):
+## Kinds (all multipliers; value > 0):
 ##   recruit_arrival_interval_multiplier — units-system arrival cadence
 ##     (normal interval, jitter, and the opening-rush ramp scale together;
 ##     < 1.0 = a busier road)
@@ -19,6 +19,12 @@
 ##   gear_cost_multiplier     — units-system gear recipe payments
 ##   stipend_bonus            — the run-start `grant_resources` stipend
 ##     (value 1.25 = +25% starting resources)
+##   suspicion_decay          — the suspicion system's PASSIVE decay, both
+##     tiers proportionally (L1-B2, the pressure-model extension: value
+##     1.15 = the meter cools 15% faster; high-tier still decays slower)
+##   veterans                 — the army's score in the assault odds math
+##     ONLY (L1-B2: value 1.08 = the same roster fights 8% above raw power;
+##     the commit floor and run-score banking read the RAW army_power)
 class_name UnlockEffect
 extends Resource
 

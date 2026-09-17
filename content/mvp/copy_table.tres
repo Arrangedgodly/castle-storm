@@ -115,6 +115,7 @@ templates = Dictionary[StringName, PackedStringArray]({
 &"title_next": PackedStringArray("Deal the next hand"),
 &"unit_promoted": PackedStringArray("{name} is struck off the rolls as {rank} — {count} now.", "{name} turns over: a {rank}. The count reads {count}."),
 &"unlock_branch_old_guard": PackedStringArray("The Old Guard"),
+&"unlock_branch_survivors": PackedStringArray("The Survivors"),
 &"unlock_branch_workshop": PackedStringArray("The Workshop"),
 &"unlock_branch_yard": PackedStringArray("The Yard"),
 &"unlock_flavor_cousin_ironmonger": PackedStringArray("The family price is a threat and a discount."),
@@ -128,6 +129,9 @@ templates = Dictionary[StringName, PackedStringArray]({
 &"unlock_flavor_the_sergeants_primer": PackedStringArray("Shouting is free; brevity has to be drilled."),
 &"unlock_flavor_the_smiths_signature": PackedStringArray("Half the invoice. Twice the embossing."),
 &"unlock_flavor_unpaid_artisans": PackedStringArray("Dues are waived. Nails, regrettably, are not."),
+&"unlock_flavor_quiet_boots": PackedStringArray("Soft soles, short memories, fewer questions."),
+&"unlock_flavor_scarred_banners": PackedStringArray("Patched cloth; the hands under it are not."),
+&"unlock_flavor_the_night_watch": PackedStringArray("They watch the roads till the roads forget."),
 &"unlock_flavor_war_games_on_sundays": PackedStringArray("The crown rests on Sundays. The drills do not."),
 &"warn_context": PackedStringArray("Keep hands quiet.", "Nothing to see here.")
 })

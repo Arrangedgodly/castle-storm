@@ -11,12 +11,14 @@
 ## Application contract (the regime-quirk pattern, docs/sim-engine.md §18):
 ## RunLifecycleSystem resolves ONE bundle at every run_start/run_restart
 ## drain and hands it to production (building costs) + units (arrival
-## cadence, training durations, gear costs) synchronously, and applies the
-## stipend field to `grant_resources` itself. Each consumer then carries
-## its APPLIED multipliers as serialized + hashed state, emitted ONLY when
-## non-identity (1000 = x1.0): an engine with no unlocks serializes and
-## hashes byte-identically to the pre-L1 build — the escalation_garrison
-## reserve's emit-when-non-null discipline.
+## cadence, training durations, gear costs) + suspicion (passive decay)
+## synchronously, applies the stipend field to `grant_resources` itself,
+## and bakes the veterans field into its own run state for the assault
+## resolver to read (the resolver stays stateless by design). Each consumer
+## then carries its APPLIED multipliers as serialized + hashed state,
+## emitted ONLY when non-identity (1000 = x1.0): an engine with no unlocks
+## serializes and hashes byte-identically to the pre-L1 build — the
+## escalation_garrison reserve's emit-when-non-null discipline.
 ##
 ## Identity defaults make a bare `LegacyModifiers.new()` the no-op bundle
 ## (proven by test).
@@ -29,12 +31,23 @@ extends RefCounted
 ## ignored by old builds' resolution rather than crashing (unknown kinds in
 ## ATTACHED packs are still a validator error — this leniency is only the
 ## runtime resolution's defense).
+##
+## L1-B2 extended the vocabulary into the pressure model (docs/balance.md
+## §6's recorded finding: the economy kinds are act-rate-limited and cannot
+## compress the first-win band): `suspicion_decay` scales the suspicion
+## system's PASSIVE decay (both tiers, proportionally — the high-tier
+## compromise keeps decaying slower; > 1.0 = the meter cools faster), and
+## `veterans` scales the army's score in the assault odds math ONLY (the
+## commit floor and score banking still read the raw roster power — the
+## multiplier must not fake the knight floor or inflate the lp bank).
 const EFFECT_KINDS: Array[StringName] = [
 	&"recruit_arrival_interval_multiplier",
 	&"building_cost_multiplier",
 	&"training_time_multiplier",
 	&"gear_cost_multiplier",
 	&"stipend_bonus",
+	&"suspicion_decay",
+	&"veterans",
 ]
 
 ## The whole arrival cadence scales together — normal interval, jitter AND
@@ -53,6 +66,16 @@ var gear_cost_milli := SimFixed.MILLI
 
 ## Run-start stipend multiplier (the `grant_resources` verb; 1250 = +25%).
 var stipend_milli := SimFixed.MILLI
+
+## Passive suspicion-decay multiplier (the suspicion system's §14 drift;
+## scales BOTH decay tiers proportionally — 1150 = the meter cools 15%
+## faster; the high-tier compromise keeps its slower rate).
+var suspicion_decay_milli := SimFixed.MILLI
+
+## Army-power multiplier in the assault odds math (the resolver's army
+## side ONLY; 1080 = the same roster fights 8% above its raw power. The
+## commit floor and run-score banking read the RAW army_power).
+var veterans_milli := SimFixed.MILLI
 
 
 ## The no-op bundle (all fields identity 1000).
@@ -79,10 +102,12 @@ func is_identity() -> bool:
 		and building_cost_milli == SimFixed.MILLI \
 		and training_time_milli == SimFixed.MILLI \
 		and gear_cost_milli == SimFixed.MILLI \
-		and stipend_milli == SimFixed.MILLI
+		and stipend_milli == SimFixed.MILLI \
+		and suspicion_decay_milli == SimFixed.MILLI \
+		and veterans_milli == SimFixed.MILLI
 
 
-## JSON-safe form (the five ints) — consumers emit it ONLY when
+## JSON-safe form (the seven ints) — consumers emit it ONLY when
 ## `is_identity()` is false, and restore verbatim (absent key = identity,
 ## the tolerant-reader rule).
 func to_dict() -> Dictionary:
@@ -92,6 +117,8 @@ func to_dict() -> Dictionary:
 		"training_milli": training_time_milli,
 		"gear_cost_milli": gear_cost_milli,
 		"stipend_milli": stipend_milli,
+		"suspicion_decay_milli": suspicion_decay_milli,
+		"veterans_milli": veterans_milli,
 	}
 
 
@@ -103,6 +130,8 @@ static func from_dict(state: Dictionary) -> LegacyModifiers:
 	mods.training_time_milli = int(state.get("training_milli", SimFixed.MILLI))
 	mods.gear_cost_milli = int(state.get("gear_cost_milli", SimFixed.MILLI))
 	mods.stipend_milli = int(state.get("stipend_milli", SimFixed.MILLI))
+	mods.suspicion_decay_milli = int(state.get("suspicion_decay_milli", SimFixed.MILLI))
+	mods.veterans_milli = int(state.get("veterans_milli", SimFixed.MILLI))
 	return mods
 
 
@@ -120,3 +149,7 @@ func _apply_kind(kind: StringName, value_milli: int) -> void:
 			gear_cost_milli = gear_cost_milli * value_milli / SimFixed.MILLI
 		&"stipend_bonus":
 			stipend_milli = stipend_milli * value_milli / SimFixed.MILLI
+		&"suspicion_decay":
+			suspicion_decay_milli = suspicion_decay_milli * value_milli / SimFixed.MILLI
+		&"veterans":
+			veterans_milli = veterans_milli * value_milli / SimFixed.MILLI
