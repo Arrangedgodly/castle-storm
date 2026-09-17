@@ -194,6 +194,17 @@ const KEY_TOKENS: Dictionary = {
 	&"unlock_flavor_quiet_boots": [],
 	&"unlock_flavor_scarred_banners": [],
 	&"unlock_flavor_the_night_watch": [],
+	# --- the legacy deck screen (L1-C, the tree UI): the empty bank's two
+	# lines, the mid-run mount-discipline note, the one-step purchase
+	# confirmation and its refusal reasons. {node} is the node's display
+	# name; {short} the bank shortfall in legacy points. ---
+	&"legacy_empty_1": [],
+	&"legacy_empty_2": [],
+	&"legacy_midrun_note": [],
+	&"legacy_purchase_line": [&"node"],
+	&"legacy_refusal_prereq": [&"node"],
+	&"legacy_refusal_short": [&"short"],
+	&"legacy_refusal_owned": [],
 }
 
 ## Automated register floor: whole WORDS that BREAK the voice (modern

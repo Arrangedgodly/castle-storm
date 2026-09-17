@@ -431,6 +431,28 @@ const DEFAULTS: Dictionary = {
 	&"unlock_flavor_the_night_watch": [
 		"They watch the roads till the roads forget.",
 	],
+	# --- the legacy deck screen (L1-C, the tree UI) ---
+	&"legacy_empty_1": [
+		"the deck is still wrapped — no legacy earned yet",
+	],
+	&"legacy_empty_2": [
+		"Finish a hand, any hand. The bank keeps the points.",
+	],
+	&"legacy_midrun_note": [
+		"A hand is live — new cards join the next hand.",
+	],
+	&"legacy_purchase_line": [
+		"The Survivors remember {node}.",
+	],
+	&"legacy_refusal_prereq": [
+		"The deck has an order — {node} first.",
+	],
+	&"legacy_refusal_short": [
+		"The bank is short — {short} more legacy.",
+	],
+	&"legacy_refusal_owned": [
+		"Already pressed into the deck.",
+	],
 }
 
 
@@ -568,6 +590,13 @@ const CONSUMERS: Dictionary = {
 	&"unlock_flavor_quiet_boots": "legacy tree node card flavor row — the L1-C tree UI (content ships in L1-B2)",
 	&"unlock_flavor_scarred_banners": "legacy tree node card flavor row — the L1-C tree UI (content ships in L1-B2)",
 	&"unlock_flavor_the_night_watch": "legacy tree node card flavor row — the L1-C tree UI (content ships in L1-B2)",
+	&"legacy_empty_1": "legacy deck empty page (first run unfinished) — LegacyScreen.view",
+	&"legacy_empty_2": "legacy deck empty page (second line) — LegacyScreen.view",
+	&"legacy_midrun_note": "legacy deck mid-run honesty line (mount discipline) — LegacyScreen.view",
+	&"legacy_purchase_line": "legacy deck purchase confirmation — LegacyScreen.purchase",
+	&"legacy_refusal_prereq": "legacy deck refusal (prerequisite missing) — LegacyScreen.purchase",
+	&"legacy_refusal_short": "legacy deck refusal (bank shortfall) — LegacyScreen.purchase",
+	&"legacy_refusal_owned": "legacy deck refusal (already owned) — LegacyScreen.purchase",
 }
 
 

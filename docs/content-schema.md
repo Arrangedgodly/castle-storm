@@ -245,7 +245,7 @@ attached to `pack_example.tres`, validated on the §5 green path).
 
 | Field | Constraint |
 |---|---|
-| `templates: Dictionary[StringName, PackedStringArray]` | every key in `CopyTable.KEY_TOKENS` (125 — content cannot invent keys no surface reads; the L1-B unlock family adds `unlock_branch_*` / `unlock_flavor_*` literal-line keys); 1..`MAX_VARIANTS` (4) variants per key; every `{token}` from the key's vocabulary; keys in `ROTATING_KEYS` (repeated beats) need ≥ 2 variants; every variant passes the banned-register word scan (word-boundary, case-insensitive — `BANNED_FRAGMENTS`) |
+| `templates: Dictionary[StringName, PackedStringArray]` | every key in `CopyTable.KEY_TOKENS` (136 — content cannot invent keys no surface reads; the L1-B unlock family adds `unlock_branch_*` / `unlock_flavor_*` literal-line keys, the L1-C deck family adds `legacy_*`); 1..`MAX_VARIANTS` (4) variants per key; every `{token}` from the key's vocabulary; keys in `ROTATING_KEYS` (repeated beats) need ≥ 2 variants; every variant passes the banned-register word scan (word-boundary, case-insensitive — `BANNED_FRAGMENTS`) |
 
 The renderer (`sim/copy_deck.gd`, `CopyDeck`) picks variants by a rotor
 derived from view data (event seq / run number / report ticks / the beat
@@ -438,7 +438,7 @@ truth — no suite carries its own content copy):
   names × 52 epithets (2,392 full-name permutations — thousands), 20
   personality tags, 72 recruit names, 10 leader trait labels — medieval
   farce, no anachronisms (banned-register scanned by test).
-- **Copy table** (T-COPY-01, additive + the L1-B/B2 unlock family): 129
+- **Copy table** (T-COPY-01, additive + the L1-B/B2 unlock + L1-C deck families): 136
   template keys × 1–4 variants
   each — the shipped voice for every repeating printed line, sized to
   the 476px/22px line-budget standard with seeded variant rotation

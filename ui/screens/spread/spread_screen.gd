@@ -102,6 +102,7 @@ const ChronicleScreenScript := preload("res://ui/screens/chronicle/chronicle_scr
 const CHRONICLE_SCENE := preload("res://ui/screens/chronicle/chronicle_screen.tscn")
 const DaySheetScreenScript := preload("res://ui/screens/spread/day_sheet_screen.gd")
 const PressRoomScreenScript := preload("res://ui/screens/spread/press_room_screen.gd")
+const LegacyScreenScript := preload("res://ui/screens/legacy/legacy_screen.gd")
 
 ## Default demo seed (deterministic identity + arrival draw; override
 ## with CS_SEED).
@@ -146,6 +147,7 @@ var stats := {
 	&"chronicles_opened": 0, &"chronicles_closed": 0,
 	&"day_sheets_opened": 0, &"day_sheets_closed": 0,
 	&"press_rooms_opened": 0, &"press_rooms_closed": 0,
+	&"legacies_opened": 0, &"legacies_closed": 0,
 	&"type_scale_changes": 0, &"motion_changes": 0,
 	&"catch_up_prints": 0, &"quiet_lines": 0,
 	&"first_nudges": 0, &"first_focuses": 0,
@@ -198,6 +200,12 @@ var _day_sheet: DaySheetScreen
 ## Press-Room verb. Its steps write preferences into the META domain
 ## (persisted across hands, sessions and restarts) and apply LIVE.
 var _press_room: PressRoomScreen
+## THE LEGACY (L1-C): the growing deck — the meta-screen where banked
+## legacy points buy permanent upgrades between runs. Paper like its
+## siblings, opened from the header's The-Legacy verb; buys go down the
+## REAL host command (unlock_purchase) and apply at the next run start
+## (the L1-A rule, printed honestly when a hand is live).
+var _legacy: LegacyScreen
 ## The line-form primer's session latch (finishing refinement #2, P2):
 ## one printed teaching line at the first dashed (in-progress) edge the
 ## session shows — once per session, the lightest honest cadence.
@@ -275,6 +283,7 @@ func _ready() -> void:
 	_build_intro_screen()
 	_build_day_sheet_screen()
 	_build_press_room_screen()
+	_build_legacy_screen()
 	_build_chronicle_screen()
 	host.event_observed.connect(_on_event)
 	host.sim_advanced.connect(_on_ticks)
@@ -664,6 +673,18 @@ func _build_press_room_screen() -> void:
 	_press_room.preference_changed.connect(_on_preference_changed)
 
 
+## Build the legacy deck screen ONCE, BESIDE its sibling table papers in
+## z-order (the papers are mutually exclusive — whichever opens folds
+## the others; the chronicle stays topmost). Paper over the table while
+## open, never modal chrome.
+func _build_legacy_screen() -> void:
+	_legacy = LegacyScreenScript.new()
+	_legacy.name = "LegacyScreen"
+	_legacy.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(_legacy)
+	_legacy.closed.connect(_on_legacy_closed)
+
+
 ## Open the chronicle ledger (the header chip's verb): the run header's
 ## chronicle affordance, in world grammar. Focus is remembered so
 ## closing returns the pad player to the chip that opened it. The table
@@ -677,6 +698,8 @@ func open_chronicle() -> void:
 		_day_sheet.close()
 	if _press_room != null and _press_room.is_open():
 		_press_room.close()
+	if _legacy != null and _legacy.is_open():
+		_legacy.close()
 	_chronicle.open(host, get_router())
 
 
@@ -694,6 +717,8 @@ func open_day_sheet() -> void:
 		_chronicle.close()
 	if _press_room != null and _press_room.is_open():
 		_press_room.close()
+	if _legacy != null and _legacy.is_open():
+		_legacy.close()
 	_day_sheet.open(host, get_router(), presenter)
 
 
@@ -724,6 +749,8 @@ func open_press_room() -> void:
 		_chronicle.close()
 	if _day_sheet != null and _day_sheet.is_open():
 		_day_sheet.close()
+	if _legacy != null and _legacy.is_open():
+		_legacy.close()
 	_press_room.open(host, get_router())
 
 
@@ -733,6 +760,39 @@ func _on_press_room_closed() -> void:
 	stats[&"press_rooms_closed"] += 1
 	var active := get_active_slot() as OrientationSlot
 	var chip := header_chip(active, "press_room_chip") if active != null else null
+	if chip != null:
+		chip.grab_focus()
+		return
+	_focus_first_card()
+
+
+## Open the legacy deck (the header's The-Legacy verb, L1-C): the
+## growing deck where banked legacy buys permanent upgrades between
+## runs. The same paper discipline as its siblings — the other table
+## papers fold first (one paper at a time owns the table) — and NO run
+## needs to be live: the bank is a between-runs surface by design (the
+## fresh install reads the deck locked under its "earn your first
+## legacy" line).
+func open_legacy() -> void:
+	if _legacy == null or host == null:
+		return
+	stats[&"legacies_opened"] += 1
+	close_fan()
+	if _chronicle != null and _chronicle.is_open():
+		_chronicle.close()
+	if _day_sheet != null and _day_sheet.is_open():
+		_day_sheet.close()
+	if _press_room != null and _press_room.is_open():
+		_press_room.close()
+	_legacy.open(host)
+
+
+## The deck folded away: focus returns to The-Legacy chip on the active
+## slot's header verbs row (the affordance that opened it).
+func _on_legacy_closed() -> void:
+	stats[&"legacies_closed"] += 1
+	var active := get_active_slot() as OrientationSlot
+	var chip := header_chip(active, "legacy_chip") if active != null else null
 	if chip != null:
 		chip.grab_focus()
 		return
@@ -847,6 +907,8 @@ func _close_chronicle() -> void:
 		_day_sheet.close()
 	if _press_room != null and _press_room.is_open():
 		_press_room.close()
+	if _legacy != null and _legacy.is_open():
+		_legacy.close()
 
 
 ## Open the assault odds table (the army card's storm action, or the
@@ -1697,11 +1759,12 @@ func _bind_header() -> void:
 		# taller letterhead shifts the rail/spread/chronicle down honestly
 		# instead of drawing over them.
 		slot.layout_topology()
-		# THE LEDGER VERBS ROW (T-UI-08 + refinements #2/#5): the
-		# chronicle chip, the day-sheet chip and the press-room chip at
-		# the row's right end — the same ActionChip grammar as every
-		# verb, one of each per slot (the router's focus_id equivalence
-		# carries the pad player's place across orientation swaps).
+		# THE LEDGER VERBS ROW (T-UI-08 + refinements #2/#5 + L1-C): the
+		# chronicle chip, the day-sheet chip, the press-room chip and the
+		# legacy chip at the row's right end — the same ActionChip grammar
+		# as every verb, one of each per slot (the router's focus_id
+		# equivalence carries the pad player's place across orientation
+		# swaps).
 		var verbs := strip.get_child(1) if strip.get_child_count() > 1 else null
 		if verbs == null:
 			verbs = _build_ledger_verbs()
@@ -1709,7 +1772,7 @@ func _bind_header() -> void:
 			slot.layout_topology()
 
 
-## The header's verbs row: a right-aligned HBox (spacer + the three
+## The header's verbs row: a right-aligned HBox (spacer + the four
 ## table-paper chips). Built once per slot by _bind_header.
 func _build_ledger_verbs() -> Control:
 	var row := HBoxContainer.new()
@@ -1722,6 +1785,7 @@ func _build_ledger_verbs() -> Control:
 	row.add_child(_ledger_chip("chronicle_chip", "The Chronicle", 172.0, open_chronicle))
 	row.add_child(_ledger_chip("day_sheet_chip", "The Day-Sheet", 160.0, open_day_sheet))
 	row.add_child(_ledger_chip("press_room_chip", "The Press-Room", 150.0, open_press_room))
+	row.add_child(_ledger_chip("legacy_chip", "The Legacy", 140.0, open_legacy))
 	return row
 
 
@@ -2059,6 +2123,8 @@ func _capture_hook() -> void:
 		_day_sheet_then_capture(int(OS.get_environment("CS_SPREAD_DAYSHEET")), settle)
 	elif not OS.get_environment("CS_SPREAD_PRESS").is_empty():
 		_press_room_then_capture(int(OS.get_environment("CS_SPREAD_PRESS")), settle)
+	elif not OS.get_environment("CS_SPREAD_LEGACY").is_empty():
+		_legacy_then_capture(int(OS.get_environment("CS_SPREAD_LEGACY")), settle)
 	elif OS.get_environment("CS_SPREAD_LOUD") == "1":
 		# The loud/pressure drive owns its prelude (see _unfold_boot_intro):
 		# its captures were among the four veil-contaminated finds.
@@ -2480,6 +2546,119 @@ func _press_room_then_capture(mode: int, settle: float) -> void:
 	print("[spread] press-room capture: factor %.2f, reduced %s, steps %d"
 		% [TypeScale.factor(), str(MotionProfile.reduced()),
 			_press_room.sheet().type_steps().size()])
+	_settle_then_capture(settle if settle > 0.0 else 0.4)
+
+
+## CS_SPREAD_LEGACY=1/2/3 (L1-C): the growing deck's honest captures.
+## =1 FRESH BANK — the first run still live, nothing earned: the deck
+## opens over the veiled table ALL locked/dashed under the "earn your
+## first legacy" line. =2 MID-RUN WITH SOME OWNED — three real hands end
+## through the real verbs (banking their scores), the new hand plays on,
+## then the player's own path buys a few cards through the real card
+## presses BEFORE the capture (the mid-run mount note prints honestly).
+## =3 FULL TREE — the whole deck kept: the meta bank is seeded through
+## the fixture seam (the suspicion-meter precedent), then every node is
+## bought through the REAL host command until nothing is affordable; the
+## capture shows the deck fully solid + ink-filled crests.
+func _legacy_then_capture(mode: int, settle: float) -> void:
+	await _unfold_boot_intro()
+	if mode == 1:
+		host.driving = false
+		open_legacy()
+		for i in 90:
+			await get_tree().process_frame
+			if get_viewport().gui_get_focus_owner() != null:
+				break
+		var fresh_view: Dictionary = _legacy.view()
+		print("[spread] legacy capture (fresh): bank %d, owned %d/%d, empty %s, live run %s — every card locked or short"
+			% [int(fresh_view["bank"]), int(fresh_view["owned_count"]), int(fresh_view["node_count"]),
+				str(bool(fresh_view["empty"])), str(bool(fresh_view["live_run"]))])
+		_settle_then_capture(settle if settle > 0.0 else 0.4)
+		return
+	if mode == 2:
+		var intro_was_enabled := intro_enabled
+		intro_enabled = false
+		for i in 3:
+			var hours := 14.0 + float((i * 7) % 23)
+			var waited := 0.0
+			while waited < hours and host.is_run_running():
+				host.fast_forward(SimEngine.TICKS_PER_SIM_HOUR)
+				if demo_policy != null and demo_policy.on_ticks(SimEngine.TICKS_PER_SIM_HOUR):
+					demo_policy.apply(host)
+				waited += 1.0
+			match i % 3:
+				0:
+					host.submit(&"run_abort")
+				1:
+					host.submit(&"resolve_victory", &"loss", -1)
+				_:
+					host.submit(&"resolve_victory", &"win", host.units().army_power())
+			host.fast_forward(2)
+			if not host.is_run_running():
+				host.restart_run()
+				host.advance_ticks(1)
+		intro_enabled = intro_was_enabled
+		host.fast_forward(3 * SimEngine.TICKS_PER_SIM_HOUR)
+		refresh_from_state()
+		host.driving = false
+		open_legacy()
+		for i in 90:
+			await get_tree().process_frame
+			if get_viewport().gui_get_focus_owner() != null:
+				break
+		# The player's own path: buy through the real card presses — walk
+		# focus onto the next affordable card (the deck's own seed rule),
+		# then press it. Three cards kept, each through the real verb.
+		var bought: Array[String] = []
+		for i in 3:
+			var target: LegacySheet.LegacyCard = null
+			for card in _legacy.sheet().cards():
+				if bool(card.model()["purchasable"]):
+					target = card
+					break
+			if target == null:
+				break
+			target.grab_focus()
+			await get_tree().process_frame
+			bought.append(String(StringName(String(target.model()["id"]))))
+			(target as BaseButton).pressed.emit()
+			for f in 30:
+				await get_tree().process_frame
+		var mid_view: Dictionary = _legacy.view()
+		print("[spread] legacy capture (mid-run): %d hands earned %d legacy in all; spent %d on [%s] through the real presses — bank now %d, owned %d/%d, live run %s (the mount note prints)"
+			% [int(mid_view["runs_recorded"]), int(mid_view["total_earned"]), int(mid_view["spent"]),
+				", ".join(bought), int(mid_view["bank"]),
+				int(mid_view["owned_count"]), int(mid_view["node_count"]), str(bool(mid_view["live_run"]))])
+		print("[spread]   print: %s" % _legacy.sheet().print_text())
+		_settle_then_capture(settle if settle > 0.0 else 0.4)
+		return
+	# mode 3: the full tree, bought through the real command. One real
+	# hand ends first so the count line reads honestly (a kept deck with
+	# no hands recorded would be a fixture's tell).
+	host.submit(&"run_abort")
+	host.fast_forward(2)
+	host.meta.legacy_points = 99999  # the fixture seam (the meter precedent)
+	var guard := 0
+	while true:
+		var affordable := host.unlock_affordable()
+		if affordable.is_empty() or guard > 64:
+			break
+		for id in affordable:
+			host.unlock_purchase(id)
+		guard += 1
+	host.fast_forward(2)
+	refresh_from_state()
+	host.driving = false
+	open_legacy()
+	for i in 90:
+		await get_tree().process_frame
+		if get_viewport().gui_get_focus_owner() != null:
+			break
+	var full_view: Dictionary = _legacy.view()
+	print("[spread] legacy capture (full tree): owned %d/%d, bank %d (residual), runs %d — every card SOLID + ink-filled crest; seed focus: %s"
+		% [int(full_view["owned_count"]), int(full_view["node_count"]), int(full_view["bank"]),
+			int(full_view["runs_recorded"]),
+			"back chip (nothing left to buy)" if get_viewport().gui_get_focus_owner() == _legacy.sheet().back_chip() else "a card"])
 	_settle_then_capture(settle if settle > 0.0 else 0.4)
 
 

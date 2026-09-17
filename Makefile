@@ -107,6 +107,12 @@ run-game:
 #                                                               # type-scale + motion steps, the kept rule, the back verb)
 #   CS_SPREAD_SHOT=/path.png CS_SPREAD_PRESS=2 make run-demo    # the same card after the 1.3x step is pressed through the real
 #                                                               # chip — the LIVE re-flow (card + veiled table at the larger hand)
+#   CS_SPREAD_SHOT=/path.png CS_SPREAD_LEGACY=1 make run-demo   # L1-C: the growing deck, FRESH BANK — first run live, nothing
+#                                                               # earned: the whole deck locked/dashed under "earn your first legacy"
+#   CS_SPREAD_SHOT=/path.png CS_SPREAD_LEGACY=2 make run-demo   # L1-C: MID-RUN with some owned — 3 real hands bank, real card
+#                                                               # presses buy nodes, the mount note + the purchase print
+#   CS_SPREAD_SHOT=/path.png CS_SPREAD_LEGACY=3 make run-demo   # L1-C: the FULL TREE — every node bought through the real
+#                                                               # command (bank seeded via the fixture seam), all cards solid
 #   CS_SPREAD_SHOT=/path.png CS_SPREAD_FIRST=1 make run-demo    # the first session, moment 1: the EMPTY SPREAD (staked plots)
 #                                                               # + the first gate hint at the 7-minute arrival (T-UI-10)
 #   CS_SPREAD_SHOT=/path.png CS_SPREAD_FIRST=2 make run-demo    # moment 2: the assignment + build-order hints, focus on the plot

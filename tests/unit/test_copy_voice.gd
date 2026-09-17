@@ -42,6 +42,9 @@ const QUOTE_BUDGET := 476.0
 const CARD_BUDGET := 232.0
 const PACKET_BUDGET := 504.0
 const STRIP_BUDGET := 610.0
+## The legacy deck's print row (L1-C): the 640-capped sheet's inner width
+## minus the row's rule + separation (588 - 30 - 10 = 548), pinned at 536.
+const LEGACY_BUDGET := 536.0
 
 ## Which surface each key prints on (the budget it must fit). Keys NOT
 ## listed print on multi-line/autowrap or chip surfaces — they get the
@@ -104,6 +107,12 @@ const KEY_BUDGETS: Dictionary = {
 	&"prefs_kept": QUOTE_BUDGET, &"prefs_type_note": QUOTE_BUDGET,
 	&"prefs_motion_note": QUOTE_BUDGET,
 	&"prefs_motion_full": QUOTE_BUDGET, &"prefs_motion_steady": QUOTE_BUDGET,
+	# the legacy deck screen (L1-C) — the deck's print row label (the
+	# 640-capped sheet's inner width minus the rule and separation)
+	&"legacy_empty_1": QUOTE_BUDGET, &"legacy_empty_2": QUOTE_BUDGET,
+	&"legacy_midrun_note": QUOTE_BUDGET, &"legacy_purchase_line": LEGACY_BUDGET,
+	&"legacy_refusal_prereq": LEGACY_BUDGET, &"legacy_refusal_short": QUOTE_BUDGET,
+	&"legacy_refusal_owned": QUOTE_BUDGET,
 }
 
 
@@ -255,7 +264,20 @@ func _worst_case_params() -> Dictionary:
 		"hours": 127, "count": 999, "points": 1999, "level": 25,
 		"before": 100, "after": 100, "power": 150, "reason": 9,
 		"verb": "were", "hands": "12 hands", "amount": 999,
+		# the legacy deck's tokens (L1-C): the tree's longest node display
+		# name, and the widest shortfall the abbreviated bank can print.
+		"node": _longest_node_name(pack),
+		"short": 9999,
 	}
+
+
+## The tree's longest node display name (a tree-less pack degrades to a
+## representative long name — the budget pin must never crash on content).
+func _longest_node_name(pack: ContentPack) -> String:
+	if pack.unlock_tree == null:
+		return "The Union of Unpaid Artisans"
+	return _longest((pack.unlock_tree.nodes as Array)
+		.map(func(n: UnlockNodeDef) -> String: return n.display_name))
 
 
 ## Full substitution for measurement: every token replaced with its

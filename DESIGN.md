@@ -351,7 +351,7 @@ measured — the letterhead row has no width to spare at the 720 portrait base) 
 letterhead (leader name, regime-ink rule, regime name, clock) at full table width
 (the name wrapping to as many lines as the pools deal, the row growing with them),
 then THE LEDGER VERBS row (The Chronicle chip + The Day-Sheet chip + The Press-Room
-chip, right-aligned, full grips).
+chip + The Legacy chip, right-aligned, full grips).
 
 **Key Characteristics:** hierarchy reads ground → cards → pips/numerals (edges first,
 numbers second, faces last); roster runs 1–30 cards; the Watchful Eye perches on the
@@ -475,8 +475,8 @@ button chips, 5px on paper panels (theme styleboxes).
   and the row's wrapped height is derived inside the slot's topology pass — a pure
   function of text + type factor + strip width, so the rendered layout stays a
   function of sim state alone. It tops a two-row header column whose second row is
-  THE LEDGER VERBS (The Chronicle + The Day-Sheet + The Press-Room ActionChips,
-  right-aligned, full grips, focus-equivalent across orientation swaps).
+  THE LEDGER VERBS (The Chronicle + The Day-Sheet + The Press-Room + The Legacy
+  ActionChips, right-aligned, full grips, focus-equivalent across orientation swaps).
 - **ActionFan / ActionChip** (`ui/screens/spread/action_fan.gd`): the contextual
   affordance — a column of print-styled chips fanned at a card's edge (to its right,
   mirrored left when the table runs out, always inside the screen). Each chip: leading
@@ -578,6 +578,38 @@ All screens compose the same grammar; none forks a component:
   the story never waits on the table's papers. No debug/show-fps here: dev
   chrome stays gated on `CS_DEBUG_CHROME`.
 
+- **LegacyScreen / LegacySheet** (`ui/screens/legacy/`): THE GROWING DECK (L1-C) —
+  the meta-shop where banked legacy points buy permanent upgrades between
+  runs, as the chronicle's sibling paper (0.90 veil, 640-capped column,
+  never modal chrome). The four branches print as FAMILIES (crest slot +
+  CopyDeck branch name + solid rule), each node one card in the world's
+  grammar: name, CopyDeck flavor line, the EFFECT in plain readable terms
+  ("buildings cost 5% less" — templated from the effect payload, never an
+  invented mechanic), the cost in legacy pips, and state by LINE FORM —
+  owned SOLID + ink-filled crest plate, affordable DASHED (the deck's
+  in-hand form; the enabled verb, seeded focus), prereq-locked STRUCK +
+  "requires <node>", unaffordable DASHED + the shortfall count. The bank
+  band (bank + total earned + hands recorded) and runs-recorded line
+  print under the letterpress title; purchases and refusals print
+  themselves on the deck's own paper (double rule + "The Survivors
+  remember <node>." — the ActionChip signature grammar; struck refusals
+  name the prerequisite or the shortfall). ONE-STEP BUY (a shop, not a
+  gamble — no two-step confirm) down the REAL host command
+  (`GameHost.unlock_purchase`), bank + tree rebound LIVE, focus stays on
+  the bought card. MOUNT DISCIPLINE: opened over a live hand the deck
+  prints the honest L1-A note — new cards join the NEXT hand. A fresh
+  bank still opens the deck: locked and dashed under the CopyDeck "earn
+  your first legacy" line. Entries: the spread header's The-Legacy verb
+  (both slots, focus-equivalent) AND the boot title card's Legacy chip
+  (present once a hand has ended — the bank is why a player returns;
+  paper over the title's own table, cyclic chip focus). Input parity ×3
+  (card press / pad primary on the focused card — ancestral Button
+  check, cards nest in grids / Enter through the real pipeline); the pad
+  column walks cards + back chip cyclically; unclipped at the four
+  common sizes. The card's deterministic minimum rides
+  `custom_minimum_size` at bind (Godot 4.7: Button's native minimum
+  shadows the `_get_minimum_size` virtual — probe-pinned).
+
 ### Motion grammar
 
 Three named transitions, paced in one place (`ui/theme/motion_profile.gd`), all
@@ -614,7 +646,7 @@ the reveal is content, not animation; entrance slides skip entirely):
 | Component gallery (visual inspection) | `ui/theme/theme_gallery.tscn` (`make run-gallery`) |
 | LayoutRouter / OrientationSlot / CardSpread / ResponsiveScreen | `ui/layout/layout_router.gd` · `orientation_slot.gd` · `card_spread.gd` · `responsive_screen.gd` |
 | The Spread + card factory + fan + Eye + header + motion | `ui/screens/spread/` (spread_screen.gd, spread_cards.gd, card_actions.gd, action_fan.gd, card_motion.gd, watchful_eye.gd, run_header.gd, suspicion_events.gd, catch_up_print.gd, first_session.gd, day_sheet_screen.gd, press_room_screen.gd) |
-| Intro / Assault / Chronicle screens | `ui/screens/intro/` · `ui/screens/assault/` · `ui/screens/chronicle/` |
+| Intro / Assault / Chronicle / Legacy screens | `ui/screens/intro/` · `ui/screens/assault/` · `ui/screens/chronicle/` · `ui/screens/legacy/` |
 | Regime inks (content) | `content/mvp/regimes/{gilded_crown,iron_rotunda,paper_crown,velvet_fist}.tres` |
 | Copy system | `sim/copy_deck.gd` + `content/mvp/copy_table.tres` + `docs/voice-bible.md` |
 | Pins | `tests/unit/test_theme_grammar.gd` · `test_type_scale.gd` · `test_colorblind_audit.gd` · `test_copy_voice.gd` |

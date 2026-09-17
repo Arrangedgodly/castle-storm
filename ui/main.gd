@@ -42,6 +42,7 @@ extends Control
 
 const SPREAD_SCENE := preload("res://ui/screens/spread/spread_screen.tscn")
 const SpreadScreen := preload("res://ui/screens/spread/spread_screen.gd")
+const LegacyScreenScript := preload("res://ui/screens/legacy/legacy_screen.gd")
 const GROUND_SCENE := preload("res://ui/theme/table_ground.tscn")
 const RULE_SCRIPT := preload("res://ui/theme/rule_mark.gd")
 
@@ -65,6 +66,10 @@ const CARD_WIDTH := 560.0
 ## The game's name as printed on the card (the display face's small
 ## caps carry the letterpress).
 const GAME_NAME := "CASTLE STORM"
+
+## The front door's Legacy chip label (L1-C — the code-side verb
+## grammar, the header verbs row's own).
+const LEGACY_CHIP_LABEL := "The Legacy"
 
 ## The REAL engine host this shell booted (null before _ready).
 var host: GameHost
@@ -92,8 +97,14 @@ var _caution_label: Label
 var _begin_chip: ActionFan.ActionChip
 var _continue_chip: ActionFan.ActionChip
 var _new_run_chip: ActionFan.ActionChip
+## The Legacy deck chip on the title card (L1-C): present only once a
+## hand has ended (the bank is why a player returns) — the growing deck
+## opens as paper over the title's own table.
+var _legacy_chip: ActionFan.ActionChip
 ## The NEW-RUN confirm latch (the odds-COMMIT grammar's armed step).
 var _new_run_armed := false
+## The legacy deck composed over the title (null until first opened).
+var _legacy: LegacyScreenScript
 
 
 func _ready() -> void:
@@ -244,8 +255,11 @@ func _card_line() -> Label:
 
 
 ## The route's affordance chips: one BEGIN (fresh/ended) or CONTINUE
-## (primary, signature) + NEW RUN (secondary). Full grips; the two-chip
+## (primary, signature) + NEW RUN (secondary). Full grips; the chip
 ## column is a cyclic focus trap (pad parity — the fan's rule).
+## L1-C: once a hand has ENDED anywhere on this install, THE LEGACY
+## chip joins the column — the banked points are the reason to return,
+## and the door to them lives on the front door itself.
 func _build_chips() -> Control:
 	var table: CopyTable = Inks.pack().copy
 	var rotor := host.meta.runs_recorded
@@ -260,32 +274,51 @@ func _build_chips() -> Control:
 		_new_run_chip = _chip(CopyDeck.line(table, &"title_new_run", rotor), false)
 		_new_run_chip.pressed.connect(_on_new_run)
 		rows.add_child(_new_run_chip)
-		_wire_chip_cycle()
 	else:
 		var key := &"title_next" if route == ROUTE_BEGIN_NEXT else &"title_begin"
 		_begin_chip = _chip(CopyDeck.line(table, key, rotor), true)
 		_begin_chip.pressed.connect(_on_begin)
 		rows.add_child(_begin_chip)
+	if show_legacy_chip_for(host.meta.runs_recorded):
+		_legacy_chip = _chip(LEGACY_CHIP_LABEL, false)
+		_legacy_chip.pressed.connect(_on_legacy)
+		rows.add_child(_legacy_chip)
+	_wire_chip_cycle()
 	return rows
 
 
-## CONTINUE <-> NEW RUN: focus cycles inside the card (a pad player
-## never escapes the two doors into bare table). DEFERRED — the chips
-## build during _ready, before the shell enters the tree, and NodePaths
-## only resolve in-tree.
+## The Legacy chip's visibility rule (pure — tests pin it): the chip
+## prints only once at least one hand has ENDED (runs_recorded counts
+## ended hands). A fresh install has nothing banked and no deck worth
+## reading yet — the game's first door stays single.
+static func show_legacy_chip_for(runs_recorded: int) -> bool:
+	return runs_recorded > 0
+
+
+## CONTINUE <-> NEW RUN <-> THE LEGACY: focus cycles inside the card (a
+## pad player never escapes the doors into bare table). DEFERRED — the
+## chips build during _ready, before the shell enters the tree, and
+## NodePaths only resolve in-tree.
 func _wire_chip_cycle() -> void:
 	_wire_chip_cycle_paths.call_deferred()
 
 
 func _wire_chip_cycle_paths() -> void:
-	if _continue_chip == null or _new_run_chip == null or not is_inside_tree():
+	var column: Array[Control] = []
+	for chip: ActionFan.ActionChip in [_continue_chip, _new_run_chip, _legacy_chip]:
+		if chip != null:
+			column.append(chip)
+	if _begin_chip != null:
+		column.append(_begin_chip)
+	var count := column.size()
+	if count == 0 or not is_inside_tree():
 		return
-	var up := _continue_chip.get_path()
-	var down := _new_run_chip.get_path()
-	_continue_chip.focus_neighbor_top = down
-	_continue_chip.focus_neighbor_bottom = down
-	_new_run_chip.focus_neighbor_top = up
-	_new_run_chip.focus_neighbor_bottom = up
+	var paths: Array[NodePath] = []
+	for node in column:
+		paths.append(node.get_path())
+	for i in count:
+		column[i].focus_neighbor_top = paths[wrapi(i - 1, 0, count)]
+		column[i].focus_neighbor_bottom = paths[wrapi(i + 1, 0, count)]
 
 
 ## One print-styled chip (ActionFan's ActionChip unforked — the intro
@@ -362,6 +395,28 @@ func _on_new_run() -> void:
 	_mount_spread(SpreadScreen.ENTRY_NEW_HAND)
 
 
+## THE LEGACY (L1-C): the growing deck opens as PAPER OVER THE TITLE'S
+## OWN TABLE (the chronicle's composition rule — the front door has its
+## ground, the deck is paper on it; no modal chrome). The real host
+## rides across; closing returns focus to the chip that opened it. A
+## live hand beneath is fine — the deck prints the mount rule honestly.
+func _on_legacy() -> void:
+	if _legacy == null:
+		_legacy = LegacyScreenScript.new()
+		_legacy.name = "LegacyScreen"
+		_legacy.set_anchors_preset(Control.PRESET_FULL_RECT)
+		_title_layer.add_child(_legacy)
+		_legacy.closed.connect(_on_legacy_closed)
+	_legacy.open(host)
+
+
+## The deck folded away over the title: focus returns to The Legacy
+## chip (the affordance that opened it).
+func _on_legacy_closed() -> void:
+	if _legacy_chip != null:
+		_legacy_chip.grab_focus()
+
+
 ## The whole title card is the single-chip modes' affordance (the intro
 ## packet's precedent — touch parity: a tap anywhere on the paper is the
 ## gesture). The continue mode carries two doors; only the chips answer.
@@ -424,6 +479,8 @@ func _release_title() -> void:
 	_begin_chip = null
 	_continue_chip = null
 	_new_run_chip = null
+	_legacy_chip = null
+	_legacy = null  # the deck is the title's own paper — it folds with it
 
 
 # --- the platform seams -------------------------------------------------------------

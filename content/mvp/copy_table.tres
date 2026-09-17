@@ -133,5 +133,12 @@ templates = Dictionary[StringName, PackedStringArray]({
 &"unlock_flavor_scarred_banners": PackedStringArray("Patched cloth; the hands under it are not."),
 &"unlock_flavor_the_night_watch": PackedStringArray("They watch the roads till the roads forget."),
 &"unlock_flavor_war_games_on_sundays": PackedStringArray("The crown rests on Sundays. The drills do not."),
+&"legacy_empty_1": PackedStringArray("the deck is still wrapped — no legacy earned yet"),
+&"legacy_empty_2": PackedStringArray("Finish a hand, any hand. The bank keeps the points."),
+&"legacy_midrun_note": PackedStringArray("A hand is live — new cards join the next hand."),
+&"legacy_purchase_line": PackedStringArray("The Survivors remember {node}."),
+&"legacy_refusal_prereq": PackedStringArray("The deck has an order — {node} first."),
+&"legacy_refusal_short": PackedStringArray("The bank is short — {short} more legacy."),
+&"legacy_refusal_owned": PackedStringArray("Already pressed into the deck."),
 &"warn_context": PackedStringArray("Keep hands quiet.", "Nothing to see here.")
 })
