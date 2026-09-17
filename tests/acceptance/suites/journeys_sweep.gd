@@ -323,7 +323,18 @@ func _journey_5_victory_restart(harness) -> void:
 			break
 	commit.grab_focus()
 	await _frames(harness, 2)
-	await _key(harness, 4194309)  # COMMIT by keyboard
+	await _key(harness, 4194309)  # the FIRST keyboard COMMIT arms the die
+	await _frames(harness, 3)
+	harness.check(screen._assault.state == screen._assault.State.ODDS,
+		"J5: one Enter arms — the die is not yet cast")
+	commit = null  # the armed table re-laid its chips; find the new verb
+	for chip in screen._assault.stage().chips():
+		if chip is Button and String((chip as Button).action.get("id", "")) == "commit":
+			commit = chip
+			break
+	commit.grab_focus()
+	await _frames(harness, 2)
+	await _key(harness, 4194309)  # the SECOND Enter casts
 	for i in 90:
 		await _frame(harness)
 		if screen._assault.state != screen._assault.State.ODDS:

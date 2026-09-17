@@ -28,7 +28,9 @@
 ##   C. THE SUSPICION CHOICE CARD — submit + fold, three ways.
 ##   D. THE ASSAULT — odds open via the STORM chip (three ways),
 ##      below-floor COMMIT refusal (three ways), RETREAT (three ways),
-##      and a full TOUCH-ONLY storm (commit -> skip -> close -> win
+##      the TWO-PRESS COMMIT confirm (three ways: one press arms — the
+##      die is not yet cast — and the armed table walks away free), and
+##      a full TOUCH-ONLY storm (commit -> skip -> close -> win
 ##      handoff) beside the pad-only storm deck_nav_sweep already ran.
 ##   E. THE CHRONICLE LEDGER — open / page turn / close, three ways.
 ##   F. THE LEADER INTRO — the one gesture, three ways.
@@ -779,6 +781,46 @@ func _matrix_assault(harness) -> void:
 			army_screen._assault.close()
 			await _frames(harness, 3)
 
+	# --- the TWO-PRESS confirm, x3: one press arms, the armed table walks away
+	# (the harden P1: the run-deciding verb is never one mispress away —
+	# focus seeds on RETREAT, the free verb; one COMMIT press arms the
+	# die without casting it, and the armed table still retreats free)
+	for leg: String in ["kb", "pad", "touch"]:
+		var opened := await _open_odds_via_storm_chip(harness, army_screen, leg)
+		if not harness.check(opened, "parity/assault: odds reopen for the confirm rows (%s)" % leg.to_upper()):
+			break
+		var seeded := _focus_owner(harness)
+		harness.check(seeded is Button and String((seeded as Button).action.get("id", "")) == "retreat",
+			"parity/assault: the odds table seeds focus on RETREAT, the free verb (%s)" % leg.to_upper())
+		commit = _chip_by_id(army_screen._assault, "commit")
+		commit.grab_focus()
+		await _frames(harness, 2)
+		match leg:
+			"kb":
+				await _key(harness, KEY_ENTER)
+			"pad":
+				await _pad(harness, BTN_A)
+			"touch":
+				await _tap_control(harness, commit)
+		await _frames(harness, 3)
+		harness.check(army_screen._assault.state == army_screen._assault.State.ODDS,
+			"parity/assault: one %s COMMIT arms — the die is not yet cast (state %d)"
+			% [leg.to_upper(), army_screen._assault.state])
+		# The armed die never traps: back walks away free (Esc / pad B /
+		# the touch retreat chip).
+		match leg:
+			"kb":
+				await _key(harness, KEY_ESCAPE)
+			"pad":
+				await _pad(harness, BTN_B)
+			"touch":
+				await _tap_control(harness, _chip_by_id(army_screen._assault, "retreat"))
+		await _frames(harness, 3)
+		harness.check(not army_screen._assault.is_open(),
+			"parity/assault: %s walks away from the armed die at no cost" % leg.to_upper())
+		harness.check(_focus_owner(harness) != null,
+			"parity/assault: focus survives walking away from the armed die (%s)" % leg.to_upper())
+
 	# --- a full TOUCH-ONLY storm (commit -> skip -> close -> win handoff) -----
 	var outcomes: Array = []
 	army_screen._assault.finished.connect(func(outcome: StringName, _script: Dictionary) -> void:
@@ -786,7 +828,11 @@ func _matrix_assault(harness) -> void:
 	var opened_by_touch := await _open_odds_via_storm_chip(harness, army_screen, "touch")
 	harness.check(opened_by_touch, "parity/assault: the touch storm opens the odds")
 	commit = _chip_by_id(army_screen._assault, "commit")
-	await _tap_control(harness, commit)  # COMMIT by touch
+	await _tap_control(harness, commit)  # the FIRST tap arms (the die is not yet cast)
+	await _frames(harness, 3)
+	harness.check(army_screen._assault.state == army_screen._assault.State.ODDS,
+		"parity/assault: one touch COMMIT arms — the die is not yet cast")
+	await _tap_control(harness, _chip_by_id(army_screen._assault, "commit"))  # the SECOND tap casts
 	for i in 60:
 		await _frame(harness)
 		if army_screen._assault.state != army_screen._assault.State.ODDS:

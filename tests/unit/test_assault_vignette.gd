@@ -10,7 +10,13 @@
 ##   - THE ODDS SCREEN: binds live odds with blocks that equal the
 ##     query's permille, the knight-floor gate refuses BELOW the floor
 ##     with a printed reason and WITHOUT submitting (no events, hash
-##     untouched), retreat is free, focus lands on COMMIT;
+##     untouched — a refused petition never arms), retreat is free,
+##     focus seeds on RETREAT (the safe verb) and COMMIT is a TWO-PRESS
+##     raise — the first press only ARMS (the printed caution, the
+##     re-labeled chip, nothing submitted), the second casts the die
+##     (the harden round's P1: one mispressed Enter or pad-A never
+##     decides the run; the x3 input-mode legs live in the parity
+##     matrix, section D);
 ##   - THE VIGNETTE: replays from the event stream alone — the same
 ##     battle driven through two stages produces the SAME authored
 ##     visual sequence hash, skip (one input) lands the exact states
@@ -310,7 +316,15 @@ func _battle_events(run_seed: int) -> Array:
 # --- the odds screen -------------------------------------------------------------------------
 
 
-func test_odds_screen_binds_live_parity_and_focuses_commit() -> void:
+## The player's two-step raise (the confirm step): arm, then cast. The
+## programmatic seam for every test that pins the storm itself — the
+## input-mode legs (Enter / pad A / touch tap) live in the parity matrix.
+func _confirmed_commit(assault) -> void:
+	assault.commit()  # arms: the printed caution, nothing submitted
+	assault.commit()  # casts the die
+
+
+func test_odds_screen_binds_live_parity_and_seeds_retreat() -> void:
 	var host := _knight_host(WIN_SEED, 2)
 	var screen: SpreadScreen = await _mounted_screen(host)
 	await _open_assault(screen)
@@ -331,10 +345,12 @@ func test_odds_screen_binds_live_parity_and_focuses_commit() -> void:
 		assert_bool(node is Popup or node is Window or node is AcceptDialog).is_false()
 		for child in node.get_children():
 			stack.append(child)
-	# Focus lands on COMMIT (the bold verb) and the chips keep grips.
+	# THE SAFE SEED (the harden P1): focus lands on RETREAT — the free
+	# verb — so a mispress on open retreats at no cost, never commits.
+	# The chips keep grips.
 	var focus := get_viewport().gui_get_focus_owner()
 	assert_that(focus).is_not_null()
-	assert_str(String(focus.action.get("id", ""))).is_equal("commit")
+	assert_str(String(focus.action.get("id", ""))).is_equal("retreat")
 	for chip in assault.stage().chips():
 		var min_size: Vector2 = chip.get_combined_minimum_size()
 		assert_float(min_size.y).is_greater_equal(float(Inks.TOUCH_GRIP_MIN) - 0.01)
@@ -354,6 +370,11 @@ func test_knight_floor_gate_refuses_in_print_without_submitting() -> void:
 	assert_str(String(commit_chip.action["reason"])).contains("15 mustered")
 	assault.commit()
 	await get_tree().process_frame
+	assert_int(assault.state).is_equal(assault.State.ODDS)
+	# A REFUSED PETITION NEVER ARMS: a second press refuses again — the
+	# two-step raise exists to guard the die, never to sneak it past the
+	# floor with a double-tap.
+	assault.commit()
 	assert_int(assault.state).is_equal(assault.State.ODDS)
 	# Time may pass, but NOTHING assault-shaped was submitted or rolled.
 	host.fast_forward(3)
@@ -388,6 +409,66 @@ func test_retreat_from_odds_is_free() -> void:
 	screen.queue_free()
 
 
+func test_commit_is_two_presses_the_die_never_one_mispress() -> void:
+	## THE HARDEN P1: the first COMMIT only ARMS — the clerk's printed
+	## caution, the re-labeled chip, NOTHING submitted; the second press
+	## casts. One mispress (Enter or pad-A on a stray focus) can never
+	## decide the run.
+	var host := _knight_host(WIN_SEED, 2)
+	var screen: SpreadScreen = await _mounted_screen(host)
+	await _open_assault(screen)
+	var assault := screen._assault
+	# FIRST PRESS — arms. Nothing storm-shaped moves.
+	var kinds: Array = []
+	host.event_observed.connect(func(event: Dictionary) -> void: kinds.append(event["type"]))
+	var hash_before := host.engine.state_hash()
+	assault.commit()
+	assert_int(assault.state).is_equal(assault.State.ODDS)
+	var printed := assault.stage().printed_lines()
+	assert_str(String(printed[printed.size() - 1]["text"])).contains("die is cast")
+	# The chip NAMES its next press (state in text, never hue alone) and
+	# focus returns to the armed verb — the confirming press lands there.
+	assert_str(String(assault.stage().chips()[0].action["label"])).contains("die is cast")
+	await get_tree().process_frame
+	var focus := get_viewport().gui_get_focus_owner()
+	assert_str(String(focus.action.get("id", ""))).is_equal("commit")
+	host.fast_forward(3)
+	var assault_kinds := kinds.filter(func(kind): return String(kind).begins_with("assault"))
+	assert_int(assault_kinds.size()).is_zero()  # no roll, no beat, nothing
+	assert_int(host.engine.state_hash()).is_not_equal(hash_before)  # only time passed
+	# SECOND PRESS — the die is cast.
+	assault.commit()
+	assert_int(assault.state).is_not_equal(assault.State.ODDS)
+	# One settle frame: the cast clears the chips (their queue_free needs
+	# an idle before the suite's orphan audit).
+	await get_tree().process_frame
+	screen.queue_free()
+
+
+func test_armed_die_walks_away_free_and_reopens_unarmed() -> void:
+	## The armed confirmation never traps: BACK retreats at no cost from
+	## the armed table, and a re-open starts the pen fresh — one press
+	## ARMS again, it does not cast.
+	var host := _knight_host(WIN_SEED, 2)
+	var screen: SpreadScreen = await _mounted_screen(host)
+	await _open_assault(screen)
+	var assault := screen._assault
+	assault.commit()  # arm
+	assert_int(assault.state).is_equal(assault.State.ODDS)
+	assault._unhandled_input(_action_event(&"back"))  # the input path
+	await get_tree().process_frame
+	assert_bool(assault.is_open()).is_false()
+	await _open_assault(screen)
+	assert_int(assault.state).is_equal(assault.State.ODDS)
+	assault.commit()
+	assert_int(assault.state).is_equal(assault.State.ODDS)
+	var printed := assault.stage().printed_lines()
+	assert_str(String(printed[printed.size() - 1]["text"])).contains("die is cast")
+	# One settle frame (the arm re-laid the chips this same frame).
+	await get_tree().process_frame
+	screen.queue_free()
+
+
 # --- the vignette ------------------------------------------------------------------------------
 
 
@@ -401,7 +482,7 @@ func test_commit_replays_the_beats_and_lands_the_win_seam() -> void:
 	var finished: Array = []
 	assault.finished.connect(func(outcome: StringName, script: Dictionary) -> void:
 		finished.append([String(outcome), BeatScript.visual_sequence_hash(script)]))
-	assault.commit()
+	_confirmed_commit(assault)
 	assert_bool(await _await_outcome(screen)).is_true()
 	# Every beat landed in order; the outcome sealed.
 	assert_array(landed).is_equal([0, 1, 2, 3])
@@ -432,7 +513,7 @@ func test_loss_seam_blockquote_and_survivors() -> void:
 	var assault := screen._assault
 	var power_before := host.units().army_power()
 	var knights_before: int = host.units().unit_count(&"knight")
-	assault.commit()
+	_confirmed_commit(assault)
 	assert_bool(await _await_outcome(screen)).is_true()
 	var script: Dictionary = assault._script
 	assert_str(String(script["outcome"])).is_equal("loss")
@@ -462,7 +543,7 @@ func test_vignette_replays_deterministically_from_events_alone() -> void:
 	var screen: SpreadScreen = await _mounted_screen(host)
 	await _open_assault(screen)
 	var assault := screen._assault
-	assault.commit()
+	_confirmed_commit(assault)
 	assert_bool(await _await_outcome(screen)).is_true()
 	var script: Dictionary = assault._script
 	var roster: Array = assault._roster_snapshot
@@ -496,7 +577,7 @@ func test_skip_lands_the_same_states_pacing_reaches() -> void:
 	var screen: SpreadScreen = await _mounted_screen(host)
 	await _open_assault(screen)
 	var assault := screen._assault
-	assault.commit()
+	_confirmed_commit(assault)
 	# Let the first beat land, then ONE INPUT skips the whole vignette.
 	assert_bool(await _beat_reached(assault, 0)).is_true()
 	assault._unhandled_input(_action_event(&"back"))
@@ -521,7 +602,7 @@ func test_reduced_motion_collapses_beats_with_printed_summaries() -> void:
 	var screen: SpreadScreen = await _mounted_screen(host)
 	await _open_assault(screen)
 	var assault := screen._assault
-	assault.commit()
+	_confirmed_commit(assault)
 	assert_bool(await _await_outcome(screen, 240)).is_true()
 	assert_str(String(assault._script["outcome"])).is_equal("loss")
 	var printed := assault.stage().printed_lines()

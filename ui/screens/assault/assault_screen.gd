@@ -8,7 +8,12 @@
 ##               resolver's pure query (per batch — training and gear
 ##               settle silently), COMMIT bold, RETREAT free (player
 ##               choice honored: retreating costs nothing and returns to
-##               the spread untouched);
+##               the spread untouched). COMMIT is TWO presses — the
+##               first only ARMS (the clerk's printed caution, the chip
+##               re-labeled), the second raises the standard: the die is
+##               cast, never one mispress away (the finishing critique's
+##               P1 — the run-deciding verb and the free verb may not
+##               share one press);
 ##   resolving — COMMIT went down the host's one write path; the screen
 ##               drains EXACTLY the one tick the command needs
 ##               (advance_ticks(1) — the commit is tick-aligned by
@@ -26,11 +31,14 @@
 ##               hands off through `finished` (T-UI-05's restart flow
 ##               mounts on that seam — this screen never restarts).
 ##
-## FOCUS PATH (Daredevil): odds opens focused on COMMIT (the bold verb),
-## the chips are a cyclic trap, back retreats from odds at no cost, the
-## vignette needs no focus (one input skips), outcome focuses the close
-## chip. Reduced motion collapses the beats to near-instant while the
-## printed summaries carry the whole story.
+## FOCUS PATH (Daredevil): odds opens focused on RETREAT — the free,
+## safe verb (the asymmetry is the point: one mispressed Enter or pad-A
+## retreats at no cost instead of deciding the run; COMMIT answers with
+## the two-step confirm above) — the chips are a cyclic trap, back
+## retreats from odds at no cost, the vignette needs no focus (one input
+## skips), outcome focuses the close chip. Reduced motion collapses the
+## beats to near-instant while the printed summaries carry the whole
+## story.
 ##
 ## AUDIO HOOKS (the documented sound-shape, no assets yet):
 ##   beat_landed(beat, index) — per settled beat: advance = the march
@@ -69,6 +77,11 @@ var _roster_snapshot: Array[Dictionary] = []
 var _battle_events: Array[Dictionary] = []
 var _script := {}
 var _banked_points := 0
+## The COMMIT confirm step: true once the first press armed the die (the
+## printed caution + the re-labeled chip), consumed by the second press.
+## Reset on every open (a closed table re-opens with a fresh pen) and on
+## the sim's own denial; a refused petition never arms.
+var _commit_armed := false
 ## Generation counter: skip() bumps it; stale async loops exit.
 var _generation := 0
 var _drain_tries := 0
@@ -103,6 +116,7 @@ func open(p_host: GameHost, p_router: LayoutRouter) -> void:
 	_script = {}
 	_banked_points = 0
 	_drain_tries = 0
+	_commit_armed = false
 	if host.event_observed.is_connected(_on_event):
 		host.event_observed.disconnect(_on_event)
 	host.event_observed.connect(_on_event)
@@ -125,7 +139,9 @@ func open(p_host: GameHost, p_router: LayoutRouter) -> void:
 	# the print says what stands against what (an empty strip reads
 	# unfinished, the capture find).
 	_stage.print_line(Inks.LineClass.PLAIN, _composition_line())
-	_focus_commit()
+	# The safe seed: RETREAT (the free verb) holds focus on open — the
+	# run-deciding verb is two presses away, never one mispress.
+	_focus_chip("retreat")
 
 
 ## The odds screen's opening print: the two sides of the fight in one
@@ -180,9 +196,14 @@ func _odds_chip_actions() -> Array[Dictionary]:
 		reason = "no army mustered"
 	elif not bool(_view["floor_met"]):
 		reason = AssaultPresenter.floor_line(_view)
+	# The armed chip NAMES its next press (the confirm step's affordance —
+	# state in text, never hue alone; the printed caution carries the why).
+	var commit_label := "COMMIT THE STORM"
+	if _commit_armed:
+		commit_label = "Commit — the die is cast"
 	return [
 		{
-			"id": "commit", "label": "COMMIT THE STORM", "command": &"commit_assault",
+			"id": "commit", "label": commit_label, "command": &"commit_assault",
 			"subject": &"", "value": 0, "enabled": commit_enabled, "reason": reason,
 			"signature": true,
 		},
@@ -197,14 +218,22 @@ func _odds_chip_actions() -> Array[Dictionary]:
 func _refresh_odds_meters() -> void:
 	## Silent drift (training/gear settle without events): the meters
 	## re-print per batch; the RANKS rebuild only when the roster itself
-	## changed (no churn on every batch).
+	## changed (no churn on every batch). A rebuild PRESERVES the focused
+	## chip — an armed confirmation stays where the player left it, and
+	## focus never yanks to the bold verb (the mispress the safe seed
+	## exists to prevent).
 	var fresh := AssaultPresenter.odds_view(host.assault().assault_odds(host.engine))
 	if _roster_signature(fresh) != _roster_signature(_view):
+		var focused_id := ""
+		var focus := get_viewport().gui_get_focus_owner()
+		if focus is BaseButton and focus in _stage.chips():
+			focused_id = String(focus.action.get("id", ""))
 		_view = fresh
 		_stage.bind_odds(_view)
 		_stage.set_chips(_odds_chip_actions())
 		_wire_chips()
-		_focus_commit()
+		if focused_id.is_empty() or not _focus_chip(focused_id):
+			_focus_chip("retreat")
 		return
 	_view = fresh
 	_stage.refresh_odds(fresh)
@@ -242,16 +271,29 @@ func retreat() -> void:
 	close()
 
 
-## COMMIT: the floor gate first (the printed refusal — the sim's own
-## denial stays the last-line defense), then the real command down the
-## host's one write path, then the synchronous one-tick drain.
+## COMMIT (the two-step raise): the floor gate first (the printed
+## refusal — the sim's own denial stays the last-line defense), then THE
+## CONFIRM STEP — the first press only ARMS: the clerk prints the
+## caution, the chip re-labels, focus stays on the verb the player
+## pressed; one mispressed Enter or pad-A can never decide the run. The
+## second press is the die cast: the real command down the host's one
+## write path, then the synchronous one-tick drain.
 func commit() -> void:
 	if state != State.ODDS:
 		return
 	_view = AssaultPresenter.odds_view(host.assault().assault_odds(host.engine))
 	if not bool(_view["floor_met"]) or _view["army_units"] <= 0:
+		_commit_armed = false  # a refused petition never stays armed
 		_stage.print_line(Inks.LineClass.WARN,
 			"The clerk refuses the paperwork: %s." % AssaultPresenter.floor_line(_view))
+		return
+	if not _commit_armed:
+		_commit_armed = true
+		_stage.set_chips(_odds_chip_actions())
+		_wire_chips()
+		_stage.print_line(Inks.LineClass.WARN,
+			"The clerk waits, pen raised — commit again: the die is cast.")
+		_focus_chip("commit")  # the confirming press lands where the player is
 		return
 	_roster_snapshot = []
 	for entry: Dictionary in _view["roster"]:
@@ -303,13 +345,15 @@ func _on_event(event: Dictionary) -> void:
 			_banked_points = int(event["value"])
 		&"assault_denied":
 			# The sim's own last-line defense (e.g. the run died between
-			# open and commit): print it and fall back to the odds.
+			# open and commit): print it and fall back to the odds — the
+			# failed cast disarms; the next raise starts from the pen.
+			_commit_armed = false
 			state = State.ODDS
 			set_process(false)  # the drain ended in a refusal
 			_stage.print_line(Inks.LineClass.WARN,
 				"The assault is refused — the army is not yet an army (power %d)." % int(event["value2"]))
 			_bind_odds()
-			_focus_commit()
+			_focus_chip("retreat")
 
 
 func _on_run_state(running: bool) -> void:
@@ -509,11 +553,21 @@ func activate_focused() -> bool:
 	return false
 
 
-func _focus_commit() -> void:
+## Focus the odds chip by id, deferred (a rebuilt chip mounts this frame
+## — the re-open precedent). The deferred grab is GUARDED: a same-frame
+## cast clears the chips before the grab lands (the synchronous arm ->
+## cast path), and a freed chip must never receive focus.
+func _focus_chip(id: String) -> bool:
 	for chip in _stage.chips():
-		if String(chip.action.get("id", "")) == "commit":
-			chip.grab_focus.call_deferred()
-			return
+		if String(chip.action.get("id", "")) == id:
+			_grab_inside_tree.call_deferred(chip)
+			return true
+	return false
+
+
+func _grab_inside_tree(chip: Control) -> void:
+	if chip != null and is_instance_valid(chip) and chip.is_inside_tree():
+		chip.grab_focus()
 
 
 ## Test/inspection seam: the composed stage.

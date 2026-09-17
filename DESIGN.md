@@ -489,6 +489,9 @@ All screens compose the same grammar; none fork a component:
   the table (army cards vs the castle card with regime ink), the vignette replayed
   from the captured event stream (march down the siege lane, cards struck
   newest-first, castle dashed at the gate, aftermath wash), skippable with one input.
+  The odds table seeds focus on RETREAT (the free verb) and COMMIT is a two-step
+  raise — the first press arms (the clerk's printed caution, the chip re-labeled),
+  the second casts the die; one mispress never decides the run.
 - **ChronicleScreen / ChronicleSheet** (`ui/screens/chronicle/`): the ledger of past
   spreads over a 0.90 veil in the live regime's ground tone; outcome seals by form
   (WON double / CRUSHED struck / ABANDONED dashed); the live run prints as its own

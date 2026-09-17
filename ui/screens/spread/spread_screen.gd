@@ -1468,6 +1468,14 @@ func _sync_focus_ids(slot: OrientationSlot) -> void:
 
 
 func _build_debug_chip() -> void:
+	## DEV CHROME, OPT-IN (the closing critique's non-diegetic find: the
+	## "x600 — running" chip was the only mark in any capture that belongs
+	## to no world): built only when CS_DEBUG_CHROME=1 asks for it — a
+	## player's table and every capture show the diegetic surface alone.
+	## The accel/pause INPUT ACTIONS stay available either way (they are
+	## invisible; the chip is their only chrome).
+	if OS.get_environment("CS_DEBUG_CHROME") != "1":
+		return
 	## Bottom-RIGHT: the landscape rail's pips start from the left edge —
 	## the chip must never sit on a pip (screenshot-inspection find).
 	_scale_chip = Label.new()
@@ -1632,9 +1640,40 @@ func _capture_hook() -> void:
 	elif not OS.get_environment("CS_SPREAD_CATCHUP").is_empty():
 		_catch_up_then_capture(int(OS.get_environment("CS_SPREAD_CATCHUP")), settle)
 	elif OS.get_environment("CS_SPREAD_LOUD") == "1":
+		# The loud/pressure drive owns its prelude (see _unfold_boot_intro):
+		# its captures were among the four veil-contaminated finds.
 		_pressure_then_capture()
 	else:
+		# Plain settle: same rule — the boot reveal folds before the
+		# capture, or the shot dims through the veil.
+		await _unfold_boot_intro()
 		_settle_then_capture(settle)
+
+
+## THE CAPTURE DRIVES' SHARED PRELUDE — the consistency rule (the closing
+## critique's find, reproduced 4x: the suspicion/first-session/catch-up
+## drives unfolded the boot intro; the assault, loud and plain-settle
+## drives did not, so those captures shot through the reveal veil and
+## misrepresented the surface to every future inspection): a fresh boot's
+## reveal mounts DEFERRED over the table, so EVERY drive that captures
+## the table first waits for the paper and unfolds it — a player opens
+## the game before they play it, and the harness plays the player.
+## Documented exceptions, which capture the paper ITSELF: _intro_then_
+## capture, and _catch_up_then_capture mode 3 (the resumed check-in
+## reveal IS the capture). `mount_frames` bounds the deferred-mount wait
+## (the intro opens within a few frames of _ready; the bound only spends
+## itself when no reveal ever mounts — a resumed or silenced boot).
+func _unfold_boot_intro(mount_frames := 90) -> void:
+	for i in mount_frames:
+		await get_tree().process_frame
+		if _intro != null and _intro.is_open():
+			break
+	if _intro != null and _intro.is_open():
+		_intro.unfold()
+		for i in 300:
+			await get_tree().process_frame
+			if not _intro.is_open():
+				break
 
 
 ## CS_SPREAD_SUSPICION=1: the telegraph CHOICE CARD as it slides onto the
@@ -1645,19 +1684,8 @@ func _capture_hook() -> void:
 ## capture waits for the crushing blockquote over the swept table, then
 ## skips to the loss-restart reveal (state printed in the log).
 func _suspicion_then_capture(mode: int, settle: float) -> void:
-	# A player opens the game before they play it: the boot reveal mounts
-	# DEFERRED (a few frames after ready) — wait for it, then unfold the
-	# deal (the drive cannot show the table under paper).
-	for i in 90:
-		await get_tree().process_frame
-		if _intro != null and _intro.is_open():
-			break
-	if _intro != null and _intro.is_open():
-		_intro.unfold()
-		for i in 300:
-			await get_tree().process_frame
-			if not _intro.is_open():
-				break
+	# The shared prelude: the boot reveal folds before the drive acts.
+	await _unfold_boot_intro()
 	demo_policy = DemoPolicy.new(40, 40, true)  # greed: gets watched
 	var suspicion := host.suspicion()
 	var waited_hours := 0.0
@@ -1739,18 +1767,9 @@ func _first_session_then_capture(mode: int, settle: float) -> void:
 	host.time_scale = 1.0  # the wall clock is scenery here; ffwd drives
 	time_scale_index = 0
 	demo_policy = null  # the player's session — no autopilot
-	# A player opens the game before they play it: the boot reveal folds
-	# before the drive acts.
-	for i in 240:
-		await get_tree().process_frame
-		if _intro != null and _intro.is_open():
-			break
-	if _intro != null and _intro.is_open():
-		_intro.unfold()
-		for i in 300:
-			await get_tree().process_frame
-			if not _intro.is_open():
-				break
+	# The shared prelude (240-frame mount bound, this drive's precedent):
+	# the boot reveal folds before the drive acts.
+	await _unfold_boot_intro(240)
 	var beat := {"empty_spread_cards": (_view.get("cards", []) as Array).size()}
 	# Moment 1: the first arrival — the gate hint prints, focus parks on
 	# the offer card (the highlight is the focus ring, never a mascot).
@@ -1854,19 +1873,10 @@ func _catch_up_then_capture(mode: int, settle: float) -> void:
 	host.time_scale = TIME_SCALES[TIME_SCALES.size() - 1]
 	time_scale_index = TIME_SCALES.size() - 1
 	if mode != 3:
-		# A player opens the game before they play it: the FIRST-HAND boot
-		# reveal folds before the fresh-seed drives act (mode 3 boots
-		# RESUMED — its check-in reveal IS the capture, never pre-folded).
-		for i in 90:
-			await get_tree().process_frame
-			if _intro != null and _intro.is_open():
-				break
-		if _intro != null and _intro.is_open():
-			_intro.unfold()
-			for i in 300:
-				await get_tree().process_frame
-				if not _intro.is_open():
-					break
+		# The shared prelude: the FIRST-HAND boot reveal folds before the
+		# fresh-seed drives act (mode 3 boots RESUMED — its check-in
+		# reveal IS the capture, never pre-folded).
+		await _unfold_boot_intro()
 	if mode == 2:
 		# SEED: a few live hours, then the app hides — anchor + save, quit.
 		var seeded := 0.0
@@ -1987,15 +1997,11 @@ func _chronicle_then_capture(mode: int, settle: float) -> void:
 	# The drive ends runs; the spread would mount the loss reveal on each
 	# ending (its documented role) — disabled for the drive (sibling-suite
 	# pattern), restored after: the capture shows the LEDGER, not paper
-	# stacking on paper.
+	# stacking on paper. The BOOT reveal still folds first (the shared
+	# prelude) — the silenced mounts cannot reopen later.
 	var intro_was_enabled := intro_enabled
 	intro_enabled = false
-	if _intro != null and _intro.is_open():
-		_intro.unfold()
-		for i in 300:
-			await get_tree().process_frame
-			if not _intro.is_open():
-				break
+	await _unfold_boot_intro()
 	var hands := 3 if mode == 1 else 50
 	for i in hands:
 		var hours := 14.0 + float((i * 7) % 23)
@@ -2072,6 +2078,9 @@ func _chronicle_then_capture(mode: int, settle: float) -> void:
 ## CS_SPREAD_ASSAULT=2: COMMIT goes down the real write path and the
 ## capture waits for a landed beat mid-vignette (the watchable storm).
 func _assault_then_capture(mode: int, settle: float) -> void:
+	# The shared prelude: this drive was among the veil-contaminated
+	# captures (the odds table shot through the un-folded boot reveal).
+	await _unfold_boot_intro()
 	var assault := host.assault()
 	var waited_hours := 0.0
 	while not assault.floor_met(host.engine) and waited_hours < 220.0:
@@ -2086,6 +2095,10 @@ func _assault_then_capture(mode: int, settle: float) -> void:
 	_assault.open(host, get_router())
 	await get_tree().process_frame
 	if mode >= 2:
+		# The TWO-STEP raise, exactly as the player presses it: the first
+		# commit arms (the clerk's caution prints), the second casts.
+		_assault.commit()
+		await get_tree().process_frame
 		_assault.commit()
 		if mode == 2:
 			# A landed beat mid-vignette (the watchable storm).
@@ -2167,14 +2180,9 @@ func _intro_then_capture(mode: int) -> void:
 func _restart_then_capture(kind: String) -> void:
 	host.time_scale = TIME_SCALES[TIME_SCALES.size() - 1]
 	time_scale_index = TIME_SCALES.size() - 1
-	# A player opens the game before they play it: unfold the boot deal
-	# first (the drive cannot commit under paper — the intro owns input).
-	if _intro != null and _intro.is_open():
-		_intro.unfold()
-		for i in 300:
-			await get_tree().process_frame
-			if not _intro.is_open():
-				break
+	# The shared prelude: the boot deal unfolds before the drive acts
+	# (the drive cannot commit under paper — the intro owns input).
+	await _unfold_boot_intro()
 	if kind == "win":
 		var tries := 0
 		while tries < 5 and host.is_run_running():
@@ -2187,6 +2195,9 @@ func _restart_then_capture(kind: String) -> void:
 				waited_hours += 1.0
 			refresh_from_state()
 			_assault.open(host, get_router())
+			await get_tree().process_frame
+			# The TWO-STEP raise (the player's presses, in order).
+			_assault.commit()
 			await get_tree().process_frame
 			_assault.commit()
 			for i in 60:
@@ -2263,6 +2274,9 @@ func _capture_now(label: String, suffix := "") -> void:
 
 
 func _pressure_then_capture() -> void:
+	# The shared prelude: this drive was among the veil-contaminated
+	# captures (the pressured table shot through the un-folded reveal).
+	await _unfold_boot_intro()
 	var suspicion := host.suspicion()
 	var waited_hours := 0.0
 	while suspicion.crackdown_land_tick == -1 and suspicion.crackdowns_total == 0 \
@@ -2304,6 +2318,9 @@ func _capture_path() -> String:
 ## reveal sweep) — the knight face half-turned: what the flip actually
 ## looks like, not a pose.
 func _promote_then_capture() -> void:
+	# The shared prelude: the flip captures on the revealed table, never
+	# through the boot reveal's veil.
+	await _unfold_boot_intro()
 	var waited_hours := 0.0
 	while host.units().awaiting_promotion_ids().is_empty() and waited_hours < 90.0:
 		host.fast_forward(SimEngine.TICKS_PER_SIM_HOUR)  # _on_ticks applies the policy
@@ -2339,6 +2356,8 @@ func _promote_then_capture() -> void:
 ## CS_SPREAD_FAN=1: capture an open action fan (the in-world affordance)
 ## on the first card that has choices.
 func _fan_then_capture(settle: float) -> void:
+	# The shared prelude: the fan captures on the revealed table.
+	await _unfold_boot_intro()
 	for i in maxi(2, int(settle * 60.0)):
 		await get_tree().process_frame
 	var active := get_active_slot() as OrientationSlot

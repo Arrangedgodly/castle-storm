@@ -57,7 +57,11 @@ run-responsive:
 # folds the fan; the PROMOTE action's landing turns the trainee card
 # over (the signature moment). CS_DEMO_RESET=0 continues the previous
 # session (default: each run starts the same seeded fresh demo);
-# CS_SEED=<int> overrides the seed. Screenshot hooks (windowed):
+# CS_SEED=<int> overrides the seed. The demo debug chip (time scale /
+# sim hours / paused) is OPT-IN dev chrome, off in normal runs and every
+# capture so the table stays diegetic:
+#   CS_DEBUG_CHROME=1 make run-game                        # show the debug chip
+# Screenshot hooks (windowed):
 #   CS_SPREAD_SHOT=/path.png make run-game                # quiet state
 #   CS_SPREAD_SHOT=/p.png CS_SPREAD_LOUD=1 make run-game  # pressured (telegraph)
 #   CS_SPREAD_SHOT=/p.png CS_SPREAD_PROMOTE=1 make run-game  # promote, mid-flip

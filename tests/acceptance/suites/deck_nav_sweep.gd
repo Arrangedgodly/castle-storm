@@ -21,9 +21,11 @@
 ##   2. THE ACTION FAN: pad A opens it off a focused card, dpad cycles
 ##      every chip (the focus trap holds), pad A submits the focused
 ##      chip, pad B folds — focus returns to the card each way;
-##   3. THE ASSAULT: odds (dpad between the chips; A on a below-floor
-##      COMMIT prints the refusal and stays open; A on RETREAT closes —
-##      the pad fallback this sweep forced into existence), the vignette
+##   3. THE ASSAULT: odds (focus seeds on RETREAT; dpad between the
+##      chips; A on a below-floor COMMIT prints the refusal and stays
+##      open; A on RETREAT closes — the pad fallback this sweep forced
+##      into existence; on a floor-met table the first A ARMS the die
+##      and the second casts it — the two-step raise), the vignette
 ##      (A skips), the outcome (A closes) — a full pad-only storm;
 ##   4. THE CHRONICLE LEDGER over a 50-hand ring: A on the header chip
 ##      opens it (the second pad fallback this sweep forced), dpad walks
@@ -438,9 +440,16 @@ func _sweep_assault(harness) -> void:
 		if chip is Button and String((chip as Button).action.get("id", "")) == "commit":
 			commit = chip
 			break
-	harness.check(_focus_owner(harness) == commit,
-		"nav/assault: focus lands on COMMIT when the odds open")
-	# Pad A on the struck COMMIT: the printed refusal, screen stays open.
+	var seeded := _focus_owner(harness)
+	harness.check(seeded is Button and String((seeded as Button).action.get("id", "")) == "retreat",
+		"nav/assault: focus seeds on RETREAT when the odds open (the safe verb)")
+	# dpad onto the struck COMMIT through the cyclic trap; pad A: the
+	# printed refusal, screen stays open (a refused petition never arms).
+	for direction in DIRECTIONS:
+		if _focus_owner(harness) == commit:
+			break
+		await _tap(harness, direction)
+	harness.check(_focus_owner(harness) == commit, "nav/assault: dpad reaches the struck COMMIT")
 	await _tap(harness, BTN_A)
 	await _frames(harness, 3)
 	harness.check(screen._assault.is_open() and screen._assault.state == screen._assault.State.ODDS,
@@ -464,8 +473,8 @@ func _sweep_assault(harness) -> void:
 	screen.queue_free()
 	await _frames(harness, 3)
 
-	# 3b. The full pad storm on a floor-met army: A commits, A skips the
-	# vignette, A closes the outcome — no keyboard, no touch, no seams.
+	# 3b. The full pad storm on a floor-met army: A arms, A casts, A skips
+	# the vignette, A closes the outcome — no keyboard, no touch, no seams.
 	var storm_host := _knight_host(WIN_SEED, 2)
 	var storm_screen := await _mounted_screen(harness, storm_host)
 	# NOT frozen: the commit's one-tick drain runs through advance_ticks,
@@ -475,16 +484,32 @@ func _sweep_assault(harness) -> void:
 		outcomes.append(String(outcome)))
 	storm_screen.open_assault()
 	await _frames(harness, 3)
-	harness.check(_focus_owner(harness) is Button
-			and String((_focus_owner(harness) as Button).action.get("id", "")) == "commit",
-		"nav/assault: COMMIT holds focus on the floor-met odds table")
-	await _tap(harness, BTN_A)  # COMMIT — the pad path
+	var storm_seeded := _focus_owner(harness)
+	harness.check(storm_seeded is Button and String((storm_seeded as Button).action.get("id", "")) == "retreat",
+		"nav/assault: the floor-met odds table seeds focus on RETREAT too")
+	# dpad onto COMMIT; the first A ARMS (the die is not yet cast), the
+	# second CASTS — the two-step raise by pad alone.
+	var on_commit := false
+	for direction in DIRECTIONS:
+		var focus := _focus_owner(harness)
+		if focus is Button and String((focus as Button).action.get("id", "")) == "commit":
+			on_commit = true
+			break
+		await _tap(harness, direction)
+	harness.check(on_commit, "nav/assault: dpad reaches COMMIT on the floor-met table")
+	await _tap(harness, BTN_A)  # ARM — the pad path
+	await _frames(harness, 3)
+	var armed_focus := _focus_owner(harness)
+	harness.check(storm_screen._assault.state == storm_screen._assault.State.ODDS
+			and armed_focus is Button and String((armed_focus as Button).action.get("id", "")) == "commit",
+		"nav/assault: the first pad A arms the die — still odds, focus on the armed verb")
+	await _tap(harness, BTN_A)  # CAST — the second pad press
 	for i in 60:
 		await _frames(harness, 1)
 		if storm_screen._assault.state != storm_screen._assault.State.ODDS:
 			break
 	harness.check(storm_screen._assault.state == storm_screen._assault.State.VIGNETTE,
-		"nav/assault: pad A on COMMIT commits the storm (state %d)" % storm_screen._assault.state)
+		"nav/assault: the second pad A casts the die (state %d)" % storm_screen._assault.state)
 	await _tap(harness, BTN_A)  # one input skips the vignette
 	for i in 200:
 		await _frames(harness, 1)

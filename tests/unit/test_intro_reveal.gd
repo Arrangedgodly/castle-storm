@@ -476,6 +476,8 @@ func test_win_mounts_from_the_assault_seam_and_deals_the_new_leader() -> void:
 	screen.open_assault()
 	await get_tree().process_frame
 	await get_tree().process_frame
+	# The two-step raise (the confirm step): arm, then cast.
+	screen._assault.commit()
 	screen._assault.commit()
 	for i in 1500:
 		await get_tree().process_frame

@@ -73,7 +73,10 @@ Where a row is owned by a different suite, it is named.
 | Action | Touch | Pad | Keyboard | Owning test |
 |---|---|---|---|---|
 | Open the odds table (via the STORM chip on an army card) | tap chip | A on focused chip | Enter | §D all three |
-| COMMIT below the floor — the printed refusal, table stays | tap COMMIT | A on COMMIT | Enter | §D all three |
+| Odds focus seeds on RETREAT (the safe verb — one mispress retreats free, never commits) | n/a (seamless) | seeded | seeded | §D all three; `deck_nav_sweep.gd` §3 |
+| COMMIT below the floor — the printed refusal, table stays (a refused petition never arms) | tap COMMIT | A on COMMIT | Enter | §D all three |
+| **The two-step raise**: first COMMIT ARMS (the clerk's printed caution, the chip re-labels, nothing submitted); the second CASTS the die | tap COMMIT, tap again | A on COMMIT, A again | Enter, Enter | §D all three + the touch storm; `deck_nav_sweep.gd` §3 pad storm; `journeys_sweep.gd` J5 keyboard storm |
+| Walk away from the ARMED table (free — the die never traps) | tap RETREAT | B | Esc | §D all three |
 | RETREAT (free) | tap RETREAT | A on RETREAT / B | Enter on RETREAT / Esc | §D all three |
 | Skip the vignette (one input) | any tap | A / B | Enter / Esc | §D touch storm; `deck_nav_sweep.gd` §3 pad storm; `journeys_sweep.gd` J5 keyboard storm |
 | Close the outcome | tap close chip | A / B | Enter | same three suites |
