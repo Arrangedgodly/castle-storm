@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-09-16T23:53:17Z",
+  "generatedAt": "2026-09-17T09:01:51Z",
   "title": "Design System: Castle Storm",
   "extensions": {
     "colorMeta": {
@@ -103,9 +103,9 @@
       "name": "Run Header",
       "kind": "nav",
       "refersTo": "button-chip",
-      "description": "The letterhead above the table: leader name (display face), a rule in the regime's second ink, uppercase regime name, clock plate — text ink by the print rule.",
+      "description": "The letterhead above the table: leader name (display face, wrapping at word boundaries — the row grows with its lines, never a mid-word clip), a rule in the regime's second ink, uppercase regime name, clock plate — text ink by the print rule.",
       "html": "<div class=\"ds-run-header\">\n  <span class=\"ds-run-header__name\">Bartholomew the Marginally Brave</span>\n  <span class=\"ds-run-header__rule\"></span>\n  <span class=\"ds-run-header__regime\">THE GILDED CROWN</span>\n  <span class=\"ds-run-header__clock\">212h · power 41</span>\n</div>",
-      "css": ".ds-run-header { display: flex; align-items: center; gap: 14px; background: #3B2E1F; padding: 6px 12px; min-height: 48px; }\n.ds-run-header__name { font-family: \"IM Fell English SC\", Georgia, serif; font-size: 28px; color: #E7D9BD; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }\n.ds-run-header__rule { width: 30px; height: 3px; background: #CCA34C; }\n.ds-run-header__regime { font-family: \"Alegreya Sans\", Verdana, sans-serif; font-size: 19px; font-weight: 500; color: #CCA34C; letter-spacing: 0.05em; }\n.ds-run-header__clock { font-family: \"Alegreya Sans\", Verdana, sans-serif; font-size: 15px; font-weight: 500; color: #E7D9BD; }"
+      "css": ".ds-run-header { display: flex; align-items: center; gap: 14px; background: #3B2E1F; padding: 6px 12px; min-height: 48px; }\n.ds-run-header__name { font-family: \"IM Fell English SC\", Georgia, serif; font-size: 28px; line-height: 1.15; color: #E7D9BD; flex: 1; white-space: normal; overflow-wrap: break-word; }\n.ds-run-header__rule { width: 30px; height: 3px; background: #CCA34C; }\n.ds-run-header__regime { font-family: \"Alegreya Sans\", Verdana, sans-serif; font-size: 19px; font-weight: 500; color: #CCA34C; letter-spacing: 0.05em; }\n.ds-run-header__clock { font-family: \"Alegreya Sans\", Verdana, sans-serif; font-size: 15px; font-weight: 500; color: #E7D9BD; }"
     }
   ],
   "narrative": {
@@ -136,6 +136,7 @@
       "Do keep every interactive target at or above the 48-unit grip (cards 96x96 minimum; chronicle rows grip-height; chips grip-sized).",
       "Do let content recolor: regime grounds/secondaries, faces, and copy are data — UI code reads them through Inks/the manifest, never hardcodes.",
       "Do print events as chronicle lines/blockquotes on the table; dwell and self-fold paper rather than dismissing it for the player.",
+      "Do keep in-run prints retrievable — the strip is a window, the day-sheet is the hand's page (every strip row + blockquote payload accumulates on it, newest first); teach the line-form grammar once per session at its first dashed edge, and let the background save flush print one quiet filing line (the periodic hourly autosave stays silent — routine status is not news).",
       "Do budget single-line copy against its surface (476px quote rows / 610px strip / 232px choice card / 504px packet band) in the real italic face with >= 30px margin.",
       "Do route every motion through MotionProfile.duration() and scale-bump local font sizes with TypeScale.scaled()."
     ],

@@ -520,7 +520,14 @@ All screens compose the same grammar; none fork a component:
   newest-first, castle dashed at the gate, aftermath wash), skippable with one input.
   The odds table seeds focus on RETREAT (the free verb) and COMMIT is a two-step
   raise — the first press arms (the clerk's printed caution, the chip re-labeled),
-  the second casts the die; one mispress never decides the run.
+  the second casts the die; one mispress never decides the run. The PORTRAIT odds
+  lane spends its height (finishing refinement #4): the tally prints MID-LANE
+  between the castle and the host (the odds literally between the two sides), an
+  open-field corridor (15% of the lane, clamped; standoff 10 units off the castle
+  walls) reserves the battle line's landing ground, and ranks grow tall (a
+  168-unit portrait cap vs the shared 132) so small hosts fill the foot — no dead
+  band (worst barren stretch ≤25% of the title-to-chronicle region, was 30%). The
+  landscape lane is byte-pinned unchanged.
 - **ChronicleScreen / ChronicleSheet** (`ui/screens/chronicle/`): the ledger of past
   spreads over a 0.90 veil in the live regime's ground tone; outcome seals by form
   (WON double / CRUSHED struck / ABANDONED dashed); the live run prints as its own
