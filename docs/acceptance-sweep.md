@@ -5,8 +5,9 @@ The final production gate: the town-hall acceptance criteria
 PRODUCT.md §"Accessibility & Inclusion") verified as a coherent whole.
 Every row below names the evidence that stands behind it in `make test`.
 
-**State: `make test` green — 569 gdUnit4 unit/property cases + 1,274
-acceptance checks, ~55s wall (budget <60s).**
+**State: `make test` green — 715 gdUnit4 unit/property cases + 1,362
+acceptance checks, ~39s wall (budget <60s). Rows below name the evidence
+at the sweep that wrote them; Layer 1's rows are §11.**
 
 ## The matrix results, criterion by criterion
 
@@ -138,7 +139,7 @@ acceptance checks, ~55s wall (budget <60s).**
 
 ### 10. The journeys 1–5 — PASS
 
-`journeys_sweep.gd` (NEW, 33 checks) ties the arcs together at the
+`journeys_sweep.gd` (33 checks at the MVP sweep) ties the arcs together at the
 screen: J1 first session (reveal → recruit → worker → farm → trickle →
 trainee — table carries the session's cards); J2 daily check-in (capped
 9h37m window → one print, passive → one choice answered → focus held);
@@ -149,6 +150,44 @@ regime, chronicle sealed). The sim-level arcs remain in
 `full_run_ci.gd`/`marathon_*`; per-moment pins in the unit suites. No
 journey gap found — the sweep consolidated what was piecemeal and added
 the missing J1/J2/J3 screen-level arcs.
+
+### 11. Layer 1 — the always-on legacy loop (L1-D, 2026-09-17) — PASS
+
+The Layer-1 loop as one continuous acceptance arc, `journeys_sweep.gd`
+**J6** (+31 checks, 65 total), through the REAL front door
+(`ui/main.tscn`):
+
+- **The multi-run arc (3 accelerated runs)**: a fresh install → the
+  knight-fixture army → the storm committed by KEYBOARD → the WIN banks
+  run 1 (bank == the won hand's chronicle score, exactly) → quit at the
+  reveal through the platform boundary (`background` flush) → the
+  returning boot finds the live hand (CONTINUE) and the title carries
+  **The Legacy chip** → the deck opens through the chip (keyboard): the
+  bank band reads the real banked score over the live hand (the honest
+  mount rule) → focus seeds the FIRST AFFORDABLE card → one Enter buys
+  **Grandma's Recipes** down the real `unlock_purchase` command (bank
+  pays exactly the card's price, the purchase prints on the deck's
+  paper) → back folds the deck, focus returns to the chip → the two-step
+  NEW RUN ends run 2 honestly (abandoned, banked) → the loss-restart
+  reveal deals run 3 — **whose opening stipend pays each content line ×
+  the card's milli exactly (food 55, timber 88 at ×1.1), the veterans
+  read stays identity, and the applied multiplier rides the run save** →
+  chronicle, run counter, bank + spent, and the deck's own arithmetic
+  all agree. The stipend exactness is proven load-bearing (A/B:
+  asserting identity milli fails both lines).
+- **The first-session interaction check**: the FRESH title carries NO
+  Legacy chip (`show_legacy_chip_for(0)` false — nothing earned, no deck
+  to read; the fresh flow stays single-BEGIN with seeded focus), and the
+  RETURNING title's chip never steals the seeded CONTINUE focus. The
+  deck's earn-first line itself (fresh bank, everything locked) is
+  L1-C's pinned unit territory (`test_legacy_screen.gd`), reached
+  mid-run through the header verb.
+- Supporting pins: the L1-C/L1-B2 unit suites (the deck's mapping,
+  states, buy/refuse contract, parity, budgets, persistence; the tree's
+  content + compound millis) and the balance evidence in
+  `docs/balance.md` §6/6b (re-verified at L1-D close: baseline band
+  79 h / 12/12 unchanged, full-tree 70 h / 12/12, greed crushes at 27 h
+  on both seeds).
 
 ## Accepted deviations (with rationale)
 
@@ -167,7 +206,7 @@ the missing J1/J2/J3 screen-level arcs.
 |---|---|---|
 | `tests/acceptance/suites/input_parity_matrix.gd` | 153 | the three-mode matrix (§3 above) |
 | `tests/acceptance/suites/responsive_sweep.gd` | 56 | the four-size whole-screen sweep (§4) + the 1.3× spot |
-| `tests/acceptance/suites/journeys_sweep.gd` | 33 | the five journeys at the screen (§10) |
+| `tests/acceptance/suites/journeys_sweep.gd` | 33 → **65** | the five journeys at the screen (§10) + J6 the Layer-1 loop (§11, L1-D) |
 | `tests/unit/test_type_scale.gd` | 8 | the font-scale mechanism (§9) |
 | `tests/unit/test_colorblind_audit.gd` | 6 | the consolidated colorblind audit (§8) |
 

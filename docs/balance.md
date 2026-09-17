@@ -216,7 +216,9 @@ first win banks ~230-260; an early loss/crush ~150. The curve:
 
 **The full-tree probe** (12 seeds, 20261201+; the L1-B rows recorded
 2026-09-15, re-run 2026-09-17; the L1-B2 rows recorded 2026-09-17 on the
-15-node tree):
+15-node tree; re-verified at the L1-D close 2026-09-17 — baseline and
+full-tree rows reproduce exactly, bundle / pressure / greed lines
+unchanged):
 
 | config | won | win mean | slowest | losses | crushed |
 |---|---|---|---|---|---|
