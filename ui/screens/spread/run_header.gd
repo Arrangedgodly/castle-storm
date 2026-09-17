@@ -6,9 +6,33 @@
 ## recolors the rule by content (Inks.regime_secondary), never by code.
 ## Chrome, not a control: nothing here is interactive, so it carries no
 ## focus (grips apply to interactive targets only).
+##
+## THE LINE BUDGET (finishing refinement #6, the closing critique's caveat):
+## the letterhead prints on one row at the table's full width, and the name
+## WRAPS at word boundaries when the pools deal a long name (the epithet
+## drops to its own line — a letterhead's own move, and the same wrap every
+## other print surface in this world already uses; the old clip-at-the-plate
+## fail-safe cut names like "…the Heavily Record" mid-word at 1.0x, and at
+## 1.3x even mid-length names). The regime and clock plates never clip:
+## their minimums fit their own measured text (the plate grows, the text
+## stays whole — "THE GILDED CROWN" measured 209px on a 195px plate at
+## 1.3x). The strip's minimum width never exceeds the table: the name's
+## minimum is its granted plate (the refit below), never the unwrapped name.
 extends HBoxContainer
 
 const RULE_SCENE := preload("res://ui/theme/rule_mark.tscn")
+
+## The plates' base minimums (design units at 1.0x; grown by the type
+## factor AND by their own measured text — whichever is wider). The pad
+## is a hair of air inside each plate (the HBox's own 14-unit separation
+## is the gap between plates); 6 keeps even the widest single word
+## ("Bartholomew" at 1.3x measures 242px) inside the name's plate at the
+## 720 portrait strip.
+const REGIME_PLATE_BASE := 150.0
+const TIME_PLATE_BASE := 96.0
+const PLATE_PAD := 6.0
+## The HBox's plate separation (kept in sync with _ready's override).
+const PLATE_SEPARATION := 14.0
 
 var _name_label: Label
 var _rule: Control
@@ -22,7 +46,16 @@ func _ready() -> void:
 	_name_label = Label.new()
 	_name_label.theme_type_variation = &"CardTitle"
 	_name_label.add_theme_font_size_override("font_size", TypeScale.scaled(28))  # the letterhead fits long names at table width
-	_name_label.clip_text = true  # the strip's minimum never exceeds the table
+	# FINISHING #6: the name wraps at word boundaries instead of clipping —
+	# the row's height grows with the wrapped lines (the strip column's
+	# topology follows its combined minimum). clip_text keeps the label's
+	# own text OUT of its minimum (the original fail-safe's own semantics)
+	# so the EXPLICIT refit below is the one authority on the row's size —
+	# an autowrap label's own minimum evaluation otherwise drifts with the
+	# width it was last laid at (stale in hidden slots; the layout-hash
+	# determinism pin caught it).
+	_name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_name_label.clip_text = true
 	_name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_name_label.custom_minimum_size = Vector2(160, 0)
 	_name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -36,26 +69,78 @@ func _ready() -> void:
 	_regime_label = Label.new()
 	_regime_label.theme_type_variation = &"RoleLine"
 	_regime_label.clip_text = true
-	# The plates' budgets grow with the type (T-QA-05 type scale): at 1.3x
-	# the regime line measures ~170px on a 150px plate and clipped mid-word
-	# (the windowed 1.3x spot-check's find).
-	_regime_label.custom_minimum_size = Vector2(150.0 * TypeScale.factor(), 0)
+	_regime_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	_regime_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_regime_label)
 	_time_label = Label.new()
 	_time_label.theme_type_variation = &"PipLabel"
 	_time_label.clip_text = true
-	_time_label.custom_minimum_size = Vector2(96.0 * TypeScale.factor(), 0)
+	_time_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	_time_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_time_label)
+	_fit_plates()
 
 
 func _get_minimum_size() -> Vector2:
 	## A full grip-height row: the display-face name plate (~44 units at
 	## size 28) must fit INSIDE the strip — an undersized minimum made the
 	## labels overflow into the chronicle below (caught by screenshot
-	## inspection, not by the rect tests — labels draw outside rects).
+	## inspection, not by the rect tests — labels draw outside rects). A
+	## wrapped name (finishing #6) grows the row past this floor through
+	## the HBox's own child accounting; this floor is the single-line rest.
 	return Vector2(Inks.TOUCH_GRIP_MIN * 4.0, Inks.TOUCH_GRIP_MIN)
+
+
+## The measured width of one label's text in its resolved face (the
+## font-metric seam the copy budget tests share).
+func _text_width(label: Label) -> float:
+	var font: Font = label.get_theme_font(&"font")
+	return font.get_string_size(label.text, HORIZONTAL_ALIGNMENT_LEFT,
+		-1.0, label.get_theme_font_size(&"font_size")).x
+
+
+## The plates' minimums fit their own text: the authored base grown by the
+## type factor, or the measured text plus a pad — whichever is wider. A
+## plate never clips its print ("THE GILDED CROWN" measured 209px at 1.3x;
+## the old fixed plate was 195px). Measured on every bind so a longer
+## regime name or clock simply widens its plate and the name cedes the
+## difference (wrapping another line if it must).
+func _fit_plates() -> void:
+	if _regime_label == null:
+		return
+	_regime_label.custom_minimum_size = Vector2(maxf(
+		REGIME_PLATE_BASE * TypeScale.factor(),
+		_text_width(_regime_label) + PLATE_PAD), 0.0)
+	_time_label.custom_minimum_size = Vector2(maxf(
+		TIME_PLATE_BASE * TypeScale.factor(),
+		_text_width(_time_label) + PLATE_PAD), 0.0)
+
+
+## Re-fit the letterhead's budgets for one strip width (called by the
+## slot's layout_topology BEFORE it reads this row's combined minimum, so
+## the row's height is a PURE function of text + type factor + strip
+## width — never of which width a previous layout pass happened to leave
+## behind; the layout-hash determinism pin caught exactly that drift).
+func refit(strip_w: float) -> void:
+	if _name_label == null or _rule == null:
+		return
+	_fit_plates()
+	var others := _rule.get_combined_minimum_size().x \
+		+ _regime_label.custom_minimum_size.x \
+		+ _time_label.custom_minimum_size.x \
+		+ 3.0 * PLATE_SEPARATION
+	var avail := maxf(160.0, strip_w - others)
+	var font: Font = _name_label.get_theme_font(&"font")
+	var size_now: int = _name_label.get_theme_font_size(&"font_size")
+	var wrapped := font.get_multiline_string_size(_name_label.text,
+		HORIZONTAL_ALIGNMENT_LEFT, avail, size_now)
+	# The WIDTH floor is load-bearing (the chronicle live-label's own
+	# find): an autowrap label evaluates its OWN minimum against its
+	# minimum width — floor it at the width this row actually grants the
+	# name and the label's own wrap evaluation agrees with the measured
+	# height instead of drifting with whatever width a previous layout
+	# left behind.
+	_name_label.custom_minimum_size = Vector2(avail, wrapped.y)
 
 
 ## Bind from the view model's leader block + run clock + the ground the
@@ -74,3 +159,4 @@ func bind(leader: Dictionary, sim_hours: float, army_power: int, ground: Color) 
 	_rule.set("rule_ink", Inks.regime_secondary(leader["regime_id"]))
 	_time_label.text = "%dh · power %d" % [int(sim_hours), army_power]
 	_time_label.add_theme_color_override("font_color", text_ink)
+	_fit_plates()

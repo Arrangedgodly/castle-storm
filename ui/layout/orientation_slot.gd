@@ -116,7 +116,23 @@ func layout_topology() -> void:
 		return
 	var header_size := Vector2.ZERO
 	if _header != null:
+		# FINISHING #6: the letterhead's name wraps, and its wrapped height
+		# must be derived HERE — at the width THIS pass is about to fit —
+		# never left over from an earlier layout at another width (the
+		# spread's layout-hash determinism pin). The row owns the refit;
+		# the slot owns the width.
+		var before: Vector2 = _header.get_combined_minimum_size()
+		if _header.get_child_count() > 0 and _header.get_child(0).has_method(&"refit"):
+			_header.get_child(0).refit(maxf(0.0, size.x - 2.0 * edge_margin))
 		header_size = _header.get_combined_minimum_size()
+		# A refit that CHANGED the row's minimum must reach the host: the
+		# sort that resized this slot read the stale minimum, and a HIDDEN
+		# slot never gets a corrective pass of its own (hidden children
+		# don't drive container minimums) — one deferred re-sort re-fits
+		# both slots at the fresh budget. Converges: the next pass refits
+		# to the same minimum and queues nothing.
+		if not before.is_equal_approx(header_size) and get_parent() is Container:
+			(get_parent() as Container).queue_sort()
 	var rects := topology_rects(portrait_topology, size,
 		_rail.get_combined_minimum_size(), _chronicle.get_combined_minimum_size(), edge_margin, header_size)
 	_fit(_rail, rects["rail"])
@@ -169,7 +185,14 @@ static func topology_rects(portrait: bool, bounds: Vector2, rail_size: Vector2,
 
 ## The slot's own honest minimum: rail + spread floor + chronicle stacked
 ## (portrait) — the height every parent must grant for an unclipped table.
-## An enabled header adds its height (the strip is content, not overlay).
+## An enabled header adds its FLOOR (finishing #6): the letterhead's name
+## wraps, so its live height varies with the dealt name and the type
+## factor — a live height here made the slot's minimum history-dependent,
+## and a HIDDEN slot sized at a stale moment never got a corrective pass
+## of its own (the layout-hash determinism pin caught exactly that). The
+## layout still shifts everything by the header's REAL height
+## (layout_topology reads the live combined minimum); this floor is the
+## grant a parent must provide for the one-row letterhead's table.
 func _get_minimum_size() -> Vector2:
 	if _rail == null or _spread == null or _chronicle == null:
 		return Vector2.ONE * Inks.TOUCH_GRIP_MIN
@@ -178,7 +201,7 @@ func _get_minimum_size() -> Vector2:
 	var spread_s: Vector2 = _spread.get_combined_minimum_size()
 	var header_h := 0.0
 	if _header != null:
-		header_h = _header.get_combined_minimum_size().y + 2.0 * edge_margin
+		header_h = float(Inks.TOUCH_GRIP_MIN) + 2.0 * edge_margin
 	return Vector2(
 		maxf(maxf(rail_s.x, spread_s.x), chronicle_s.x) + 2.0 * edge_margin,
 		rail_s.y + spread_s.y + chronicle_s.y + header_h + 4.0 * edge_margin)

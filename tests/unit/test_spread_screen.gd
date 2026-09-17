@@ -14,12 +14,20 @@
 ##     moves inward as the meter rises;
 ##   - the demo run: the seeded quiet demo assembles toward the storm
 ##     floor, and the seeded LOUD demo reaches the telegraph (the
-##     screenshot harness's two states are honest).
+##     screenshot harness's two states are honest);
+##   - THE LINE BUDGETS (finishing refinement #6): the letterhead holds
+##     the WIDEST pool leader name at the 1.3x max type scale (the name
+##     wraps at word boundaries, the regime/clock plates fit their own
+##     measured text — real font metrics, never a mid-word clip), and the
+##     resting Eye's share numeral fits its plate and reads at phone
+##     scale at every creep depth (the old caption both shrank to ~11px
+##     effective and drew past the plate onto the table).
 extends GdUnitTestSuite
 
 const SPREAD_SCENE := "res://ui/screens/spread/spread_screen.tscn"
 const SpreadScreen := preload("res://ui/screens/spread/spread_screen.gd")
 const WatchfulEyeScript := preload("res://ui/screens/spread/watchful_eye.gd")
+const CardMotion := preload("res://ui/screens/spread/card_motion.gd")
 const LOUD_SEED := 20261103  # spread_screen.DEFAULT_SEED — the screenshot seed
 
 const TEST_SIZES: Array[Vector2i] = [
@@ -585,8 +593,14 @@ func test_armed_eye_plate_countdown_rule_and_clear_lane() -> void:
 	assert_bool(eye._rule.visible).is_false()
 	var share := int(round(float(host.suspicion().suspicion_points())
 		/ float(host.suspicion().max_points()) * 100.0))
-	assert_str(eye._countdown.text).is_equal("the Crown watches — %d" % share)
-	assert_bool(eye._countdown.has_theme_font_size_override(&"font_size")).is_false()
+	# The rest share numeral (finishing #6): the caption never fit the
+	# periphery stub (it drew 60-155px past the plate); the numeral fits
+	# and its size COMPENSATES the card's meter scale.
+	assert_str(eye._countdown.text).is_equal("%d" % share)
+	assert_int(eye._countdown.get_theme_font_size(&"font_size")).is_equal(
+		TypeScale.scaled(clampi(int(round(float(WatchfulEyeScript.REST_SHARE_BASE)
+				/ maxf(0.55, eye._base_scale))),
+			WatchfulEyeScript.REST_SHARE_BASE, WatchfulEyeScript.REST_SHARE_CAP)))
 	for slot: OrientationSlot in [screen.get_portrait_slot(), screen.get_landscape_slot()]:
 		assert_float(float(slot.get_spread().get("right_reserve"))).is_zero()
 	# And the resting position is the authored perch again (read the state
@@ -618,15 +632,139 @@ func test_rest_eye_plate_stays_the_quiet_creep() -> void:
 	assert_bool(eye._rule.visible).is_false()
 	assert_bool(eye._numeral.visible).is_false()
 	assert_vector(eye.custom_minimum_size).is_equal(Vector2.ZERO)
-	assert_str(eye._countdown.text).is_equal("the Crown watches — %d" % 12)
-	assert_bool(eye._countdown.has_theme_font_size_override(&"font_size")).is_false()
+	assert_str(eye._countdown.text).is_equal("12")
 	assert_bool(eye._countdown.get_theme_color(&"font_color") == Inks.INK_SOFT).is_true()
+	# The numeral fits its plate and reads at phone scale (finishing #6):
+	# the share is the ONLY numeric suspicion readout, so it must clear
+	# the pip-label floor in EFFECTIVE height (font x card scale) while
+	# never drawing past the plate's inner width onto the table.
+	var rest_font: Font = eye._countdown.get_theme_font(&"font")
+	var rest_size: int = eye._countdown.get_theme_font_size(&"font_size")
+	var rest_px: float = rest_font.get_string_size(eye._countdown.text,
+		HORIZONTAL_ALIGNMENT_LEFT, -1.0, rest_size).x
+	assert_float(rest_px).is_less_equal((eye.size.x - 28.0) + 0.5) \
+		.override_failure_message("the rest numeral must fit the plate's inner width")
+	assert_float(rest_size * eye.scale.x).is_greater_equal(15.0) \
+		.override_failure_message("the rest numeral's effective height must clear the pip floor")
 	# The periphery stub perches by the authored formula (the creep at 12%).
 	var spread_rect: Rect2 = active.get_spread().get_global_rect()
 	var slot_rect := active.get_global_rect()
 	var max_inset: float = maxf(0.0, spread_rect.size.x * 0.5 - eye.size.x)
 	assert_float(eye.global_position.x).is_equal_approx(
 		slot_rect.end.x - eye.size.x - 8.0 - 0.12 * max_inset, 0.5)
+	screen.queue_free()
+
+
+# --- the letterhead's line budget (finishing refinement #6) -------------------------------
+
+
+## The widest pool leader name in the theme's REAL display face (the
+## T-COPY-01 font-metric seam: the pools measured, not guessed).
+func _widest_pool_name(font: Font, size: int) -> String:
+	var firsts: Array = Inks.pack().identity.leader_first_names
+	var epithets: Array = Inks.pack().identity.leader_epithets
+	var widest := ""
+	var widest_px := -1.0
+	for a in firsts.size():
+		for b in epithets.size():
+			var candidate := "%s %s" % [firsts[a], epithets[b]]
+			var px: float = font.get_string_size(candidate,
+				HORIZONTAL_ALIGNMENT_LEFT, -1.0, size).x
+			if px > widest_px:
+				widest_px = px
+				widest = candidate
+	return widest
+
+
+func _label_text_fits(label: Label) -> float:
+	## The label's measured text width in its resolved face (the theme item
+	## is "font_size" — "font" returns the base default, the probe lesson).
+	var font: Font = label.get_theme_font(&"font")
+	return font.get_string_size(label.text, HORIZONTAL_ALIGNMENT_LEFT,
+		-1.0, label.get_theme_font_size(&"font_size")).x
+
+
+func test_letterhead_holds_the_longest_pool_name_at_max_type() -> void:
+	## FINISHING #6 (the critique's header caveat): at 1.3x the leader name
+	## truncated mid-word and the regime label clipped its own plate. The
+	## letterhead now WRAPS the name at word boundaries (the epithet drops
+	## to its own line — the strip column's topology follows its combined
+	## minimum), and the regime/clock plates fit their own measured text.
+	## Pinned at the WORST real combination: the widest pool name (measured
+	## in the theme's CardTitle face), the widest regime, a 3-digit clock.
+	var host := _test_host()
+	var screen: SpreadScreen = await _mounted_screen(host)
+	await _settle_window(screen, Vector2i(720, 1280), true)  # the tightest letterhead
+	var theme: Theme = load("res://ui/theme/spread_theme.tres") as Theme
+	var title_font: Font = theme.get_font(&"font", &"CardTitle")
+	for factor in [1.0, 1.3]:
+		TypeScale.apply_factor(factor)
+		screen._apply_type_scale_live(factor)
+		for i in 6:
+			await get_tree().process_frame
+		var slot := screen.get_active_slot() as OrientationSlot
+		var header = slot.get_header().get_child(0)
+		# The WORST combination through the REAL bind path (the screen's own
+		# _bind_header relays the view's leader block and re-lays the
+		# topology for the wrapped row).
+		screen._view["leader"]["name"] = _widest_pool_name(title_font, TypeScale.scaled(28))
+		screen._view["leader"]["regime_name"] = "The Gilded Crown"
+		screen._view["leader"]["regime_id"] = &"gilded_crown"
+		screen._view["sim_hours"] = 888.0
+		screen._view["army_power"] = 888
+		screen._bind_header()
+		for i in 4:
+			await get_tree().process_frame
+		var name_label: Label = header._name_label
+		# The name wraps (never clips): every word fits the plate's width
+		# and the wrapped height fits the plate (the row grew to hold it).
+		assert_int(name_label.autowrap_mode).is_equal(TextServer.AUTOWRAP_WORD_SMART)
+		var nfont: Font = name_label.get_theme_font(&"font")
+		var nsize: int = name_label.get_theme_font_size(&"font_size")
+		var wrapped := nfont.get_multiline_string_size(name_label.text,
+			HORIZONTAL_ALIGNMENT_LEFT, name_label.size.x, nsize)
+		assert_float(wrapped.y).is_less_equal(name_label.size.y + 1.0) \
+			.override_failure_message("the wrapped name must fit its plate's height")
+		for word in name_label.text.split(" "):
+			assert_float(nfont.get_string_size(String(word),
+				HORIZONTAL_ALIGNMENT_LEFT, -1.0, nsize).x) \
+				.is_less_equal(name_label.size.x + 0.5) \
+				.override_failure_message("no single word may exceed the name plate")
+		# The plates fit their own measured text (the old fixed plates
+		# clipped "THE GILDED CROWN" 10px at 1.0x and 14px at 1.3x).
+		assert_float(_label_text_fits(header._regime_label)) \
+			.is_less_equal(header._regime_label.size.x + 0.5)
+		assert_float(_label_text_fits(header._time_label)) \
+			.is_less_equal(header._time_label.size.x + 0.5)
+		# The whole strip still fits the table, and at the max type scale
+		# the longest name wraps to an honest multi-line row.
+		assert_float(header.get_combined_minimum_size().x) \
+			.is_less_equal(slot.get_header().size.x + 0.5)
+		if factor > 1.0:
+			assert_float(header.get_combined_minimum_size().y) \
+				.is_greater(float(Inks.TOUCH_GRIP_MIN)) \
+				.override_failure_message("the longest name at 1.3x must wrap, not clip")
+		# Nothing escapes the design (the taller letterhead shifted the
+		# table's topology, everything still inside).
+		var design: Vector2 = screen.get_router().design_size()
+		for row in slot.get_header().get_children():
+			var rect: Rect2 = (row as Control).get_global_rect()
+			assert_bool(rect.end.x <= design.x + 0.5 and rect.end.y <= design.y + 0.5).is_true()
+	# A short name at 1.0x stays a single line (no gratuitous wrap): the
+	# row's height is the one-line name plate, well under two lines.
+	TypeScale.reset()
+	screen._apply_type_scale_live(1.0)
+	for i in 6:
+		await get_tree().process_frame
+	var slot10 := screen.get_active_slot() as OrientationSlot
+	var header10 = slot10.get_header().get_child(0)
+	screen._view["leader"]["name"] = "Bran the Undersung"
+	screen._bind_header()
+	for i in 4:
+		await get_tree().process_frame
+	assert_float(header10.get_combined_minimum_size().y).is_less_equal(45.0) \
+		.override_failure_message("a short name at 1.0x must not wrap")
+	TypeScale.reset()
 	screen.queue_free()
 
 
@@ -653,12 +791,12 @@ func test_layout_hash_is_a_function_of_sim_state() -> void:
 	_drive_policy(host_b, policy_b, 9.0)
 	var screen_a: SpreadScreen = await _mounted_screen(host_a)
 	await _settle_window(screen_a, Vector2i(1280, 800), false)
-	await _settle_frames()
+	await _settle_frames(screen_a)
 	var hash_p_a: int = screen_a.layout_hash(screen_a.get_portrait_slot() as OrientationSlot)
 	var hash_l_a: int = screen_a.layout_hash(screen_a.get_landscape_slot() as OrientationSlot)
 	# Re-rendering the same state must not move a card.
 	screen_a.refresh_from_state()
-	await _settle_frames()
+	await _settle_frames(screen_a)
 	assert_int(screen_a.layout_hash(screen_a.get_portrait_slot() as OrientationSlot)).is_equal(hash_p_a)
 	assert_int(screen_a.layout_hash(screen_a.get_landscape_slot() as OrientationSlot)).is_equal(hash_l_a)
 	screen_a.queue_free()
@@ -666,7 +804,7 @@ func test_layout_hash_is_a_function_of_sim_state() -> void:
 
 	var screen_b: SpreadScreen = await _mounted_screen(host_b)
 	await _settle_window(screen_b, Vector2i(1280, 800), false)
-	await _settle_frames()
+	await _settle_frames(screen_b)
 	assert_int(screen_b.layout_hash(screen_b.get_portrait_slot() as OrientationSlot)).is_equal(hash_p_a)
 	assert_int(screen_b.layout_hash(screen_b.get_landscape_slot() as OrientationSlot)).is_equal(hash_l_a)
 	screen_b.queue_free()
@@ -674,9 +812,31 @@ func test_layout_hash_is_a_function_of_sim_state() -> void:
 
 ## Let deferred layout binds (the Eye re-place, the column ladder) and
 ## pending container sorts land before hashing the rendered layout.
-func _settle_frames() -> void:
-	for i in 4:
+## FINISHING #6: a resize can legitimately re-wrap the letterhead (the
+## spread band moves with the wrapped row), and the dealing cards'
+## settle-in slides must FINISH before the hash compares two screens —
+## the settle polls BOTH: no card still settling, then the layout hash
+## holding still across two consecutive frames.
+func _settle_frames(screen: SpreadScreen) -> void:
+	var last := [0, 0]
+	var held := false
+	for i in 40:
 		await get_tree().process_frame
+		var settling := false
+		for slot: OrientationSlot in [screen.get_portrait_slot(), screen.get_landscape_slot()]:
+			for card in (slot.get_spread() as Control).get_children():
+				if CardMotion.is_settling(card as Control):
+					settling = true
+		if settling:
+			held = false
+			continue
+		var stamp := [
+			screen.layout_hash(screen.get_portrait_slot() as OrientationSlot),
+			screen.layout_hash(screen.get_landscape_slot() as OrientationSlot)]
+		if held and stamp[0] == last[0] and stamp[1] == last[1]:
+			return
+		held = true
+		last = stamp
 
 
 func test_chronicle_strip_prints_in_world() -> void:

@@ -52,9 +52,18 @@ const SHEET_MAX_WIDTH := 640.0
 ## Entry rows per page when the screen does not derive one from bounds.
 const DEFAULT_PER_PAGE := 5
 ## Region heights for the pure layout (labels wrap inside their rows).
+## LIVE_H (finishing refinement #6, the T-UI-08 caveat): the live-hand
+## line wraps for EVERY real leader (the pools' names alone measure past
+## the row's label budget), and the old one-line 46px band covered the
+## second line. The band now holds the label's two wrapped lines
+## (font-metric measured: 2 x ChronicleLine 22 = 49px + air) and grows
+## with the type factor (the TypeScale principle: text-carrying budgets
+## grow by the same factor). At 1.3x the very widest pool names can wrap
+## a third line past the band — the documented strip-plate fail-safe
+## (TypeScale's cap rationale), recorded not fixed.
 const TITLE_H := 54.0
 const COUNT_H := 24.0
-const LIVE_H := 46.0
+const LIVE_H := 56.0
 const FOOTER_H := 26.0
 const CHIP_H := 48.0
 ## Fixed chip count (page turns + back).
@@ -432,13 +441,20 @@ func focusables() -> Array[Control]:
 	return found
 
 
+## The live band's height at the current type factor (finishing #6): a
+## text-carrying budget grows with the type — the same principle as the
+## blockquote's QUOTE_WIDTH. Pure GIVEN the factor.
+static func live_band_h() -> float:
+	return LIVE_H * TypeScale.factor()
+
+
 ## Entries per page for one design height (pure; the screen derives its
 ## page size at open, tests pin the mapping): enough wrapped entry cards
 ## to fill the band the fixed regions leave, clamped to a sane floor
 ## (never fewer than 3 — a one-entry page is a tease) and ceiling.
 static func per_page_for_height(bounds_y: float) -> int:
-	var fixed := TITLE_H + COUNT_H + LIVE_H + FOOTER_H + float(CHIP_COUNT) * CHIP_H \
-		+ 2.0 * PAD + 2.0 * MARGIN
+	var fixed := TITLE_H + COUNT_H + live_band_h() + FOOTER_H \
+		+ float(CHIP_COUNT) * CHIP_H + 2.0 * PAD + 2.0 * MARGIN
 	return clampi(int((bounds_y - fixed) / 150.0), 3, 6)
 
 
@@ -460,7 +476,7 @@ func _relaid() -> void:
 		_sheet_rect.size - Vector2(2.0 * PAD, 2.0 * PAD))
 	_fit(_title_label, _row(inner, 0.0, TITLE_H))
 	_fit(_count_label, _row(inner, TITLE_H, COUNT_H))
-	var live_h := LIVE_H if _live_row.visible else 0.0
+	var live_h := live_band_h() if _live_row.visible else 0.0
 	if _live_row.visible:
 		_fit(_live_row, _row(inner, TITLE_H + COUNT_H, live_h))
 	_fit(_scroll, _row(inner, TITLE_H + COUNT_H + live_h, list_h))
@@ -484,7 +500,7 @@ func _row(inner: Rect2, offset: float, height: float) -> Rect2:
 ## back chip). Pure: same bounds + list height => same rects.
 static func sheet_rects(bounds: Vector2, list_height: float, chip_count: int = CHIP_COUNT) -> Dictionary:
 	var wide := minf(bounds.x - 2.0 * MARGIN, SHEET_MAX_WIDTH)
-	var fixed := TITLE_H + COUNT_H + LIVE_H + FOOTER_H + float(maxi(1, chip_count)) * CHIP_H + 2.0 * PAD
+	var fixed := TITLE_H + COUNT_H + live_band_h() + FOOTER_H + float(maxi(1, chip_count)) * CHIP_H + 2.0 * PAD
 	var list_h := clampf(list_height, float(Inks.TOUCH_GRIP_MIN),
 		maxf(float(Inks.TOUCH_GRIP_MIN), bounds.y - 2.0 * MARGIN - fixed))
 	var sheet_h := fixed + list_h

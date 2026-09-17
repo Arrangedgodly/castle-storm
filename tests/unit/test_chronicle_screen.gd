@@ -19,7 +19,9 @@
 ##     entry ON-SCREEN in both directions (the round-1 verifier FAIL,
 ##     pinned on the turn path), the longest
 ##     identity-pool names fit their labels in REAL font metrics (the
-##     T-UI-06 lesson: shape content, never clip), both orientations
+##     T-UI-06 lesson: shape content, never clip), the LIVE-HAND line
+##     wraps INSIDE its band at the widest pool combination (finishing
+##     refinement #6 — the covered-second-line caveat), both orientations
 ##     unclipped at the four common sizes;
 ##   - PERSISTENCE: a real save/load round-trip lands the same ring in
 ##     the screen (chronicle survives in the meta domain).
@@ -28,6 +30,7 @@ extends GdUnitTestSuite
 const SPREAD_SCENE := "res://ui/screens/spread/spread_screen.tscn"
 const SpreadScreen := preload("res://ui/screens/spread/spread_screen.gd")
 const ChronicleScreenScript := preload("res://ui/screens/chronicle/chronicle_screen.gd")
+const ChronicleSheetScript := preload("res://ui/screens/chronicle/chronicle_sheet.gd")
 
 const TEST_SIZES: Array[Vector2i] = [
 	Vector2i(720, 1280),  # phone portrait
@@ -702,6 +705,74 @@ func test_longest_names_fit_their_labels_in_real_font_metrics() -> void:
 					HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
 				assert_float(line_width).is_less_equal(width + 0.5)
 	screen.queue_free()
+
+
+func test_live_hand_line_wraps_inside_its_band() -> void:
+	## FINISHING #6 (the T-UI-08 caveat, pinned): the live-hand line wraps
+	## for EVERY real pool leader (the label budget at the sheet's 640
+	## column is ~576px; even the SHORTEST name's line measures ~697px),
+	## and the band holds BOTH wrapped lines — the second line never hides
+	## under the entries band again. Pinned at the widest pool name +
+	## widest regime + a 3-digit clock, the worst real combination.
+	get_window().size = Vector2i(720, 1280)
+	var theme: Theme = load("res://ui/theme/spread_theme.tres") as Theme
+	var font: Font = theme.get_font(&"font", &"ChronicleLine")
+	var size := int(theme.get_font_size(&"font_size", &"ChronicleLine"))
+	# The widest leader + widest regime from the LIVE pools, measured.
+	var firsts: Array = Inks.pack().identity.leader_first_names
+	var epithets: Array = Inks.pack().identity.leader_epithets
+	var widest_name := ""
+	var widest_px := -1.0
+	for a in firsts.size():
+		for b in epithets.size():
+			var candidate := "%s %s" % [firsts[a], epithets[b]]
+			var px: float = font.get_string_size(candidate,
+				HORIZONTAL_ALIGNMENT_LEFT, -1.0, size).x
+			if px > widest_px:
+				widest_px = px
+				widest_name = candidate
+	var widest_regime := ""
+	var regime_px := -1.0
+	for id in Inks.regime_ids():
+		var name := String(Inks.regime_name(id))
+		var px: float = font.get_string_size(name,
+			HORIZONTAL_ALIGNMENT_LEFT, -1.0, size).x
+		if px > regime_px:
+			regime_px = px
+			widest_regime = name
+	var sheet: ChronicleSheetScript = ChronicleSheetScript.new()
+	sheet.size = Vector2(720.0, 1280.0)
+	get_tree().root.add_child(sheet)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	sheet.bind({
+		"title": "THE CHRONICLE", "runs_recorded": 3, "page": 0, "page_count": 2,
+		"empty": false, "bank": 4688, "entries": [], "empty_lines": [],
+		"current": {"leader": widest_name, "regime_name": widest_regime, "hours": 999},
+	})
+	await get_tree().process_frame
+	await get_tree().process_frame
+	# The precondition is real: the full line exceeds the label's width
+	# (the wrap this test pins is the design, not an accident).
+	var label: Label = sheet._live_label
+	var full_px: float = font.get_string_size(label.text,
+		HORIZONTAL_ALIGNMENT_LEFT, -1.0, size).x
+	assert_float(full_px).is_greater(label.size.x + 1.0) \
+		.override_failure_message("the longest live line must genuinely wrap")
+	# The wrap's two lines fit INSIDE the band (the covered-second-line
+	# defect this round closes — LIVE_H is the 2-line band, font-metric
+	# derived and grown by the type factor).
+	var wrapped := font.get_multiline_string_size(label.text,
+		HORIZONTAL_ALIGNMENT_LEFT, label.size.x, size)
+	assert_float(wrapped.y).is_less_equal(sheet._live_row.size.y + 1.0) \
+		.override_failure_message("the live band must hold every wrapped line")
+	assert_float(sheet._live_row.size.y) \
+		.is_greater_equal(ChronicleSheetScript.live_band_h() - 0.5)
+	# The pure mapping re-baseline (LIVE_H grew 10px: same pages at every
+	# common height — bigger band, same honest ring).
+	for pair in [[1280.0, 6], [1080.0, 4], [800.0, 3], [720.0, 3]]:
+		assert_int(ChronicleSheetScript.per_page_for_height(pair[0])).is_equal(pair[1])
+	sheet.queue_free()
 
 
 func _labels_of(root: Control) -> Array[Label]:

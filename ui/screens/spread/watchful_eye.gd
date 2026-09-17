@@ -47,6 +47,20 @@ const ARMED_SEAT_MARGIN := 8.0
 ## hue alone).
 const ARMED_CAPTION_SIZE := 17
 const ARMED_NUMERAL_SIZE := 40
+## The RESTING share numeral (finishing refinement #6, the critique's "Eye
+## countdown small at the periphery"): the quiet creep's plate is a
+## 48-unit-wide stub, and the old caption ("the Crown watches — %d", ~172px
+## in RoleLine 19) both shrank to ~11px at the deepest creep and drew
+## 60-155px PAST the plate onto the table (off the design at low
+## suspicion). The rest plate now prints the share as a bare numeral in
+## INK_SOFT — the eye glyph itself says "the Crown watches", the zone is
+## the edge's line form, and the number stays readable because its size
+## COMPENSATES the card's meter scale: the plate prints at
+## REST_SHARE_BASE / card-scale (clamped to REST_SHARE_CAP), so the
+## rendered numeral holds ~RoleLine size at every creep depth, pip-rail
+## grammar (a number under a glyph, never wider than its plate).
+const REST_SHARE_BASE := 19
+const REST_SHARE_CAP := 34
 ## The armed rule's width: a short centered stamp, not a banner (the
 ## double form is the urgent signature; the plate stays inside the accent
 ## budget).
@@ -158,18 +172,26 @@ func bind(metrics: Dictionary, hours_left: int) -> void:
 		# carried by form and SIZE, not hue alone).
 		custom_minimum_size = ARMED_CARD_MIN
 		_countdown.text = "lands in"
+		_countdown.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		_countdown.add_theme_font_size_override("font_size", TypeScale.scaled(ARMED_CAPTION_SIZE))
 		_countdown.add_theme_color_override("font_color", Inks.RED)
 		_numeral.text = "%dh" % hours_left
 		_numeral.visible = true
 		_rule.visible = true
 	else:
-		# The resting creep, EXACTLY as authored: periphery stub, one quiet
-		# role line, no red on the plate (the creep is the design).
+		# The resting creep, quiet as authored: periphery stub, no red on
+		# the plate (the creep is the design). FINISHING #6: the share
+		# prints as a bare INK_SOFT numeral (the glyph carries the
+		# watching), its size COMPENSATING the card's meter scale so it
+		# reads at ~RoleLine size at every depth — the old caption both
+		# shrank to ~11px and drew past the plate onto the table.
 		custom_minimum_size = Vector2.ZERO
-		_countdown.remove_theme_font_size_override("font_size")
 		var share := int(round(float(metrics["points"]) / float(maxi(1, int(metrics["max_points"]))) * 100.0))
-		_countdown.text = "the Crown watches — %d" % share
+		_countdown.text = "%d" % share
+		_countdown.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_countdown.add_theme_font_size_override("font_size", TypeScale.scaled(
+			clampi(int(round(float(REST_SHARE_BASE) / maxf(0.55, scale_value))),
+				REST_SHARE_BASE, REST_SHARE_CAP)))
 		_countdown.add_theme_color_override("font_color", Inks.INK_SOFT)
 		_numeral.visible = false
 		_rule.visible = false

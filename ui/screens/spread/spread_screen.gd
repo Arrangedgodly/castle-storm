@@ -1655,9 +1655,14 @@ func _bind_header() -> void:
 			header = RUN_HEADER_SCRIPT.new()
 			header.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			strip.add_child(header)
-			slot.layout_topology()
 		header.bind(_view["leader"], _view["sim_hours"], _view["army_power"],
 			Inks.ground_for(_view["leader"]["regime_id"], _view["phase"]))
+		# FINISHING #6: the letterhead's name wraps when the pools deal a
+		# long one — the row's height can change BIND TO BIND (a new leader,
+		# a type-scale step), so the topology re-lays on every bind; a
+		# taller letterhead shifts the rail/spread/chronicle down honestly
+		# instead of drawing over them.
+		slot.layout_topology()
 		# THE LEDGER VERBS ROW (T-UI-08 + refinements #2/#5): the
 		# chronicle chip, the day-sheet chip and the press-room chip at
 		# the row's right end — the same ActionChip grammar as every

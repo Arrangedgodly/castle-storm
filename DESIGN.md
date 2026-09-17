@@ -348,7 +348,8 @@ of rotation slack reserve height for the rotated bounding boxes.
 card gaps, 6-unit chronicle-row separation, 16-unit header-strip separation. The run
 header inserts at the very top and shifts everything below: a two-row COLUMN (probe-
 measured — the letterhead row has no width to spare at the 720 portrait base) — the
-letterhead (leader name, regime-ink rule, regime name, clock) at full table width,
+letterhead (leader name, regime-ink rule, regime name, clock) at full table width
+(the name wrapping to as many lines as the pools deal, the row growing with them),
 then THE LEDGER VERBS row (The Chronicle chip + The Day-Sheet chip, right-aligned,
 full grips).
 
@@ -464,8 +465,14 @@ button chips, 5px on paper panels (theme styleboxes).
 - **RunHeader** (`ui/screens/spread/run_header.gd`): the letterhead — leader name
   (display face, 28px), a solid rule in the regime's second ink, uppercase regime
   name in the secondary, clock/power plate in PipLabel; text ink by the print rule
-  against the live ground. It tops a two-row header column whose second row is THE
-  LEDGER VERBS (The Chronicle + The Day-Sheet ActionChips, right-aligned, full
+  against the live ground. The letterhead's line budget (finishing refinement #6):
+  the name WRAPS at word boundaries when the pools deal a long one (the epithet
+  drops to its own line — never a mid-word clip at any type scale), the regime and
+  clock plates fit their own measured text (a plate grows, its print stays whole),
+  and the row's wrapped height is derived inside the slot's topology pass — a pure
+  function of text + type factor + strip width, so the rendered layout stays a
+  function of sim state alone. It tops a two-row header column whose second row is
+  THE LEDGER VERBS (The Chronicle + The Day-Sheet ActionChips, right-aligned, full
   grips, focus-equivalent across orientation swaps).
 - **ActionFan / ActionChip** (`ui/screens/spread/action_fan.gd`): the contextual
   affordance — a column of print-styled chips fanned at a card's edge (to its right,
@@ -489,8 +496,12 @@ button chips, 5px on paper panels (theme styleboxes).
   The table makes way: CardSpread's `right_reserve` keeps the card field (and the fan's
   rotated end-card corners) clear of the armed seat, so the perch never crowds the end
   card. The resting creep is untouched — unarmed binds are exactly the authored quiet
-  forms, and the armed countdown refreshes per sim batch so the numeral never goes
-  stale.
+  forms — except the rest plate's share readout (finishing refinement #6): the share
+  prints as a bare INK_SOFT numeral (the glyph carries the watching), its size
+  COMPENSATING the card's meter scale so it reads at ~RoleLine size at every creep
+  depth and never draws past the plate (the old caption both shrank to ~11px
+  effective and spilled 60–155px onto the table). The armed countdown refreshes per
+  sim batch so the numeral never goes stale.
 
 ### The Screens (paper over the table)
 
@@ -513,7 +524,11 @@ All screens compose the same grammar; none fork a component:
 - **ChronicleScreen / ChronicleSheet** (`ui/screens/chronicle/`): the ledger of past
   spreads over a 0.90 veil in the live regime's ground tone; outcome seals by form
   (WON double / CRUSHED struck / ABANDONED dashed); the live run prints as its own
-  dashed strip, never an entry.
+  dashed strip, never an entry — and that live line WRAPS for real pool names (every
+  leader name exceeds the row's label budget), so its band holds the wrapped lines
+  (finishing refinement #6: two lines at 1.0×, grown by the type factor — the same
+  principle as every text-carrying budget; the pre-#6 one-line band covered the
+  second line).
 - **DaySheetScreen** (`ui/screens/spread/day_sheet_screen.gd`): the live run's own
   page — the retrieval surface for in-run history. Every line this hand printed
   accumulates on one scrolled column of ChronicleLine rows, NEWEST FIRST (the
