@@ -93,7 +93,7 @@ func _journey_1_first_session(harness) -> void:
 	var idle: Array = host.units().idle_units(host.units().base_unit_id())
 	harness.check(not idle.is_empty(), "J1: the recruit stands on the table")
 	host.submit(&"assign_role", &"worker", idle[0])
-	host.fast_forward(SimEngine.TICKS_PER_SIM_HOUR)  # the worker's 0.5h drill
+	host.fast_forward(SimEngine.TICKS_PER_SIM_HOUR)  # settle past the worker's (zero-hour) hop
 	# The build-order choice first (a staked plot has no stations), THEN the
 	# "lend a hand" verb.
 	var farm_raised := false

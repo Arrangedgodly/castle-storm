@@ -344,7 +344,7 @@ engine.register_system(units)
 recruit_arrived (RNG cadence)      stable: offers wait at the gate, never expire
   -> recruit_accept                peasant joins (the base unit)
   -> assign_role worker|militia    starts that def's training timer
-       worker  (0.5h ex.)  -> unit_promoted + add_worker into production's pool
+       worker  (0h; chores)  -> unit_promoted + add_worker into production's pool
        militia (2h)        -> unit_promoted (resting militia)
   -> start_training trainee        militia -> trainee (4h)
   -> start_training knight|archer  trainee -> branch (12h / 6h)

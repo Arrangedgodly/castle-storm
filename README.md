@@ -17,7 +17,7 @@ Playable MVP, production-complete and verified in CI. The full loop — recruit,
 - Randomized leader identities and regimes on every restart; a persistent chronicle of past runs
 - Offline progress resolved on return (capped at 8h) and printed as a while-you-were-away report
 
-Balance is measured, not guessed: first recruit at ~7 minutes, first win in the 2–4 wall-day band at a 4-check-ins-a-day rhythm ([docs/balance.md](docs/balance.md)).
+Balance is measured, not guessed: first recruit at ~7 minutes, first food trickle at minute 12, first win in the 2–4 wall-day band at a 4-check-ins-a-day rhythm ([docs/balance.md](docs/balance.md)).
 
 ## Requirements
 
@@ -135,8 +135,8 @@ The honest one, in order:
 ## Known limitations
 
 - Deck performance is validated on an M-series Mac at the Deck's exact window profile — the hardware run hasn't happened yet
-- Opening pacing at 1x runs slower than the original "first payoff inside 10–15 minutes" target (first worker ~45 min); retuning is a tracked balance decision
-- One known copy bug: the assault odds screen can double the article ("Against the The Paper Crown")
+- At 1x the first trainee hop lands ~2h20m in (the 2h militia drills set the army's pace; shortening them broke the first-win band when measured)
+- Card titles step their font down to fit their plate; at the narrowest five-column roster the longest names still clip at the plate edge (fails safe, never past the card)
 - Two art packs are pending vendoring (one CC0 pack, one paid heraldry pack awaiting purchase)
 - No audio yet (event hooks exist as signals; no assets shipped)
 - English only; no mobile builds yet

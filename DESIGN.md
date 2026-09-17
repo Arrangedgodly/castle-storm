@@ -350,8 +350,8 @@ header inserts at the very top and shifts everything below: a two-row COLUMN (pr
 measured — the letterhead row has no width to spare at the 720 portrait base) — the
 letterhead (leader name, regime-ink rule, regime name, clock) at full table width
 (the name wrapping to as many lines as the pools deal, the row growing with them),
-then THE LEDGER VERBS row (The Chronicle chip + The Day-Sheet chip, right-aligned,
-full grips).
+then THE LEDGER VERBS row (The Chronicle chip + The Day-Sheet chip + The Press-Room
+chip, right-aligned, full grips).
 
 **Key Characteristics:** hierarchy reads ground → cards → pips/numerals (edges first,
 numbers second, faces last); roster runs 1–30 cards; the Watchful Eye perches on the
@@ -422,9 +422,12 @@ button chips, 5px on paper panels (theme styleboxes).
   (`play_promotion_flip(swap)`) interposes on the seam (see Motion below). Minimum
   size: a 96×96 grip (2× touch grip).
 - **CardFace** (`ui/theme/card_face.gd/.tscn`): the face plate — art slot + name plate
-  (display face, clipped) + solid under-title rule (portrait cue) + role line (soft
+  (display face) + solid under-title rule (portrait cue) + role line (soft
   ink). Reflows portrait-stacked vs landscape-side-by-side on its own aspect
-  hysteresis (flip above 1.15, back below 1.0).
+  hysteresis (flip above 1.15, back below 1.0). The plate fit (backlog sweep):
+  a plate's print steps its font down to the plate's width before it ever
+  clips — the T-UI-03 clip stays as the floored last resort (the label still
+  fails safe at the plate edge, never past the card).
 - **FaceSlot + FaceArt + the print shader** (`ui/theme/face_slot.gd`, `face_art.gd`,
   `face_print.gdshader`): face art resolves through the content art manifest — one
   `atlas_region` cell of the vendored Kenney Toon Character pose sheets (uniform 9×5
@@ -472,8 +475,8 @@ button chips, 5px on paper panels (theme styleboxes).
   and the row's wrapped height is derived inside the slot's topology pass — a pure
   function of text + type factor + strip width, so the rendered layout stays a
   function of sim state alone. It tops a two-row header column whose second row is
-  THE LEDGER VERBS (The Chronicle + The Day-Sheet ActionChips, right-aligned, full
-  grips, focus-equivalent across orientation swaps).
+  THE LEDGER VERBS (The Chronicle + The Day-Sheet + The Press-Room ActionChips,
+  right-aligned, full grips, focus-equivalent across orientation swaps).
 - **ActionFan / ActionChip** (`ui/screens/spread/action_fan.gd`): the contextual
   affordance — a column of print-styled chips fanned at a card's edge (to its right,
   mirrored left when the table runs out, always inside the screen). Each chip: leading

@@ -58,14 +58,19 @@ const DEFAULT_PER_PAGE := 5
 ## second line. The band now holds the label's two wrapped lines
 ## (font-metric measured: 2 x ChronicleLine 22 = 49px + air) and grows
 ## with the type factor (the TypeScale principle: text-carrying budgets
-## grow by the same factor). At 1.3x the very widest pool names can wrap
-## a third line past the band — the documented strip-plate fail-safe
-## (TypeScale's cap rationale), recorded not fixed.
+## grow by the same factor). BACKLOG SWEEP (the 1.3x third wrap): the
+## widest pool names wrap a THIRD line at max type scale, so the band is
+## now ADAPTIVE — _live_needed_h() measures the bound text's real wrap in
+## the live font and the band grows to hold every line (the letterhead's
+## own honest adaptation); this floor is the two-line rest state.
 const TITLE_H := 54.0
 const COUNT_H := 24.0
 const LIVE_H := 56.0
 const FOOTER_H := 26.0
 const CHIP_H := 48.0
+## Air inside the live band beyond the measured wrap (the floor's own air,
+## kept when the measured wrap takes over).
+const LIVE_AIR := 8.0
 ## Fixed chip count (page turns + back).
 const CHIP_COUNT := 3
 ## The crest plate's size inside an entry card.
@@ -264,12 +269,10 @@ func _wire_pad_column() -> void:
 
 
 func _regime_with_article(regime_name: String) -> String:
-	## Regime display names carry their own article ("The Paper Crown").
-	if regime_name.is_empty():
-		return "the Crown"
-	if regime_name.begins_with("The "):
-		return regime_name
-	return "the " + regime_name
+	## The canonical article seam lives in Inks (regime names carry their
+	## own "The" — the doubled-article rule); this wrapper keeps the sheet's
+	## call sites local.
+	return Inks.regime_with_article(regime_name)
 
 
 func _count_line(view: Dictionary) -> String:
@@ -443,9 +446,34 @@ func focusables() -> Array[Control]:
 
 ## The live band's height at the current type factor (finishing #6): a
 ## text-carrying budget grows with the type — the same principle as the
-## blockquote's QUOTE_WIDTH. Pure GIVEN the factor.
+## blockquote's QUOTE_WIDTH. Pure GIVEN the factor. The MOUNTED band uses
+## the measured _live_needed_h() instead (the 1.3x third-wrap pass); this
+## floor stays the pure-layout estimate per_page_for_height budgets from.
 static func live_band_h() -> float:
 	return LIVE_H * TypeScale.factor()
+
+
+## The live band's MEASURED height (the backlog sweep's 1.3x third-wrap
+## fix): the floor is live_band_h() (two wrapped lines + air); when the
+## real font metrics wrap the bound text TALLER — the widest pool names at
+## max type scale wrap a third line — the band grows to hold EVERY line.
+## The label's wrap width is derived, never read back from a stale layout
+## pass: sheet width (bounds-capped) - pad - the rule's minimum - the row's
+## separation. Pure given text + factor + bounds.
+func _live_needed_h() -> float:
+	if not _live_row.visible or _live_label == null or _live_label.text.is_empty():
+		return live_band_h()
+	var font: Font = _live_label.get_theme_font(&"font")
+	if font == null:
+		return live_band_h()
+	var font_size := _live_label.get_theme_font_size(&"font_size")
+	var wide := minf(size.x - 2.0 * MARGIN, SHEET_MAX_WIDTH)
+	var label_w := wide - 2.0 * PAD - _live_rule.get_combined_minimum_size().x - 10.0
+	if label_w <= 1.0:
+		return live_band_h()
+	var wrapped := font.get_multiline_string_size(_live_label.text,
+		HORIZONTAL_ALIGNMENT_LEFT, label_w, font_size)
+	return maxf(live_band_h(), wrapped.y + LIVE_AIR)
 
 
 ## Entries per page for one design height (pure; the screen derives its
@@ -469,14 +497,16 @@ func _relaid() -> void:
 	var list_height := 0.0
 	if _list != null:
 		list_height = _list.get_combined_minimum_size().y
-	var rects := sheet_rects(size, list_height, maxi(1, _chips.size()))
+	# The live band's ADAPTIVE height (the 1.3x third-wrap pass): the
+	# measured wrap when it exceeds the two-line floor.
+	var live_h := _live_needed_h() if _live_row.visible else 0.0
+	var rects := sheet_rects(size, list_height, maxi(1, _chips.size()), live_h)
 	_sheet_rect = rects["sheet"]
 	var list_h: float = rects["list_h"]
 	var inner := Rect2(_sheet_rect.position + Vector2(PAD, PAD),
 		_sheet_rect.size - Vector2(2.0 * PAD, 2.0 * PAD))
 	_fit(_title_label, _row(inner, 0.0, TITLE_H))
 	_fit(_count_label, _row(inner, TITLE_H, COUNT_H))
-	var live_h := live_band_h() if _live_row.visible else 0.0
 	if _live_row.visible:
 		_fit(_live_row, _row(inner, TITLE_H + COUNT_H, live_h))
 	_fit(_scroll, _row(inner, TITLE_H + COUNT_H + live_h, list_h))
@@ -497,10 +527,15 @@ func _row(inner: Rect2, offset: float, height: float) -> Rect2:
 ## content up to the height the bounds grant — a too-tall page SCROLLS
 ## inside its band (the caps keep every other region on the sheet).
 ## `chip_count` is the live verb count (a one-page ring prints only the
-## back chip). Pure: same bounds + list height => same rects.
-static func sheet_rects(bounds: Vector2, list_height: float, chip_count: int = CHIP_COUNT) -> Dictionary:
+## back chip); `live_height` >= 0 is the live band's MEASURED height (the
+## adaptive third-wrap pass; the default keeps the pure two-line floor
+## estimate, so the pinned pure mapping is unchanged). Pure: same bounds +
+## list height + live height => same rects.
+static func sheet_rects(bounds: Vector2, list_height: float, chip_count: int = CHIP_COUNT,
+		live_height: float = -1.0) -> Dictionary:
 	var wide := minf(bounds.x - 2.0 * MARGIN, SHEET_MAX_WIDTH)
-	var fixed := TITLE_H + COUNT_H + live_band_h() + FOOTER_H + float(maxi(1, chip_count)) * CHIP_H + 2.0 * PAD
+	var live_h := live_band_h() if live_height < 0.0 else live_height
+	var fixed := TITLE_H + COUNT_H + live_h + FOOTER_H + float(maxi(1, chip_count)) * CHIP_H + 2.0 * PAD
 	var list_h := clampf(list_height, float(Inks.TOUCH_GRIP_MIN),
 		maxf(float(Inks.TOUCH_GRIP_MIN), bounds.y - 2.0 * MARGIN - fixed))
 	var sheet_h := fixed + list_h

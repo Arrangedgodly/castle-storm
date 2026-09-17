@@ -145,14 +145,16 @@ func open(p_host: GameHost, p_router: LayoutRouter) -> void:
 
 
 ## The odds screen's opening print: the two sides of the fight in one
-## line (regime, garrison composition, our number).
+## line (regime, garrison composition, our number). The regime composes
+## through Inks.regime_with_article — the names carry their own "The"
+## (the closing critique's doubled-article P2, fixed at the template root).
 func _composition_line() -> String:
 	var regime_name := Inks.regime_name(host.run().regime_id())
 	if regime_name.is_empty():
 		regime_name = "Crown"
 	var garrison := AssaultPresenter.garrison_line(_view, regime_name)
-	return "Against the %s — %s; our sworn number %d." % [
-		regime_name, garrison.to_lower(), int(_view["army_power"])]
+	return "Against %s — %s; our sworn number %d." % [
+		Inks.regime_with_article(regime_name), garrison.to_lower(), int(_view["army_power"])]
 
 
 func close() -> void:

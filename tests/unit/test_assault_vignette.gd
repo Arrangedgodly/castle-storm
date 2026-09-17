@@ -47,6 +47,7 @@ extends GdUnitTestSuite
 
 const SPREAD_SCENE := "res://ui/screens/spread/spread_screen.tscn"
 const SpreadScreen := preload("res://ui/screens/spread/spread_screen.gd")
+const AssaultScreenScript := preload("res://ui/screens/assault/assault_screen.gd")
 
 ## Injected-time scale for watched pacing (see WAITING STRATEGY above).
 const WATCH_SCALE := 60.0
@@ -265,6 +266,49 @@ func test_garrison_and_floor_lines() -> void:
 	assert_bool(thin_view["floor_met"]).is_false()
 	assert_str(AssaultPresenter.floor_line(thin_view)).contains("15 mustered")
 	assert_str(AssaultPresenter.floor_line(thin_view)).contains("23")
+
+
+## THE COMPOSITION LINE NEVER DOUBLES THE ARTICLE (the closing critique's
+## P2, "Against the The Paper Crown"): regime display names carry their own
+## "The", so the odds screen's opening print composes through the article
+## seam (Inks.regime_with_article). Pinned on the REAL template for EVERY
+## shipped regime name — the four known seed->regime draws — plus the
+## garrison fallback branch and the article seam's own fallbacks.
+func test_composition_line_never_doubles_the_article() -> void:
+	# One seed per regime flavor (the balance band's own fixed map).
+	var regime_seeds := {
+		"gilded_crown": 20261201, "velvet_fist": 20261202,
+		"paper_crown": 20261203, "iron_rotunda": 20261207,
+	}
+	var drawn: Array[String] = []
+	for regime_id in regime_seeds.keys():
+		var host := _test_host(int(regime_seeds[regime_id]))
+		assert_str(String(host.run().regime_id())).is_equal(regime_id)
+		drawn.append(regime_id)
+		var assault: AssaultScreenScript = AssaultScreenScript.new()
+		assault.host = host
+		assault._view = AssaultPresenter.odds_view(host.assault().assault_odds(host.engine))
+		var line: String = assault._composition_line()
+		var name := Inks.regime_name(host.run().regime_id())
+		# The real print names the regime exactly once, article and all…
+		assert_str(line).contains("Against %s" % Inks.regime_with_article(name))
+		# …and the doubled-article bug is gone at ANY casing.
+		assert_bool(line.to_lower().contains("the the")).is_false()
+		assert_bool(line.contains("Against The ")).is_true()  # every shipped name carries "The "
+		assault.free()
+	assert_int(drawn.size()).is_equal(4)  # the whole regime pool was audited
+	# The garrison fallback branch (no combat modifier — dead with shipped
+	# content, kept honest for the same reason it exists) composes through
+	# the same seam.
+	var bare := {
+		"garrison_multiplier_milli": 1000, "garrison_modifier_kind": "none",
+		"garrison_base": 50, "army_multiplier_milli": 1000,
+	}
+	assert_str(AssaultPresenter.garrison_line(bare, "The Paper Crown")) \
+		.is_equal("garrison of The Paper Crown — 50 strong")
+	# The seam's own fallbacks read with exactly one article.
+	assert_str(Inks.regime_with_article("")).is_equal("the Crown")
+	assert_str(Inks.regime_with_article("Crown")).is_equal("the Crown")
 
 
 func test_beat_script_folds_a_real_commit() -> void:

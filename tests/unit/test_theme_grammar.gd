@@ -245,6 +245,63 @@ func test_face_plate_minimum_size_honors_touch_grip() -> void:
 	remove_child(face)
 
 
+## THE PLATE FIT (the backlog sweep's phone-scale clip pass): at
+## roster-scale widths a plate's print steps its font DOWN to fit the plate
+## before the T-UI-03 clip fail-safe ever engages — pinned on the longest
+## single-word recruit name at a 5-column phone-roster plate width. The
+## STRUCTURAL RESIDUE is pinned too: at a width where even the floor
+## cannot fit the text, the applied size IS the floor and the label keeps
+## its fail-safe clip (documented, never past the card).
+func test_face_plates_step_down_to_fit_before_clipping() -> void:
+	var face := (load("res://ui/theme/card_face.tscn") as PackedScene).instantiate() as CardFace
+	auto_free(face)
+	face.card_name = "Stitches"  # the longest single-word pool name
+	face.role_line = "level 1 · 1/2 workers"
+	add_child(face)
+	face.size = Vector2(108.0, 150.0)  # a 5-column phone-roster plate
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var theme: Theme = load("res://ui/theme/spread_theme.tres") as Theme
+	var title_base: int = theme.get_font_size(&"font_size", &"CardTitle")
+	var title: Label = face.name_plate()
+	var applied: int = title.get_theme_font_size(&"font_size")
+	# The fit actually stepped down from the themed base…
+	assert_int(applied).is_less(title_base)
+	# …never below the floor…
+	assert_int(applied).is_greater_equal(int(round(float(title_base) * CardFace.TITLE_FIT_FLOOR)) - 1)
+	# …and the WHOLE title now fits the plate in real font metrics (no
+	# mid-word clip at phone roster scale — the critique's P3 residue).
+	var font: Font = title.get_theme_font(&"font")
+	var width: float = font.get_string_size(title.text,
+		HORIZONTAL_ALIGNMENT_LEFT, -1.0, applied).x
+	assert_float(width).is_less_equal(title.size.x + 0.5)
+	# The role plate fits its own floor the same way.
+	var role_base: int = theme.get_font_size(&"font_size", &"RoleLine")
+	var role: Label = face.role_plate()
+	var role_applied: int = role.get_theme_font_size(&"font_size")
+	assert_int(role_applied).is_less(role_base)
+	var role_font: Font = role.get_theme_font(&"font")
+	var role_width: float = role_font.get_string_size(role.text,
+		HORIZONTAL_ALIGNMENT_LEFT, -1.0, role_applied).x
+	assert_float(role_width).is_less_equal(role.size.x + 0.5)
+	remove_child(face)
+	# THE STRUCTURAL RESIDUE, pinned honestly: a plate too narrow for even
+	# the floor keeps the fail-safe (clip at the plate edge) — the fit stops
+	# at the floor and the label stays clip_text (never past the card).
+	var stub := CardFace.new()
+	auto_free(stub)
+	stub.card_name = "Stitches"
+	add_child(stub)
+	stub.size = Vector2(60.0, 150.0)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var stub_title: Label = stub.name_plate()
+	assert_int(stub_title.get_theme_font_size(&"font_size")) \
+		.is_equal(int(round(float(title_base) * CardFace.TITLE_FIT_FLOOR)))
+	assert_bool(stub_title.clip_text).is_true()  # the documented fail-safe remains
+	remove_child(stub)
+
+
 func test_pip_mark_minimum_size_honors_touch_grip() -> void:
 	var pip := (load("res://ui/theme/pip_mark.tscn") as PackedScene).instantiate() as Control
 	auto_free(pip)

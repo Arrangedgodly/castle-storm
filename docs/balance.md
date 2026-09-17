@@ -10,16 +10,35 @@ sets nothing; defaults flow through — pinned by
 acceptance suite `tests/acceptance/suites/economy_balance_band.gd` pins the
 band on fixed seeds (one per regime). Re-sweep before any future retune.
 
+**FOLLOW-UP RETUNE (2026-09-17, the deferred backlog sweep — journey-1
+trickle timing):** content-DATA only, no tunable or logic change —
+`worker.training_time_hours` 0.5 → **0.0** (chores are zero-hour: the hoe
+is picked up on the way to the field) and `farm.base_production_per_worker_hour`
+6 → **24** (the first whole food lands ~2.5 min after staffing). The first
+visible food trickle moved **minute 58 → 22** on this harness's 5-minute
+manage cadence — **minute 12** on the player-paced reading
+(`test_first_session`'s documented sensible path) — inside the town-hall
+10–15 min first session. First worker: 45 → 16 min. The first-win band is
+UNMOVED (re-swept below: 12/12 seeds, mean 79 h, slowest 127 h — sensible
+play was never food-gated; the retune widens the opening only). The
+first-trainee half of the follow-up was measured and REJECTED: cutting the
+2 h militia drills to 1.0 h or 1.5 h pushed the first-win tail to 169 h
+(past the 132 h bound) and +3 assault losses (faster militia completions
+churn the suspicion acts), so `militia.training_time_hours` stands at 2.0
+and the trainee hop keeps its ~141-min idle cadence. Sections 1/3 below
+carry the re-measured rows; the 2026-09-15 pass's reasoning tables stand
+otherwise.
+
 ## 1. The targets (town-hall / R4 → task contract)
 
 | Target | Source | Measured (chosen) |
 |---|---|---|
 | First recruit ≤ 15 real min of the first session | journey 1 (M1 finding F2: was ~118 min, 8–12× late) | **7 min** (metronome — zero variance) |
-| "I get it" session 10–15 min: assignment + first trickle visible fast | journey 1 | first worker **45 min** (rush + 30-min training, M1 F2 called that fine), first food trickle **58 min** |
-| First win in the 2–4 day band at sensible pace (3–5 min check-ins) | town-hall | **mean 79 sim-h ≈ 3.3 wall days** at 4 check-ins/day (12/12 seeds won, slowest 127 h) |
+| "I get it" session 10–15 min: assignment + first trickle visible fast | journey 1 | first worker **16 min** (rush + zero-hour chores; was 45), first food trickle **22 min** on the 5-min manage cadence / **minute 12** player-paced (was 58) — the 2026-09-17 follow-up |
+| First win in the 2–4 day band at sensible pace (3–5 min check-ins) | town-hall | **mean 79 sim-h ≈ 3.3 wall days** at 4 check-ins/day (12/12 seeds, slowest 127 h) — unchanged by the follow-up |
 | 1000h stability: ≤ 1 crush under sensible play; crushes from GREED not existing | task contract (T-QA-02 finding) | **0 crushes**, suspicion peak 24 (< warn 35); the greed probe crushes at ~28 h |
 | Failed-assault recovery ~day-scale | task contract | **mean 29 h** loss→win (6 multi-loss runs) |
-| Check-in value (resources gained per 5-min window mid-run) | task contract | **~+20–60 gross resources** per 5-min live window; one full cycle resolves ~18–36 events, banks ~+1400–4500 away accrual, decides ~150 resources of spends |
+| Check-in value (resources gained per 5-min window mid-run) | task contract | **~+46 gross resources** per 5-min live window (the faster farm); one full cycle resolves ~36 events, banks ~+3369 away accrual, decides ~150 resources of spends |
 
 Cadence model: one `manage()` batch per check-in (the shared sensible-play
 policy), a 3-minute live session, the away gap through the REAL
@@ -50,22 +69,32 @@ uses dismissal: at the population cap the remaining offers are sent home
 (accept-what-fits, dismiss-the-rest, with locally counted room — the old
 loop read stale state and overshot the cap by up to the offer count).
 
-## 3. The recorded sweep (2026-09-15, seeds 20261201+, commit line 450‰)
+## 3. The recorded sweep (2026-09-15, seeds 20261201+, commit line 450‰;
+## re-run 2026-09-17 on the follow-up retune's content)
 
-Opening (sim-minutes from run start, mean of measured seeds):
+Opening (sim-minutes from run start, mean of measured seeds; 2026-09-17
+re-run — the "before" decomposition rows now ride the retuned worker/farm
+content on their pre-T-SIM-08 TUNABLE overrides, so their opening numbers
+moved too; their job is the rush/gate decomposition, which stands):
 
 | config | first recruit | first worker | first food trickle | arrivals in 2h |
 |---|---|---|---|---|
-| before (R4 seeds, no dismiss) | 118 | 155 | 168 | 0 |
-| + dismissal affordance | 118 | 155 | 168 | 0 |
-| + presence weights 0.3/0.05 | 118 | 155 | 168 | 0 |
-| + gate capacity 6 | 7 | 45 | 58 | 4 |
-| **chosen (rush + weights + gate + garrison 50)** | **7** | **45** | **58** | **4** |
-| rush-uniform-8 | 7 | 45 | 58 | 8 |
-| rush-ramp-8-fast | 6 | 45 | 58 | 5 |
+| before (R4 seeds, no dismiss) | 118 | 126 | 132 | 0 |
+| + dismissal affordance | 118 | 126 | 132 | 0 |
+| + presence weights 0.3/0.05 | 118 | 126 | 132 | 0 |
+| + gate capacity 6 | 7 | 16 | 22 | 4 |
+| **chosen (rush + weights + gate + garrison 50)** | **7** | **16** | **22** | **4** |
+| rush-uniform-8 | 7 | 16 | 22 | 8 |
+| rush-ramp-8-fast | 6 | 16 | 22 | 5 |
+
+(2026-09-15's recorded opening on the pre-retune content — worker 45 min,
+trickle 58 min — is superseded by the rows above; the harness's manage
+cadence is 5 sim-min, so the player-paced trickle lands earlier than the
+table's 22: minute 12 on test_first_session's documented sensible path.)
 
 Pressure — 1000h sensible-play stream, seed 20261001 (the T-QA-02 seed;
-recorded pre-pass history: **7 crushes**, 25 strikes):
+recorded pre-pass history: **7 crushes**, 25 strikes; 2026-09-17 re-run —
+unchanged by the retune):
 
 | config | crushes | strikes | cancels | warns | peak | alive |
 |---|---|---|---|---|---|---|
@@ -84,12 +113,13 @@ the weights then pull the measured estate below warn entirely; the gate
 capacity bounds the away-window stack structurally.
 
 Greed probe (military 24, population 40, never lays low, ≤400 h): every
-configuration is crushed — chosen at ~28 h after 3 warns. The failure mode
-lives on the greedy side of the line (the crush comes from presence +
-ignored telegraphs out-pacing the 4 h countdown, not from a mechanic the
-player cannot see coming).
+configuration is crushed — chosen at ~28 h after 3 warns (2026-09-17
+re-run). The failure mode lives on the greedy side of the line (the crush
+comes from presence + ignored telegraphs out-pacing the 4 h countdown, not
+from a mechanic the player cannot see coming).
 
-First win (player model above; commit at 450‰):
+First win (player model above; commit at 450‰; 2026-09-17 re-run — the
+band is unmoved by the opening retune):
 
 | cadence | sim-h/wall-day | won | mean | slowest | losses | recovery mean |
 |---|---|---|---|---|---|---|
@@ -99,11 +129,13 @@ First win (player model above; commit at 450‰):
 
 (8 h and 12 h rows are the same sim script: the catch-up cap clamps both to
 8 h of accrual per cycle; only the wall-clock differs.) Garrison axis at
-6 h cadence: **50 → 79 h mean / 12 won**, 55 → 90 h / 12, 60 → 95 h / 11.
+6 h cadence (2026-09-17 re-run): **50 → 79 h mean / 12 won**, 55 → 90 h /
+12, 60 → 95 h / 12 (slowest 145 h).
 
-Check-in value (mid-run, cadence 6 h): a 5-min live window sees ~+20 gross
-resources; one full cycle resolves ~36 events, banks ~+1425 resources of
-away accrual, and decides ~150 resources of spends (upgrade + gear).
+Check-in value (mid-run, cadence 6 h; 2026-09-17 re-run): a 5-min live
+window sees ~+46 gross resources (the faster farm); one full cycle resolves
+~36 events, banks ~+3369 resources of away accrual, and decides ~150
+resources of spends (timber 86 / food 28 / iron 35).
 
 ## 4. Where the tension lives now (and where the failure lives)
 
@@ -121,13 +153,19 @@ away accrual, and decides ~150 resources of spends (upgrade + gear).
 ## 5. CI pinning and how to re-tune
 
 - `tests/acceptance/suites/economy_balance_band.gd` (16 checks): opening
-  bounds (recruit ≤ 15 min, worker ≤ 60, trickle ≤ 75), 4 fixed regime seeds
+  bounds (recruit ≤ 15 min, worker ≤ 30, trickle ≤ 30 — tightened with the
+  2026-09-17 follow-up retune; measured 7 / 16 / 22), 4 fixed regime seeds
   each winning ≤ 240 h with mean in [48, 96] h and tail ≤ 132 h, recovery
   ≤ 72 h, tension ≥ 1 warn, the greed crush, and check-in value > 0.
 - `economy_stability_1000h` now asserts the tuned reality honestly:
   crushes ≤ 1, suspicion peak < warn under sensible play, structural
   telegraph/strike/crush/restart rules unchanged.
-- To re-tune: edit the defaults in `content/schema/economy_tunables.gd`,
+- `test_mvp_pack` pins the retuned content data (farm 24 food/h; the
+  M1-measured camp/smithy rates stand); `test_first_session` pins the
+  player-paced opening (gate 7, choice arc < 15, trickle ≤ 16, trainee
+  ≤ 170 — the retune's goal and its honestly-rejected half).
+- To re-tune: edit the defaults in `content/schema/economy_tunables.gd`
+  (or the content data the opening rides on — units/buildings `.tres`),
   `make balance-sweep`, update this doc's tables, then the band bounds.
   The sweep's decomposition rows ("before" = R4 seeds + no dismissal) exist
   so the next pass always has its before/after on one harness.

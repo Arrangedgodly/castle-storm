@@ -775,6 +775,71 @@ func test_live_hand_line_wraps_inside_its_band() -> void:
 	sheet.queue_free()
 
 
+## THE 1.3x THIRD WRAP (the backlog sweep pin): at max type scale the
+## widest pool names wrap the live-hand line to a THIRD line — the band is
+## now ADAPTIVE (its height measured from the bound text's real wrap in
+## the live font), so every wrapped line renders; the documented
+## strip-plate fail-safe no longer covers a line.
+func test_live_hand_band_holds_every_wrapped_line_at_1_3x() -> void:
+	TypeScale.apply_factor(1.3)
+	get_window().size = Vector2i(720, 1280)
+	var theme: Theme = load("res://ui/theme/spread_theme.tres") as Theme
+	var font: Font = theme.get_font(&"font", &"ChronicleLine")
+	var size := int(theme.get_font_size(&"font_size", &"ChronicleLine"))
+	# The widest leader + widest regime from the LIVE pools (the worst
+	# corner the fail-safe documented), measured in the scaled face.
+	var firsts: Array = Inks.pack().identity.leader_first_names
+	var epithets: Array = Inks.pack().identity.leader_epithets
+	var widest_name := ""
+	var widest_px := -1.0
+	for a in firsts.size():
+		for b in epithets.size():
+			var candidate := "%s %s" % [firsts[a], epithets[b]]
+			var px: float = font.get_string_size(candidate,
+				HORIZONTAL_ALIGNMENT_LEFT, -1.0, size).x
+			if px > widest_px:
+				widest_px = px
+				widest_name = candidate
+	var widest_regime := ""
+	var regime_px := -1.0
+	for id in Inks.regime_ids():
+		var name := String(Inks.regime_name(id))
+		var px: float = font.get_string_size(name,
+			HORIZONTAL_ALIGNMENT_LEFT, -1.0, size).x
+		if px > regime_px:
+			regime_px = px
+			widest_regime = name
+	var sheet: ChronicleSheetScript = ChronicleSheetScript.new()
+	sheet.size = Vector2(720.0, 1280.0)
+	get_tree().root.add_child(sheet)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	sheet.bind({
+		"title": "THE CHRONICLE", "runs_recorded": 3, "page": 0, "page_count": 2,
+		"empty": false, "bank": 4688, "entries": [], "empty_lines": [],
+		"current": {"leader": widest_name, "regime_name": widest_regime, "hours": 999},
+	})
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var label: Label = sheet._live_label
+	# The precondition is real at 1.3x: the worst-corner text wraps PAST
+	# two lines (the third line the fail-safe used to cover).
+	var wrapped_two := font.get_multiline_string_size(label.text,
+		HORIZONTAL_ALIGNMENT_LEFT, label.size.x, size, 2)
+	var wrapped := font.get_multiline_string_size(label.text,
+		HORIZONTAL_ALIGNMENT_LEFT, label.size.x, size)
+	assert_float(wrapped.y).is_greater(wrapped_two.y + 1.0) \
+		.override_failure_message("the 1.3x worst corner must genuinely wrap a third line")
+	# The adaptive band holds EVERY wrapped line (no covered third line).
+	assert_float(wrapped.y).is_less_equal(sheet._live_row.size.y + 1.0) \
+		.override_failure_message("the adaptive live band must hold every wrapped line at 1.3x")
+	assert_float(sheet._live_row.size.y) \
+		.is_greater_equal(ChronicleSheetScript.live_band_h() - 0.5)
+	sheet.queue_free()
+	await get_tree().process_frame
+	TypeScale.reset()
+
+
 func _labels_of(root: Control) -> Array[Label]:
 	var found: Array[Label] = []
 	var queue: Array[Control] = [root]

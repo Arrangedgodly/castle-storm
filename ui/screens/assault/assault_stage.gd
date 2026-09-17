@@ -879,6 +879,7 @@ class RankCard:
 		name_label.clip_text = true
 		name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		name_label.name = &"NamePlate"
+		name_label.resized.connect(_refit_plates)
 		column.add_child(name_label)
 		var role_label := Label.new()
 		role_label.theme_type_variation = &"PipLabel"
@@ -887,6 +888,7 @@ class RankCard:
 		role_label.clip_text = true
 		role_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		role_label.name = &"RolePlate"
+		role_label.resized.connect(_refit_plates)
 		column.add_child(role_label)
 		var pips := ContributionPips.new()
 		pips.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
@@ -907,9 +909,32 @@ class RankCard:
 			name_plate.text = String(entry["name"])
 		if role_plate != null:
 			role_plate.text = AssaultPresenter.contribution_line(entry)
+		# The plate fit (the card grammar's shared pass): the plates step
+		# their local TypeScale sizes down to the card's width before the
+		# T-UI-03 clip fail-safe ever engages. Text changes refit directly;
+		# width changes arrive through the plates' `resized`.
+		_refit_plates()
 		var pips := _plate(&"Pips") as ContributionPips
 		if pips != null:
 			pips.bind(int(entry["def_power"]), int(entry["gear_power"]))
+
+
+	## The rank plates' fit (see CardFace.fit_label_to_width — same grammar,
+	## locally baked sizes). Guarded by text+width so the fit's own min-size
+	## ripple cannot ping-pong the relayout.
+	var _fit_key := ""
+
+	func _refit_plates() -> void:
+		var name_plate := _plate(&"NamePlate") as Label
+		var role_plate := _plate(&"RolePlate") as Label
+		if name_plate == null or role_plate == null:
+			return
+		var key := "%s|%s@%.1f" % [name_plate.text, role_plate.text, size.x]
+		if key == _fit_key:
+			return
+		_fit_key = key
+		CardFace.fit_label_to_width(name_plate, 0.7, 2, TypeScale.scaled(14))
+		CardFace.fit_label_to_width(role_plate, 0.75, 1, TypeScale.scaled(11))
 
 
 	## Land on the authored target right now (the CardMotion rule: a

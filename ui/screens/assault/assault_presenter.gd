@@ -93,7 +93,10 @@ static func garrison_line(view: Dictionary, regime_name: String) -> String:
 		return "garrison %d · our ranks ×%s" % [int(view["garrison_base"]), _multiplier_text(int(view["army_multiplier_milli"]))]
 	if regime_name.is_empty():
 		return "garrison %d" % int(view["garrison_base"])
-	return "garrison of the %s — %d strong" % [regime_name, int(view["garrison_base"])]
+	# The article seam (the closing critique's P2): regime names carry their
+	# own "The" — compose through Inks, never a literal "the %s".
+	return "garrison of %s — %d strong" % [
+		Inks.regime_with_article(regime_name), int(view["garrison_base"])]
 
 
 ## The knight floor's printed gate (the commit refusal below floor).

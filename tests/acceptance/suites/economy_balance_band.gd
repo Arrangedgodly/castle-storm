@@ -60,8 +60,8 @@ func run(harness) -> void:
 	# --- Opening: journey 1 on the shipped content.
 	var opening := _measure_opening(SEEDS[0])
 	harness.check(int(opening["recruit"]) > 0 and int(opening["recruit"]) <= 15, "journey 1: first recruit within 15 real minutes (measured %d min — the opening rush, M1 finding F2 fixed)" % opening["recruit"])
-	harness.check(int(opening["worker"]) > 0 and int(opening["worker"]) <= 60, "first worker promoted within the hour (measured %d min: rush + assignment + 30-min training)" % opening["worker"])
-	harness.check(int(opening["food"]) > 0 and int(opening["food"]) <= 75, "first food trickle visible fast (measured %d min: staffed farm producing)" % opening["food"])
+	harness.check(int(opening["worker"]) > 0 and int(opening["worker"]) <= 30, "first worker on the farm fast (measured %d min: rush + assignment + zero-hour chores — the trickle-retune pass, T-SIM-08 follow-up)" % opening["worker"])
+	harness.check(int(opening["food"]) > 0 and int(opening["food"]) <= 30, "first food trickle visible inside the first session (measured %d min at the 5-min manage cadence — the player-paced reading is minute 12; staffed farm at 24 food/h)" % opening["food"])
 	harness.check(int(opening["arrivals_2h"]) >= 3, "the rush is real: %d arrivals within the first 2h (then the normal cadence)" % opening["arrivals_2h"])
 
 	# --- First win at the casual cadence, one seed per regime.

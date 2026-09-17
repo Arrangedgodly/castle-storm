@@ -7,5 +7,5 @@ script = ExtResource("1_a")
 id = &"worker"
 display_name = "Worker"
 can_work = true
-training_time_hours = 0.5
+training_time_hours = 0.0
 face_id = &"face_worker"

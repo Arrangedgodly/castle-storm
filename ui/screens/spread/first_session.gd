@@ -30,15 +30,17 @@
 ##     consumes no input, scrolls away as the world keeps printing, and
 ##     dismisses on action (the beat's verb landing IS the dismissal;
 ##     the flag means it can never re-print).
-##   - HONEST PACING (measured, docs/balance.md's own opening rows): the
-##     T-SIM-08 early-arrival boost puts the first recruit at minute 7;
-##     the CHOICE arc (gate answered, role chosen, plot raised) completes
-##     by minute ~9 of wall time at 1x — that is the "I get it" window.
-##     The two PAYOFF prints land when the sim brings them: the first
-##     whole food ~minute 49 (worker hop 0.5h + 6 food/h), the trainee
-##     hop ~minute 140 (militia drills 2h) — the idle-game cadence the
-##     check-in flow (T-UI-09) serves. The beats fire whenever they fire;
-##     nothing here waits or gates.
+##   - HONEST PACING (measured, docs/balance.md's own opening rows — the
+##     T-SIM-08 follow-up retune): the early-arrival boost puts the first
+##     recruit at minute 7; the CHOICE arc (gate answered, role chosen,
+##     plot raised) completes by minute ~9 of wall time at 1x — that is
+##     the "I get it" window. The first PAYOFF print lands at minute 12
+##     (the trickle retune: chores are zero-hour, the farm pours 24
+##     food/h) — INSIDE the town-hall's 10-15 min first session. The
+##     trainee hop keeps its ~minute-141 idle cadence (the 2h militia
+##     drills are the first-win band's pacing — measured: shortening them
+##     pushed the band's tail past its bound, so they stand). The beats
+##     fire whenever they fire; nothing here waits or gates.
 ##
 ## Determinism: no RNG, no wall clock — every trigger is an event or a
 ## stock compare, every line renders through CopyDeck with the beat's

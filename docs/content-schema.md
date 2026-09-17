@@ -359,11 +359,13 @@ truth — no suite carries its own content copy):
 
 - **Resources**: food, timber, iron. **Gear slots**: weapon, armor × 3 tiers.
 - **Units**: the 6-unit chain peasant→worker/militia→trainee→knight|archer
-  at the M1-measured numbers (worker 0.5h, militia 2h, trainee 4h,
-  knight 12h combat 10, archer 6h combat 6; t1 knight kit = 25 iron +
+  (worker 0h — zero-hour chores, the 2026-09-17 journey-1 trickle retune;
+  militia 2h, trainee 4h, knight 12h combat 10, archer 6h combat 6 — the
+  M1-measured drill ladder stands; t1 knight kit = 25 iron +
   5 timber ≈ 2.8h of fully-staffed L1 smithy — M1 finding F3's healthy
   parity, pinned by test).
-- **Buildings** (the M1 watch-item reconciliation): farm (food 6/h, 2
+- **Buildings** (the M1 watch-item reconciliation): farm (food 24/h —
+  the journey-1 trickle retune; 2
   slots, timber 15, r=1.08), lumber_camp (timber 6/h, 2 slots, food 10,
   r=1.10), smithy (iron 3/h, 3 slots, timber 40 + food 20, r=1.12) and
   training_grounds (non-producing flavor card — training needs no

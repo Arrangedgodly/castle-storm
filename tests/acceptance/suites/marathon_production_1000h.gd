@@ -87,12 +87,13 @@ func run(harness) -> void:
 		harness.check(amount > 0 and amount < 4_611_686_018_427_387_904, "%s pool positive and far from int64 bounds: %d" % [id, amount])
 
 	# --- Exact closed-form: fixed rates accrue EXACTLY over 1000 hours
-	# (no upgrades): 2x6/h food, 2x6/h timber, 3x3/h iron, minus build costs
+	# (no upgrades): 2x24/h food (the journey-1 trickle retune), 2x6/h
+	# timber, 3x3/h iron, minus build costs
 	# from the granted billion (farm 15t; lumber_camp 10f; smithy 40t+20f).
 	var plain := _build(RUN_SEED, _identity_regime())
 	_seed_run(plain)
 	plain.fast_forward(total_ticks)
-	harness.check(plain.get_resource(&"food") == 1_000_000_000 - 10 - 20 + 12_000, "food exact after 1000h: %d" % plain.get_resource(&"food"))
+	harness.check(plain.get_resource(&"food") == 1_000_000_000 - 10 - 20 + 48_000, "food exact after 1000h: %d" % plain.get_resource(&"food"))
 	harness.check(plain.get_resource(&"timber") == 1_000_000_000 - 15 - 40 + 12_000, "timber exact after 1000h: %d" % plain.get_resource(&"timber"))
 	harness.check(plain.get_resource(&"iron") == 1_000_000_000 + 9_000, "iron exact after 1000h: %d" % plain.get_resource(&"iron"))
 

@@ -402,6 +402,33 @@ func _assert_register_clean(text: String) -> void:
 			assert_str(text).is_not_equal("banned '%s' in: %s" % [hit.get_string(), text])
 
 
+## THE ARTICLE AUDIT (the closing critique's P2, "Against the The Paper
+## Crown"): every shipped regime name carries its own "The", so NO copy
+## template may prepend a literal article to the {regime} token — the
+## doubled-article class of bug is refused at EVERY variant of BOTH copy
+## sources, not just the one surface that happened to render it.
+func test_no_template_prepends_an_article_to_the_regime_token() -> void:
+	var rx := RegEx.create_from_string("(?i)\\bthe \\{regime\\}")
+	var table := _table()
+	for key in table.templates.keys():
+		for variant in table.templates[key]:
+			var hit := rx.search(String(variant))
+			if hit != null:
+				assert_str(String(variant)).is_not_equal(
+				"doubled article 'the {regime}' in %s" % String(key))
+	for key in CopyDeck.DEFAULTS.keys():
+		for variant in CopyDeck.DEFAULTS[key]:
+			var hit := rx.search(String(variant))
+			if hit != null:
+				assert_str(String(variant)).is_not_equal(
+				"doubled article 'the {regime}' in DEFAULTS %s" % String(key))
+	# And the canonical seam agrees with the content: every shipped regime
+	# name already carries its article, so the seam ships it untouched.
+	for id in Inks.regime_ids():
+		assert_str(Inks.regime_with_article(Inks.regime_name(id))) \
+			.is_equal(Inks.regime_name(id))
+
+
 # --- the coverage report -------------------------------------------------------------------
 
 

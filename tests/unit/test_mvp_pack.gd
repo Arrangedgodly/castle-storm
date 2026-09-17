@@ -144,10 +144,15 @@ func test_producer_rates_and_costs_match_the_m1_measured_economy() -> void:
 	var farm := buildings[&"farm"] as BuildingDef
 	var camp := buildings[&"lumber_camp"] as BuildingDef
 	var smithy := buildings[&"smithy"] as BuildingDef
-	# The M1 trio: farm 6 food/h (2 slots), lumber camp 6 timber/h (2 slots),
-	# smithy 3 iron/h (3 slots) — the numbers the thin-loop gate measured
-	# (knight floor ~26h honest, first iron ~14h).
-	assert_float(farm.base_production_per_worker_hour).is_equal(6.0)
+	# The M1 trio, with the farm raised by the T-SIM-08 follow-up (journey
+	# 1's first-trickle retune): farm 24 food/h (2 slots) so the first
+	# whole food lands ~2.5 min after staffing — the trickle print inside
+	# the 10-15 min first session; lumber camp 6 timber/h (2 slots) and
+	# smithy 3 iron/h (3 slots) stand at the M1-measured numbers (the
+	# retune moved ONLY the food opening; the estate's build costs — the
+	# camp's 10 food, the grounds' 15 — were measured against it and the
+	# first-win band re-swept identical: 12/12 seeds, mean 79h).
+	assert_float(farm.base_production_per_worker_hour).is_equal(24.0)
 	assert_int(farm.worker_slots_base).is_equal(2)
 	assert_float(camp.base_production_per_worker_hour).is_equal(6.0)
 	assert_int(camp.worker_slots_base).is_equal(2)

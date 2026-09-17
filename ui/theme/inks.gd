@@ -190,6 +190,21 @@ static func regime_name(id: StringName) -> String:
 	return ""
 
 
+## THE ARTICLE RULE (the closing critique's P2, fixed at the root): regime
+## display names CARRY their own article — every shipped flavor begins with
+## "The " ("The Paper Crown"). A template that wants the regime mid-sentence
+## composes through THIS seam, never by prepending a literal "the" (that is
+## how "Against the The Paper Crown" happened). Empty falls back to "the
+## Crown"; a name already carrying "The" ships as-is; anything else takes a
+## lowercase article.
+static func regime_with_article(regime_name: String) -> String:
+	if regime_name.is_empty():
+		return "the Crown"
+	if regime_name.begins_with("The "):
+		return regime_name
+	return "the " + regime_name
+
+
 static func regime_ground(id: StringName) -> Color:
 	## First ink: the table ground tone this regime tints (RegimeDef.ink_ground).
 	var p := pack()

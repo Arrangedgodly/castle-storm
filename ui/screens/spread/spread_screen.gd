@@ -1673,11 +1673,11 @@ func _place_eye(slot: OrientationSlot, node: Control, metrics: Dictionary,
 ## to read as a collision). Re-running the pure topology after the bind
 ## places the strip and shifts everything below it, both orientations.
 ## FINISHING REFINEMENT #2: the strip is a COLUMN — row 0 the letterhead
-## at the table's full width, row 1 THE LEDGER VERBS (the Chronicle chip
-## and the Day-Sheet chip, right-aligned). The letterhead row measured
-## 666-of-672 fixed units at the 720 portrait base: a second verb beside
-## it would stub the leader's name, and the column WIDENS the letterhead
-## instead (the name plate takes what the verbs vacate).
+## at the table's full width, row 1 THE LEDGER VERBS (the Chronicle,
+## Day-Sheet and Press-Room chips, right-aligned). The letterhead row
+## measured 666-of-672 fixed units at the 720 portrait base: a second verb
+## beside it would stub the leader's name, and the column WIDENS the
+## letterhead instead (the name plate takes what the verbs vacate).
 func _bind_header() -> void:
 	stats[&"header_binds"] += 1
 	for slot: OrientationSlot in [get_portrait_slot(), get_landscape_slot()]:

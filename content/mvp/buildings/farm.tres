@@ -7,7 +7,7 @@ script = ExtResource("1_b")
 id = &"farm"
 display_name = "Farm"
 resource_produced = &"food"
-base_production_per_worker_hour = 6.0
+base_production_per_worker_hour = 24.0
 worker_slots_base = 2
 base_cost = Dictionary[StringName, int]({
 &"timber": 15

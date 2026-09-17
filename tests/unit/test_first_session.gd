@@ -11,14 +11,17 @@
 ## pacing is measured HONESTLY at 1x (1 sim tick == 1 wall minute):
 ##
 ##   THE PACING TRUTH (pinned here, mirrors docs/balance.md's opening
-##   rows — T-SIM-08's verified numbers): the T-SIM-08 early-arrival
+##   rows — the T-SIM-08 follow-up retune): the T-SIM-08 early-arrival
 ##   boost puts the first recruit at minute 7; the CHOICE arc (gate
 ##   answered, role chosen, plot raised — every loop verb surfaced, the
-##   "I get it" window) completes by minute ~9; the two PAYOFF prints
-##   land when the sim brings them — first whole food ~minute 49 (worker
-##   hop 0.5h + 6 food/h), trainee hop ~minute 140 (militia drills 2h).
-##   The town-hall "10–15 min" line is met by the choice arc; the
-##   payoff prints ride the idle cadence the check-in flow serves.
+##   "I get it" window) completes by minute ~9; the first PAYOFF print —
+##   the food trickle — lands at minute 12 (the trickle retune: chores are
+##   zero-hour, the farm pours 24 food/h), INSIDE the town-hall's 10–15
+##   min first session; the trainee hop stays at ~minute 141 (the 2h
+##   militia drills are the band's pacing — measured: cutting them to
+##   1.0h/1.5h pushed the first-win tail to 169h past the 132h bound, so
+##   the drill time stands and the trainee rides the idle cadence the
+##   check-in flow serves).
 extends GdUnitTestSuite
 
 const SPREAD_SCENE := "res://ui/screens/spread/spread_screen.tscn"
@@ -26,11 +29,13 @@ const SpreadScreen := preload("res://ui/screens/spread/spread_screen.gd")
 
 ## 1x pacing bounds (sim ticks == wall minutes). See the header: the
 ## gate pin is T-SIM-08's own "first recruit 7 min exact"; the choice
-## arc's <15 bound is journey 1's "I get it" window; the payoff bounds
-## guard against arrival/production drift, not aspiration.
+## arc's <15 bound is journey 1's "I get it" window; the TRICKLE pin is
+## the retune's goal (visible inside the first 10-15 min session, with
+## headroom for arrival/production drift); the trainee bound guards
+## drift, not aspiration.
 const GATE_TICK := 7
 const CHOICE_ARC_MAX_TICK := 15
-const TRICKLE_MAX_TICK := 70
+const TRICKLE_MAX_TICK := 16
 const TRAINEE_MAX_TICK := 170
 
 var _dir_seq := 0
@@ -174,7 +179,7 @@ func test_trickle_prints_the_real_first_increase() -> void:
 	var idle: Array = host.units().idle_units(host.units().base_unit_id())
 	host.submit(&"assign_role", &"worker", int(idle[0]))
 	host.submit(&"upgrade_building", &"farm", 1)
-	# The worker joins the pool after the 0.5h hop; the hand goes down
+	# The worker joins the pool at the zero-hour chores hop; the hand goes down
 	# the moment one stands ready; +1 food lands ~10 min later.
 	while int(screen.stats[&"first_nudges"]) < 4:
 		if host.production().idle_workers() > 0:
