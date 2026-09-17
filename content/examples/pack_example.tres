@@ -11,6 +11,7 @@
 [ext_resource type="Resource" path="res://content/examples/regimes/gilded_crown.tres" id="9_g1wtl"]
 [ext_resource type="Script" path="res://content/schema/content_pack.gd" id="10_xygtr"]
 [ext_resource type="Resource" path="res://content/examples/economy_tunables.tres" id="11_bi0q2"]
+[ext_resource type="Resource" path="res://content/examples/unlock_tree.tres" id="19_l1tree"]
 [ext_resource type="Script" path="res://content/schema/unit_def.gd" id="12_ka5pa"]
 [ext_resource type="Resource" path="res://content/examples/units/peasant.tres" id="13_wktj3"]
 [ext_resource type="Resource" path="res://content/examples/units/worker.tres" id="14_ugolb"]
@@ -32,3 +33,4 @@ regimes = Array[ExtResource("8_jbnvw")]([ExtResource("9_g1wtl")])
 identity = ExtResource("7_mr37k")
 tunables = ExtResource("11_bi0q2")
 art = ExtResource("1_l36ma")
+unlock_tree = ExtResource("19_l1tree")

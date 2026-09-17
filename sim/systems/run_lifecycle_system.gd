@@ -110,13 +110,16 @@ var _regimes: Array[RegimeDef] = []
 var _identity: IdentityPools = null
 var _starting_grants: Dictionary = {}  # StringName resource id -> int amount (boot-injected content, never serialized)
 var _stipend_run := 0  # run_index that already took its stipend (0 = none; serialized + hashed)
+var _legacy: LegacySystem = null  # the L1 unlock-tree provider (null = identity modifiers)
+var _legacy_stipend_milli := SimFixed.MILLI  # the run's APPLIED stipend multiplier (serialized + hashed when non-identity)
 
 
 func _init(
 	p_regimes: Array[RegimeDef],
 	p_identity: IdentityPools = null,
 	p_meta: RunMeta = null,
-	p_starting_grants: Dictionary = {}
+	p_starting_grants: Dictionary = {},
+	p_legacy: LegacySystem = null
 ) -> void:
 	var seen: Dictionary = {}
 	for regime in p_regimes:
@@ -133,6 +136,7 @@ func _init(
 	if _identity == null:
 		push_warning("run: no identity pools in pack — run_start will be refused (reason %d)" % REASON_NO_CONTENT)
 	_starting_grants = p_starting_grants.duplicate()
+	_legacy = p_legacy
 	meta = p_meta if p_meta != null else RunMeta.new()
 
 
@@ -355,7 +359,10 @@ func stipend_paid_run() -> int:
 ## host-facing bootstrap verb that replaces backdoor `set_resource` calls
 ## (M1 finding F1): the amounts live in CONTENT (boot-injected here), never in
 ## the command, so the verb cannot carry arbitrary amounts — it is a stipend,
-## not a cheat vector. Denied loudly when no run is running (3), the pack
+## not a cheat vector. The L1 stipend-bonus unlock multiplies the CONTENT
+## amounts at the drain (`_legacy_stipend_milli`, resolved at the fold that
+## opened this run; identity 1000 pays the exact content line — byte-
+## identical events). Denied loudly when no run is running (3), the pack
 ## declares no stipend (4), or this run already took it (5). Emits one
 ## `resources_granted` event per resource line (sorted resource order — the
 ## dict's file order is not canonical across hand edits), value = amount
@@ -376,7 +383,10 @@ func _handle_grant(engine: SimEngine, command: SimCommand) -> void:
 	# (observed: same dict, different event order in two runs).
 	ids.sort_custom(func(a, b) -> bool: return String(a) < String(b))
 	for id in ids:
-		var amount := int(_starting_grants[id])
+		# Single floored integer division (the cost-curve pattern); floored
+		# lines clamp to 1 so a stipend can never vanish under a fractional
+		# multiplier. Identity: amount == the exact content line.
+		var amount := maxi(1, int(_starting_grants[id]) * _legacy_stipend_milli / SimFixed.MILLI)
 		engine.add_resource(id, amount)
 		engine.events.record(engine.tick_count, &"resources_granted", id, amount, engine.get_resource(id))
 	_stipend_run = run_index
@@ -420,6 +430,22 @@ func _fold_new_run(engine: SimEngine, draw_regime: bool) -> void:
 	var production := engine.get_system(&"production")
 	if production != null and production.has_method("set_regime"):
 		production.set_regime(_regime)
+	# The L1 legacy handoff (docs/sim-engine.md §18, the same drain-time
+	# pattern): resolve ONE modifier bundle from the purchased unlock set
+	# and apply it to the siblings the moment the run opens — so purchases
+	# land at the NEXT run start, never mid-run. The stipend field is baked
+	# below (this system owns the grant verb); production/units carry their
+	# own applied multipliers as serialized + hashed state (the regime-
+	# quirks precedent — a restore resumes them verbatim, and an engine
+	# with NO unlocks serializes nothing and hashes byte-identically to the
+	# pre-L1 build).
+	var mods := _legacy.modifiers() if _legacy != null else LegacyModifiers.identity()
+	_legacy_stipend_milli = mods.stipend_milli
+	if production != null and production.has_method("set_legacy_modifiers"):
+		production.set_legacy_modifiers(mods)
+	var units := engine.get_system(&"units")
+	if units != null and units.has_method("set_legacy_modifiers"):
+		units.set_legacy_modifiers(mods)
 
 
 ## Closes the running run: banks the score into RunMeta (win OR loss),
@@ -530,6 +556,12 @@ func state_hash() -> int:
 	hash_value = _mix(hash_value, String(regime_id()).hash())
 	for tag in _leader_tags:
 		hash_value = _mix(hash_value, String(tag).hash())
+	# The APPLIED L1 stipend multiplier is hashed state — but only when
+	# non-identity, so engines with no unlocks hash byte-identically to the
+	# pre-L1 build (an oracle blind to it could call a lost multiplier
+	# "identical" and diverge on the next grant — the T-ARCH-03 lesson).
+	if _legacy_stipend_milli != SimFixed.MILLI:
+		hash_value = _mix(hash_value, _legacy_stipend_milli)
 	return hash_value
 
 
@@ -537,7 +569,7 @@ func to_dict() -> Dictionary:
 	var tags: Array[String] = []
 	for tag in _leader_tags:
 		tags.append(String(tag))
-	return {
+	var state := {
 		"status": status,
 		"run_index": run_index,
 		"leader_first": _leader_first,
@@ -551,6 +583,14 @@ func to_dict() -> Dictionary:
 		"last_score": last_score,
 		"stipend_run": _stipend_run,
 	}
+	# The applied L1 stipend multiplier rides along ONLY when non-identity
+	# (additive-optional, the escalation_garrison emit-when-non-null
+	# discipline): a no-unlocks engine saves byte-identically to pre-L1, a
+	# modulated one restores its stipend verbatim (no run_start drain runs
+	# post-restore to re-resolve it).
+	if _legacy_stipend_milli != SimFixed.MILLI:
+		state["legacy_stipend_milli"] = _legacy_stipend_milli
+	return state
 
 
 func from_dict(state: Dictionary) -> void:
@@ -578,6 +618,10 @@ func from_dict(state: Dictionary) -> void:
 	# boot-injected content, like every def): without it, a restore would
 	# allow a second grant of the stipend and silently double the boot pool.
 	_stipend_run = int(state.get("stipend_run", 0))
+	# Tolerant read of the applied L1 stipend multiplier: absent key = a
+	# pre-L1 (or no-unlocks) save = identity — the next fold re-resolves
+	# from the live provider anyway.
+	_legacy_stipend_milli = int(state.get("legacy_stipend_milli", SimFixed.MILLI))
 
 
 ## FNV-flavored 32-bit-safe mix (same shape as SimEngine._mix —

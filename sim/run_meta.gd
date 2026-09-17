@@ -4,9 +4,10 @@
 ## (town-hall: failure banks FULL progress — every run, win or loss, accrues),
 ## the chronicle, the append-only record of past runs (leader, regime,
 ## outcome, duration, army stats) that T-UI-08 lists as spread history,
-## and the first-session onboarding flags (T-UI-10 — once-only nudges).
-## No spending yet — Layer 1's unlock tree is a post-MVP phase by the
-## Ant-Man layer gate; at MVP the reserve only accumulates.
+## the first-session onboarding flags (T-UI-10 — once-only nudges), and the
+## L1 legacy unlock purchases (`unlocks` — spent through LegacySystem, the
+## post-MVP layer-1 unlock tree service, which decrements the bank and
+## owns every purchase rule).
 ##
 ## Save-domain contract (docs/sim-engine.md §12): this object lives in the
 ## META save domain, NEVER in the run save. RunLifecycleSystem composes
@@ -97,6 +98,20 @@ func set_reduced_motion_preference(on: bool) -> void:
 	preferences["reduced_motion"] = on
 
 
+## Legacy unlock tree purchases (L1): node id (String) -> true, insertion
+## order = purchase order. META domain deliberately — unlocks are meta-
+## progression banked across every run (R5: always-on, fed by every run win
+## or lose), so they must survive restarts, engine re-inits and process
+## restarts, and a run-save restore must never fork them (rule §3.6, same
+## rule as the bank). The tree itself is boot-injected content and never
+## serialized; ids resolve against the pack's UnlockTreeDef at boot, and an
+## id that left the tree is KEPT (historical purchase) while contributing
+## no effect. Additive-optional with a tolerant reader (save-schema §5):
+## pre-L1 metas lack the key and read back as {} — no purchases, which is
+## right. Spending decrements `legacy_points` through LegacySystem only.
+var unlocks := {}
+
+
 ## True when the beat's flag is set (never-printed beats read false).
 func first_session_flag(key: StringName) -> bool:
 	return bool(first_session.get(String(key), false))
@@ -127,6 +142,7 @@ func to_dict() -> Dictionary:
 		"last_seen_epoch": last_seen_epoch,
 		"first_session": session,
 		"preferences": preferences.duplicate(true),
+		"unlocks": unlocks.duplicate(true),
 	}
 
 
@@ -165,4 +181,13 @@ func apply_dict(state: Dictionary) -> bool:
 	chronicle.clear()
 	for entry in state.get("chronicle", []):
 		chronicle.append(entry)
+	# Same discipline for the L1 unlock purchases: absent block -> {} (a
+	# pre-L1 meta owns nothing — the honest read); a present key counts as
+	# owned only when truthy, so a hand-edited meta degrades to the legal
+	# purchase set, never a crash.
+	unlocks = {}
+	var stored_unlocks: Dictionary = state.get("unlocks", {})
+	for key in stored_unlocks.keys():
+		if bool(stored_unlocks[key]):
+			unlocks[String(key)] = true
 	return true

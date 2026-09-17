@@ -61,6 +61,7 @@ through `ContentValidator.load_pack(path)`.
 | `art` | `ArtManifest` | set, valid; covers every referenced key | Asset keys → vendored sources + licenses (§3) | T-ARCH-04, T-UI-01 |
 | `starting_grants` | `Dictionary[StringName, int]` | keys ⊆ `resources`; values > 0 (additive, T-DATA-02) | Run-start stipend paid by the `grant_resources` command (M1 finding F1); empty = no stipend, the verb is refused | T-DATA-02, T-SIM-04, T-UI-05 |
 | `copy` | `CopyTable` | set, valid (additive-optional, T-COPY-01) | Event-copy template table — keyed variants for every repeating printed line, read through `CopyDeck` with seeded rotation (docs/voice-bible.md); absent = the code-side floor | T-COPY-01, all printing surfaces |
+| `unlock_tree` | `UnlockTreeDef` | valid when attached (additive-optional, L1) | The legacy unlock tree — purchasable meta-progression nodes fed by the banked legacy points of every run (R5: always-on, Rogue Legacy manor pattern). Absent/null = the pack ships no tree and the whole L1 layer runs empty (the pre-L1-B MVP shape) — no format bump | L1 LegacySystem/Modifiers, the tree UI |
 
 Cross-refs between defs use **`StringName` ids, never file paths or
 ExtResource chains**: `peasant.promotion_paths = [&"worker", &"militia"]`,
@@ -175,6 +176,50 @@ forward-compatible** — append to the registry, no format bump):
 
 Town-hall's example flavor is expressible in one line each:
 garrison ×1.2 (archers on the walls) + timber ×0.85 (timber tax).
+
+### UnlockNodeDef + UnlockEffect + UnlockTreeDef (`content/schema/unlock_*.gd`) — L1, the legacy unlock tree
+
+The persistent meta-progression layer (post-MVP Layer 1; R5's Rogue
+Legacy manor pattern — always-on, fed by every run win or lose). The tree
+attaches to the pack **additively-optional** (`unlock_tree`); the MVP pack
+ships none until L1-B authors one, and its absence is legal everywhere.
+
+| Field | Type | Constraint | Meaning |
+|---|---|---|---|
+| `UnlockNodeDef.id` | `StringName` | non-empty, unique in tree | Stable content id (`RunMeta.unlocks` persists it — ids are the purchase contract) |
+| `UnlockNodeDef.display_name` | `String` | non-empty | Localization-ready name |
+| `UnlockNodeDef.branch` | `StringName` | non-empty | Tree-UI grouping label (R5: 2–4 node families per layer — e.g. economy, people) |
+| `UnlockNodeDef.cost` | `int` | > 0 | Purchase price in banked legacy points (earn rates per docs/balance.md: ~150–260 lp/run) |
+| `UnlockNodeDef.prerequisites` | `Array[StringName]` | resolve to node ids in the SAME tree; the graph is ACYCLIC (validator DFS, the promotion-graph pattern — a cycle is unpurchasable and fails the load) | Node ids that must be owned first |
+| `UnlockNodeDef.effect` | `UnlockEffect` | exactly one per node (the RegimeModifier discipline) | The node's single typed effect |
+| `UnlockEffect.kind` | `StringName` | in the L1 registry (below) | Operator kind |
+| `UnlockEffect.value` | `float` | > 0 | Multiplier value |
+| `UnlockTreeDef.version` | `int` | ≥ 1 | Tree-shape version for humans/tools; ADDITIVE nodes never bump it (node ids are the contract — same rule as §6) |
+| `UnlockTreeDef.nodes` | `Array[UnlockNodeDef]` | non-empty when attached | Every purchasable node |
+
+Effect kind registry (`ContentValidator.LEGACY_EFFECT_KINDS`, mirroring
+`LegacyModifiers.EFFECT_KINDS` — the resolution engine owns the
+vocabulary; additive entries are forward-compatible exactly like the
+regime kinds):
+
+- `recruit_arrival_interval_multiplier` — the WHOLE arrival cadence
+  scales together (normal interval, jitter, the opening-rush ramp; < 1.0
+  = a busier road)
+- `building_cost_multiplier` — construction/upgrade costs (composes with
+  regime cost quirks at the same run-start drain)
+- `training_time_multiplier` — training durations (< 1.0 = faster drills;
+  zero-hour trainings stay zero-hour)
+- `gear_cost_multiplier` — gear recipe payments (floored lines, min 1)
+- `stipend_bonus` — the run-start `grant_resources` stipend (1.25 = +25%)
+
+Validator: `ContentValidator.validate_unlock_tree(tree)` (pure, also
+called by `validate_pack` for an attached tree; error grammar
+`"unlock '<id>': <problem>"` / `"unlock-tree: <problem>"`, wording is API
+— asserted verbatim by `tests/unit/test_legacy_system.gd`). Resolution +
+purchase rules + persistence: `sim/legacy_system.gd` +
+`sim/legacy_modifiers.gd` and docs/sim-engine.md §18. Worked example:
+`content/examples/unlock_tree.tres` (4 nodes, 2 branches, 1 gated edge —
+attached to `pack_example.tres`, validated on the §5 green path).
 
 ### IdentityPools (`content/schema/identity_pools.gd`) — T-SIM-04, T-COPY-01
 
@@ -338,6 +383,7 @@ buildings/farm.tres          food 6/h/worker, timber 15, r=1.08, milestones [10,
 gear/gear_weapon_t1.tres     weapon t1: 5 timber + 10 iron, combat 2
 gear/gear_armor_t1.tres      armor t1: 15 iron, combat 3
 regimes/gilded_crown.tres    garrison ×1.2 + timber ×0.85, inks, crest
+unlock_tree.tres             L1 seeds: 4 nodes, 2 branches, 1 gated edge
 identity_pools.tres          8× first, 8× epithet, 6× tags, 12× recruit
 economy_tunables.tres        R4 seeds (== class defaults)
 art_manifest.tres            10 assets: Kenney/tzunghaor CC0, Armorial

@@ -57,6 +57,7 @@ var _prod_quirk_all_milli := SimFixed.MILLI
 var _prod_quirk_milli: Dictionary = {}  # StringName resource -> int milli
 var _cost_quirk_all_milli := SimFixed.MILLI
 var _cost_quirk_milli: Dictionary = {}  # StringName resource -> int milli
+var _legacy_cost_milli := SimFixed.MILLI  # applied L1 building-cost multiplier (1000 = identity)
 
 
 ## Per-building mutable state. Everything derived from content (def,
@@ -174,7 +175,11 @@ func upgrade_cost(id: StringName) -> Dictionary[StringName, int]:
 	var milestone: int = state.milestone_table[target]
 	for resource in state.def.base_cost:
 		var quirk: int = _cost_quirk_milli.get(resource, _cost_quirk_all_milli)
-		var line: int = int(state.def.base_cost[resource]) * growth * milestone * quirk / 1_000_000_000
+		# Four milli factors (growth x milestone x regime quirk x the L1
+		# legacy cost multiplier), one floored division at the end. Identity
+		# legacy (1000) divides the same rational by 10^9 x 1000 = 10^12 —
+		# the floored result is bit-identical to the three-factor form.
+		var line: int = int(state.def.base_cost[resource]) * growth * milestone * quirk * _legacy_cost_milli / 1_000_000_000_000
 		cost[resource] = maxi(1, line)
 	return cost
 
@@ -335,6 +340,12 @@ func state_hash() -> int:
 	for resource in _cost_quirk_milli:
 		hash_value = _mix(hash_value, String(resource).hash())
 		hash_value = _mix(hash_value, int(_cost_quirk_milli[resource]))
+	# The applied L1 cost multiplier is hashed state when non-identity —
+	# the same verifier discipline as the quirks above (an oracle blind to
+	# it could call a restore that lost the multiplier "identical"); at
+	# identity it is omitted so pre-L1 hashes are byte-identical.
+	if _legacy_cost_milli != SimFixed.MILLI:
+		hash_value = _mix(hash_value, _legacy_cost_milli)
 	for state in _states:
 		hash_value = _mix(hash_value, String(state.def.id).hash())
 		hash_value = _mix(hash_value, state.level)
@@ -358,7 +369,7 @@ func to_dict() -> Dictionary:
 	var cost_milli := {}
 	for resource in _cost_quirk_milli:
 		cost_milli[String(resource)] = int(_cost_quirk_milli[resource])
-	return {
+	var state := {
 		"workers_idle": workers_idle,
 		"buildings": buildings,
 		# Applied regime economy multipliers (T-ARCH-03 verifier fix): a
@@ -372,6 +383,14 @@ func to_dict() -> Dictionary:
 			"cost_milli": cost_milli,
 		},
 	}
+	# The applied L1 building-cost multiplier rides along ONLY when
+	# non-identity (additive-optional; the escalation_garrison reserve's
+	# emit-when-non-null discipline): a no-unlocks engine saves
+	# byte-identically to the pre-L1 build, a discounted one restores its
+	# prices verbatim (no run_start drain re-applies them post-restore).
+	if _legacy_cost_milli != SimFixed.MILLI:
+		state["legacy_cost_milli"] = _legacy_cost_milli
+	return state
 
 
 func from_dict(state: Dictionary) -> void:
@@ -385,6 +404,9 @@ func from_dict(state: Dictionary) -> void:
 		_prod_quirk_milli = _quirk_milli_from_json(quirks.get("prod_milli", {}))
 		_cost_quirk_all_milli = int(quirks.get("cost_all_milli", SimFixed.MILLI))
 		_cost_quirk_milli = _quirk_milli_from_json(quirks.get("cost_milli", {}))
+	# Tolerant read of the applied L1 cost multiplier: absent key = a
+	# pre-L1 (or no-unlocks) save = identity prices.
+	_legacy_cost_milli = int(state.get("legacy_cost_milli", SimFixed.MILLI))
 	for entry in state.get("buildings", []):
 		var restored := _by_id.get(StringName(entry["id"])) as BuildingState
 		if restored == null:
@@ -463,6 +485,17 @@ func _apply_regime(regime: RegimeDef) -> void:
 ## constructed before the run's regime has been drawn.
 func set_regime(p_regime: RegimeDef) -> void:
 	_apply_regime(p_regime)
+
+
+## Public legacy seam (L1, docs/sim-engine.md §18): apply the resolved
+## unlock-tree modifier bundle's building-cost field. RunLifecycleSystem
+## calls this synchronously at the SAME run_start/run_restart drains as
+## set_regime, so purchases land at the next run start. NOT part of
+## reset_run: the legacy multipliers are re-applied by the fold that
+## follows the reset, and a restore reloads them verbatim from the run
+## payload (the regime-quirks discipline).
+func set_legacy_modifiers(mods: LegacyModifiers) -> void:
+	_legacy_cost_milli = SimFixed.MILLI if mods == null else mods.building_cost_milli
 
 
 ## Run-reset seam (T-SIM-04 reset contract, docs/sim-engine.md §12): every

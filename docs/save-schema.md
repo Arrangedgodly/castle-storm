@@ -237,6 +237,7 @@ stipend_run
 | `outcome` | int | 0 none / 1 victory / 2 defeat / 3 aborted |
 | `last_score` | int | score banked by the last ended run (0 while running) |
 | `stipend_run` | int | run_index that already took its starting stipend (0 = none). Serialized + hashed so a restore cannot double-pay the `grant_resources` stipend |
+| `legacy_stipend_milli` | int | OPTIONAL (L1, emit-when-non-identity — absent from every no-unlocks save, hence not in the `save-keys` block): the run's APPLIED legacy stipend multiplier in milli (1000 = identity). Resolved from the purchased unlock set at the fold that opened this run; hashed + restored verbatim (no post-restore drain re-resolves it). Absent key = a pre-L1 (or no-unlocks) save = the exact content stipend |
 
 The meta bank and chronicle are DELIBERATELY ABSENT from this sub-dict
 (rule §3.6): they live only in the meta domain (§5).
@@ -258,6 +259,7 @@ units
 | `arrival_countdown_milli` | int | milli-ticks until the next recruit offer; −1 = not yet scheduled (the first tick schedules it — a restored −1 redraws, preserving the boot shape) |
 | `offers` | Array[int] | recruit uids waiting at the gate, arrival order (never expire) |
 | `units` | Array[Dictionary] | every tracked unit in arrival order — the roster |
+| `legacy_modifiers` | Dictionary | OPTIONAL (L1, emit-when-non-identity — absent from every no-unlocks save): the APPLIED unlock-tree multipliers `{arrival_milli, training_milli, gear_cost_milli}` (1000 = identity each). The CONTENT interval/jitter/rush/duration tables are re-derived at boot; these scale them at use (exact int milli math), so a modulated save restores its cadence/timers/prices verbatim — the `regime_quirks` discipline for the units side. Mixed into `state_hash()` when non-identity |
 
 #### `systems.units.units[*]`
 
@@ -296,6 +298,7 @@ regime_quirks
 | `workers_idle` | int | idle worker pool count (assigned workers are counted per building) |
 | `buildings` | Array[Dictionary] | one entry per pack building, pack order |
 | `regime_quirks` | Dictionary | the APPLIED regime economy multipliers — serialized state since the T-ARCH-03 verifier fix (a save made under a quirked regime resumes under it; `from_dict` has no run_start drain to re-apply them). A dict WITHOUT the key is a pre-fix save and keeps the constructed regime — the documented back-compat fallback |
+| `legacy_cost_milli` | int | OPTIONAL (L1, emit-when-non-identity — absent from every no-unlocks save): the APPLIED legacy building-cost multiplier in milli (1000 = identity), a fourth milli factor in the upgrade-cost curve alongside growth × milestone × regime quirk. Applied at the same run_start/restart drain as the regime quirk; hashed + restored verbatim when non-identity |
 
 #### `systems.production.buildings[*]`
 
@@ -338,17 +341,19 @@ chronicle
 last_seen_epoch
 first_session
 preferences
+unlocks
 ```
 
 | Field | Type | Meaning / restore notes |
 |---|---|---|
 | `format_version` | int | `RunMeta.META_FORMAT_VERSION` (axis 3). Refused on mismatch |
-| `legacy_points` | int | the banked-points reserve across every recorded run — failure banks FULL progress, so every ended run accrues (win, loss, abort, abandoned-on-restart). No spending exists at MVP (L1 unlock tree is post-MVP by the layer gate) |
+| `legacy_points` | int | the banked-points reserve across every recorded run — failure banks FULL progress, so every ended run accrues (win, loss, abort, abandoned-on-restart). Spending exists since L1: `LegacySystem.purchase` decrements it (the only writer besides banking) and records the purchase in `unlocks` below |
 | `runs_recorded` | int | the MONOTONIC run number the chronicle displays — unlike engine-local `run_index` it never resets, surviving engine re-inits |
 | `chronicle` | Array[Dictionary] | append-only run records, oldest first. One small entry per completed run; unbounded by design |
 | `last_seen_epoch` | int | UTC epoch SECONDS of the offline catch-up anchor (T-SIM-07, docs/catch-up.md): the timestamp the next foreground subtracts `now` from. META domain deliberately — away time crosses run boundaries, so the anchor must outlive any engine. `0` is the FIRST-LAUNCH SENTINEL: never marked → no catch-up fires off it. Additive-optional with a tolerant reader (absent key reads as 0): a pre-T-SIM-07 meta upgrades to first-launch semantics — exactly right — with no migration |
 | `first_session` | Dictionary | the once-only onboarding flags (T-UI-10): `seen` (this install has had its first session — a returning player is never nudged), the five beat flags (`gate`/`assign`/`build`/`trickle`/`train` — each printed cue fires at most once, ever), and `done` (arc complete or the run ended). META domain because the arc must survive engine rebuilds and process restarts; the flag flip is persisted the moment it prints. Additive-optional with a tolerant reader (absent key reads as `{}` — pre-T-UI-10 metas upgrade to nudge-free, which is right) |
 | `preferences` | Dictionary | the press-room card's persisted player settings (finishing refinement #5): `type_scale` (float, clamped to the TypeScale range 1.0–1.3 on write AND read — the boot seam applies it before any chrome bakes sizes) and `reduced_motion` (bool, mirrored into `MotionProfile.forced`). A key appears only once the player sets it; until then the project-settings defaults rule. META domain deliberately: preferences must survive restarts and engine rebuilds, and a run-save restore must never fork them; the card saves the meta file the moment a step changes. Additive-optional with a tolerant reader (absent block reads as `{}` — pre-feature metas upgrade to project defaults, no migration) |
+| `unlocks` | Dictionary | the L1 legacy unlock tree purchases: purchased node id (String) → `true`, insertion order = purchase order (`LegacySystem.purchase` is the only writer; it decrements `legacy_points` in the same write and the host persists the meta domain the moment a purchase lands). META domain by the same rule as the bank: unlocks are meta-progression banked from every run, must survive restarts/engine re-inits, and must never be forkable from a run save. The TREE itself is boot-injected content (`ContentPack.unlock_tree`) and never serialized; an owned id that left the tree is kept (historical purchase) while contributing no effect. Additive-optional with a tolerant reader (absent key reads as `{}` — a pre-L1 meta owns nothing, which is right; a present-but-falsy value is filtered on read) |
 
 ### 5.1 `chronicle[*]` — one entry per ended run
 
@@ -548,7 +553,7 @@ exists for rewrites, not for growth.
 
 | Change | Bump? | Mechanism | Shipped precedent |
 |---|---|---|---|
-| Add an optional payload key; readers use `.get()` defaults (absent key = documented fallback) | **no** | nothing — old files load with the fallback, new files load everywhere | `regime_quirks` (§4.6), `stipend_run` (§4.4); `escalation_garrison` when L2 lands (§6) |
+| Add an optional payload key; readers use `.get()` defaults (absent key = documented fallback) | **no** | nothing — old files load with the fallback, new files load everywhere | `regime_quirks` (§4.6), `stipend_run` (§4.4), `unlocks` + the three L1 emit-when-non-identity modifier keys (§4.4/§4.5/§4.6/§5); `escalation_garrison` when L2 lands (§6) |
 | Add an envelope field | **no** | envelope readers use `.get()` | — |
 | Change `state_hash()` composition (mix more state) | **no** (disk untouched) | recorded hash VALUES migrate; every reproducibility assertion stays twin-based, never absolute-hash-pinned | the quirks-hash fix (T-ARCH-03 re-dispatch) |
 | Rename / move / retype / remove an existing payload field | **envelope `schema_version` + registered migration** (and the payload's own `format_version` when the run/meta payload's shape changed — §7's interlock) | migration rewrites old files on load | none yet — §7 is the template for the first one |

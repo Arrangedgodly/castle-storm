@@ -7,7 +7,10 @@
 ## contract in docs/sim-engine.md §11. Determinism rules apply in full:
 ##   - content floats (training hours, arrival interval/jitter, the opening
 ##     rush ramp) cross ONE boundary — `SimFixed.milli_from_float` at
-##     construction; after that every timer is integer math in MILLI-TICKS
+##     construction; after that every timer is integer math in MILLI-TICKS.
+##     The L1 legacy multipliers (docs/sim-engine.md §18) scale the derived
+##     values at USE through exact int milli math — identity (1000)
+##     reproduces the content values bit-for-bit
 ##   - the ONLY RNG draws are the arrival-interval jitters, drawn inside
 ##     `on_tick` (the sanctioned site) — identical run seeds produce
 ##     identical arrival sequences, and `rng.state` is hashed by the engine.
@@ -66,10 +69,13 @@ var arrivals_total := 0
 var next_uid := 1
 
 var _base_unit: StringName = &""  # def that arrives (peasant)
-var _interval_milli := 0  # arrival interval in milli-ticks
-var _jitter_milli := 0  # +/- jitter in milli-ticks (0 = no RNG draws)
+var _interval_milli := 0  # arrival interval in milli-ticks (CONTENT base; legacy scales at use)
+var _jitter_milli := 0  # +/- jitter in milli-ticks (0 = no RNG draws; legacy scales at use)
 var _early_intervals_milli: Array[int] = []  # opening rush (T-SIM-08); empty = none
 var _gate_capacity := 0  # max concurrent offers; 0 = uncapped (T-SIM-08)
+var _legacy_arrival_milli := SimFixed.MILLI  # applied L1 arrival-cadence multiplier
+var _legacy_training_milli := SimFixed.MILLI  # applied L1 training-duration multiplier
+var _legacy_gear_cost_milli := SimFixed.MILLI  # applied L1 gear-recipe multiplier
 var _arrival_countdown_milli := -1  # -1 = not yet scheduled (first tick schedules)
 var _units: Array[UnitState] = []
 var _by_uid: Dictionary = {}  # int uid -> UnitState
@@ -78,8 +84,7 @@ var _training: Array[UnitState] = []  # units with a running training timer
 var _counts: Dictionary = {}  # StringName def id -> live unit count
 var _units_by_id: Dictionary = {}  # StringName -> UnitDef
 var _gear_by_id: Dictionary = {}  # StringName -> GearDef
-var _duration_milli: Dictionary = {}  # StringName def id -> training duration in milli-ticks
-var _quarter_milli: Dictionary = {}  # StringName def id -> Array[int] 25/50/75% thresholds
+var _duration_milli: Dictionary = {}  # StringName def id -> CONTENT-base training duration in milli-ticks
 var _army_defs: Dictionary = {}  # StringName def id -> true for army-roster defs
 
 
@@ -136,12 +141,6 @@ func _init(
 	for id in _units_by_id.keys():
 		var def := _units_by_id[id] as UnitDef
 		_duration_milli[id] = SimFixed.milli_from_float(def.training_time_hours) * SimEngine.TICKS_PER_SIM_HOUR
-		var quarters: Array[int] = [
-			int(_duration_milli[id]) / 4,
-			int(_duration_milli[id]) / 2,
-			int(_duration_milli[id]) * 3 / 4,
-		]
-		_quarter_milli[id] = quarters
 		# Army roster rule (data-driven): terminal combat units — combat
 		# power contributes AND no further promotion path. Knight/archer
 		# qualify; militia/trainee still have paths; workers cannot fight.
@@ -230,9 +229,11 @@ func training_progress_milli(uid: int) -> int:
 	return 0 if unit == null else unit.progress_milli
 
 
-## Training duration in milli-ticks for a def id (0 when unknown).
+## Training duration in milli-ticks for a def id (0 when unknown). The
+## EFFECTIVE duration: the content base scaled by the applied L1 training
+## multiplier (identity returns the exact content value).
 func training_duration_milli(def_id: StringName) -> int:
-	return int(_duration_milli.get(def_id, 0))
+	return _effective_duration_milli(def_id)
 
 
 ## True while the unit finished training and is held awaiting gear + the
@@ -415,19 +416,30 @@ func on_tick(engine: SimEngine) -> void:
 			_spawn_offer(engine)
 			_arrival_countdown_milli = _next_interval_milli(engine)
 	# Training timers: one milli-tick per tick, quarter progress events,
-	# completion when the target def's duration is reached.
+	# completion when the target def's EFFECTIVE duration is reached (the
+	# content base scaled by the applied L1 training multiplier — identity
+	# reproduces the precomputed base quarters bit-for-bit).
 	for i in range(_training.size() - 1, -1, -1):
 		var unit := _training[i]
 		var before := unit.progress_milli
 		unit.progress_milli += SimFixed.MILLI
-		var quarters: Array[int] = _quarter_milli[unit.target]
-		for q in range(3):
-			var threshold: int = quarters[q]
-			if before < threshold and unit.progress_milli >= threshold:
-				engine.events.record(
-					engine.tick_count, &"training_progress", unit.target, unit.uid, (q + 1) * 250
-				)
-		if unit.progress_milli >= int(_duration_milli[unit.target]):
+		var duration := _effective_duration_milli(unit.target)
+		var quarter := duration / 4
+		var half := duration / 2
+		var three_quarters := duration * 3 / 4
+		if before < quarter and unit.progress_milli >= quarter:
+			engine.events.record(
+				engine.tick_count, &"training_progress", unit.target, unit.uid, 250
+			)
+		if before < half and unit.progress_milli >= half:
+			engine.events.record(
+				engine.tick_count, &"training_progress", unit.target, unit.uid, 500
+			)
+		if before < three_quarters and unit.progress_milli >= three_quarters:
+			engine.events.record(
+				engine.tick_count, &"training_progress", unit.target, unit.uid, 750
+			)
+		if unit.progress_milli >= duration:
 			_training.remove_at(i)
 			_complete_training(engine, unit)
 
@@ -510,7 +522,7 @@ func _handle_start_training(engine: SimEngine, command: SimCommand) -> void:
 		return
 	unit.target = target.id
 	unit.progress_milli = 0
-	var duration := int(_duration_milli[target.id])
+	var duration := _effective_duration_milli(target.id)
 	engine.events.record(
 		engine.tick_count, &"training_started", target.id, unit.uid, duration
 	)
@@ -539,12 +551,16 @@ func _handle_equip_gear(engine: SimEngine, command: SimCommand) -> void:
 		if equipped != null and gear.tier <= equipped.tier:
 			_deny(engine, command, REASON_SLOT_OCCUPIED)
 			return
+	# The L1 gear-cost multiplier composes the effective recipe lines (one
+	# floored division, min 1 per line — identity pays the exact content
+	# recipe, so pre-L1 behavior is bit-identical).
 	for resource in gear.recipe:
-		if engine.get_resource(resource) < int(gear.recipe[resource]):
+		var price := _gear_price_milli(resource, gear)
+		if engine.get_resource(resource) < price:
 			_deny(engine, command, REASON_UNAFFORDABLE)
 			return
 	for resource in gear.recipe:
-		engine.add_resource(resource, -int(gear.recipe[resource]))
+		engine.add_resource(resource, -_gear_price_milli(resource, gear))
 	unit.gear[gear.slot] = gear.id
 	engine.events.record(engine.tick_count, &"gear_equipped", gear.id, unit.uid, gear.tier)
 
@@ -577,6 +593,17 @@ func state_hash() -> int:
 	hash_value = _mix(hash_value, next_uid)
 	hash_value = _mix(hash_value, arrivals_total)
 	hash_value = _mix(hash_value, _arrival_countdown_milli)
+	# The APPLIED L1 multipliers are hashed state when non-identity (the
+	# T-ARCH-03 verifier discipline: an oracle blind to them could call a
+	# restore that lost a discount "identical" and diverge on the next
+	# arrival/timer/kit); at identity they are omitted so pre-L1 hashes are
+	# byte-identical.
+	if _legacy_arrival_milli != SimFixed.MILLI:
+		hash_value = _mix(hash_value, _legacy_arrival_milli)
+	if _legacy_training_milli != SimFixed.MILLI:
+		hash_value = _mix(hash_value, _legacy_training_milli)
+	if _legacy_gear_cost_milli != SimFixed.MILLI:
+		hash_value = _mix(hash_value, _legacy_gear_cost_milli)
 	for uid in _offers:
 		hash_value = _mix(hash_value, uid)
 	for unit in _units:
@@ -609,13 +636,28 @@ func to_dict() -> Dictionary:
 			"awaiting": unit.awaiting_promotion,
 			"gear": gear_state,
 		})
-	return {
+	var state := {
 		"next_uid": next_uid,
 		"arrivals_total": arrivals_total,
 		"arrival_countdown_milli": _arrival_countdown_milli,
 		"offers": offers,
 		"units": units,
 	}
+	# The applied L1 cadence/training/gear multipliers ride along ONLY when
+	# non-identity (additive-optional; the escalation_garrison reserve's
+	# emit-when-non-null discipline): a no-unlocks engine saves
+	# byte-identically to the pre-L1 build, a modulated one resumes its
+	# timers/prices verbatim (from_dict runs with no run_start drain to
+	# re-resolve them, exactly like production's regime_quirks).
+	if _legacy_arrival_milli != SimFixed.MILLI \
+			or _legacy_training_milli != SimFixed.MILLI \
+			or _legacy_gear_cost_milli != SimFixed.MILLI:
+		state["legacy_modifiers"] = {
+			"arrival_milli": _legacy_arrival_milli,
+			"training_milli": _legacy_training_milli,
+			"gear_cost_milli": _legacy_gear_cost_milli,
+		}
+	return state
 
 
 func from_dict(state: Dictionary) -> void:
@@ -627,6 +669,12 @@ func from_dict(state: Dictionary) -> void:
 	next_uid = int(state.get("next_uid", 1))
 	arrivals_total = int(state.get("arrivals_total", 0))
 	_arrival_countdown_milli = int(state.get("arrival_countdown_milli", -1))
+	# Tolerant read of the applied L1 multipliers: absent key = a pre-L1
+	# (or no-unlocks) save = identity cadence/timers/prices.
+	var legacy: Dictionary = state.get("legacy_modifiers", {})
+	_legacy_arrival_milli = int(legacy.get("arrival_milli", SimFixed.MILLI))
+	_legacy_training_milli = int(legacy.get("training_milli", SimFixed.MILLI))
+	_legacy_gear_cost_milli = int(legacy.get("gear_cost_milli", SimFixed.MILLI))
 	for uid in state.get("offers", []):
 		_offers.append(int(uid))
 	for entry in state.get("units", []):
@@ -674,11 +722,24 @@ func from_dict(state: Dictionary) -> void:
 ## Interval for the run's NEXT arrival (milli-ticks): the opening-rush entry
 ## when the run's arrival counter is still inside the rush (metronome — no
 ## RNG draw), otherwise the jittered normal cadence. Zero jitter draws
-## nothing — a metronome cadence leaves rng.state untouched.
+## nothing — a metronome cadence leaves rng.state untouched. Both paths
+## carry the applied L1 arrival multiplier (the whole cadence scales
+## together, rush cap included; identity reproduces the content values
+## exactly).
 func _next_interval_milli(engine: SimEngine) -> int:
 	if arrivals_total < _early_intervals_milli.size():
-		return _early_intervals_milli[arrivals_total]
+		return mini(
+			_scaled_interval_milli(_interval_milli),
+			_scaled_interval_milli(_early_intervals_milli[arrivals_total])
+		)
 	return _draw_interval_milli(engine)
+
+
+## One content milli-ticks value scaled by the applied L1 arrival
+## multiplier (exact int math; floored at one milli-tick so a cadence can
+## never reach zero — identity returns the value unchanged).
+func _scaled_interval_milli(milli_ticks: int) -> int:
+	return maxi(SimFixed.MILLI, milli_ticks * _legacy_arrival_milli / SimFixed.MILLI)
 
 
 ## True while the gate holds its full capacity of concurrent offers (the
@@ -689,12 +750,16 @@ func _gate_full() -> bool:
 
 ## Draw the next arrival interval from the engine RNG (milli-ticks). Zero
 ## jitter draws nothing — a metronome cadence leaves rng.state untouched.
-## Normal cadence only; the opening rush never calls this.
+## Normal cadence only; the opening rush never calls this. Interval and
+## jitter both carry the applied L1 arrival multiplier, so the drawn range
+## scales with the cadence (identity: the exact content draw).
 func _draw_interval_milli(engine: SimEngine) -> int:
-	if _jitter_milli <= 0:
-		return _interval_milli
-	var drawn := engine.rng.randi_range(-_jitter_milli, _jitter_milli)
-	return maxi(SimFixed.MILLI, _interval_milli + drawn)
+	var interval := _scaled_interval_milli(_interval_milli)
+	var jitter := maxi(0, _jitter_milli * _legacy_arrival_milli / SimFixed.MILLI)
+	if jitter <= 0:
+		return interval
+	var drawn := engine.rng.randi_range(-jitter, jitter)
+	return maxi(SimFixed.MILLI, interval + drawn)
 
 
 func _spawn_offer(engine: SimEngine) -> void:
@@ -752,12 +817,27 @@ func _slot_required(unit: UnitState, slot: StringName) -> bool:
 	return false
 
 
+## Effective training duration for a def id (milli-ticks): the CONTENT base
+## scaled by the applied L1 training multiplier (one exact int division;
+## zero-hour stays exactly zero; identity returns the content value).
+func _effective_duration_milli(def_id: StringName) -> int:
+	return int(_duration_milli.get(def_id, 0)) * _legacy_training_milli / SimFixed.MILLI
+
+
+## One gear recipe line under the applied L1 gear-cost multiplier (floored,
+## min 1 — a kit can never go free; identity pays the content price).
+func _gear_price_milli(resource: StringName, gear: GearDef) -> int:
+	return maxi(1, int(gear.recipe[resource]) * _legacy_gear_cost_milli / SimFixed.MILLI)
+
+
 ## Run-reset seam (T-SIM-04 reset contract, docs/sim-engine.md §12): the
 ## roster, the gate and the arrival cadence back to boot state. The next
 ## tick re-schedules the first arrival with a fresh RNG draw — the new
 ## run's stream, identical in shape to a freshly constructed engine. The
 ## opening rush (T-SIM-08) re-opens too: it is keyed on the run's own
 ## arrival counter, which this reset zeroes — every restart starts eager.
+## The L1 legacy multipliers are NOT reset here: they are engine-session
+## config, re-applied by the run system's fold at this same drain.
 ## Called synchronously by the run system at the run_restart drain.
 func reset_run(_p_regime: RegimeDef = null) -> void:
 	_units.clear()
@@ -768,6 +848,24 @@ func reset_run(_p_regime: RegimeDef = null) -> void:
 	next_uid = 1
 	arrivals_total = 0
 	_arrival_countdown_milli = -1
+
+
+## Public legacy seam (L1, docs/sim-engine.md §18): apply the resolved
+## unlock-tree bundle's arrival/training/gear fields. RunLifecycleSystem
+## calls this synchronously at the run_start/run_restart drains (the same
+## drain-time pattern as production's set_regime), so purchases land at the
+## next run start. Only ever called with the roster empty of in-flight
+## training (the fold follows the reset), so rescaling durations mid-timer
+## cannot happen by construction.
+func set_legacy_modifiers(mods: LegacyModifiers) -> void:
+	if mods == null:
+		_legacy_arrival_milli = SimFixed.MILLI
+		_legacy_training_milli = SimFixed.MILLI
+		_legacy_gear_cost_milli = SimFixed.MILLI
+		return
+	_legacy_arrival_milli = mods.recruit_arrival_interval_milli
+	_legacy_training_milli = mods.training_time_milli
+	_legacy_gear_cost_milli = mods.gear_cost_milli
 
 
 ## Scatter seam (T-SIM-05 crackdown): remove up to `count` UNASSIGNED

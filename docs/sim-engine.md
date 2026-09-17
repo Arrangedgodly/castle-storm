@@ -8,6 +8,7 @@ saving, and wall-clock drive are consumers.
   `sim/sim_event_log.gd` + `sim/sim_event.gd` (event stream),
   `sim/sim_command.gd` (command), `sim/sim_fixed.gd` (fixed-point math),
   `sim/run_meta.gd` (T-SIM-04 meta bank, §12),
+  `sim/legacy_modifiers.gd` + `sim/legacy_system.gd` (L1 unlock tree, §18),
   `sim/systems/heartbeat_system.gd` (placeholder system),
   `sim/systems/production_system.gd` (T-SIM-02 production, §10),
   `sim/systems/unit_lifecycle_system.gd` (T-SIM-03 units, §11),
@@ -18,6 +19,8 @@ saving, and wall-clock drive are consumers.
   `tests/unit/test_unit_lifecycle_system.gd`,
   `tests/unit/test_run_lifecycle_system.gd`,
   `tests/unit/test_suspicion_system.gd`,
+  `tests/unit/test_legacy_system.gd` + `tests/unit/test_legacy_run_effects.gd`
+  (L1, §18),
   acceptance marathons `tests/acceptance/suites/marathon_sim_1000h.gd`,
   `tests/acceptance/suites/marathon_production_1000h.gd`,
   `tests/acceptance/suites/marathon_units_1000h.gd`,
@@ -1051,3 +1054,78 @@ runs) and were re-recorded once: engine-only 3567881493 (unchanged),
 production 306376767, units 2731020335, run_thin 659828436,
 gate_m1 145325186, assault_storm 1090049983,
 economy_stability 500h 3692574814 / final 460399411.
+
+## 18. The legacy unlock tree (L1)
+
+The post-MVP Layer 1 — the persistent meta-progression tree (R5: the
+Rogue Legacy manor pattern — always-on, fed by EVERY run win or lose;
+docs/ultron/research/r5-revolution-idol-cadence.md). Three pieces:
+
+1. **Content** (content-schema §4 UnlockNodeDef/UnlockEffect/UnlockTreeDef,
+   `ContentValidator.validate_unlock_tree` — the loud gate: unique ids,
+   positive costs, resolving prerequisites, an ACYCLIC graph, one
+   known-kind positive effect per node). The tree attaches to the pack
+   additively-optional (`ContentPack.unlock_tree`); the MVP pack pre-L1-B
+   ships none and the whole layer runs empty.
+2. **The service** (`sim/legacy_system.gd`, `LegacySystem`) — NOT a
+   per-tick SimSystem: meta-progression is meta-domain, like RunMeta and
+   CatchUpService. A plain RefCounted host service owning the purchase
+   rules over one tree + one RunMeta. The persistence is
+   `RunMeta.unlocks` (node id -> true, purchase order; meta save domain,
+   additive-optional with a tolerant reader — pre-L1 metas read as owning
+   nothing) and `RunMeta.legacy_points` (the bank; `purchase` decrements
+   it, the only spending writer). Purchases validate affordability +
+   prerequisites + not-already-owned and refuse LOUDLY (push_error +
+   false, zero mutation); `GameHost.unlock_purchase(node_id)` is the host
+   command and persists the meta domain the moment a purchase lands.
+   Unlocks survive every restart by design — the reset contract (§12) has
+   no legacy member, and a run-save restore can never fork them.
+3. **The resolution** (`sim/legacy_modifiers.gd`, `LegacyModifiers`) —
+   what the owned set MEANS to a run: one pure bundle of int-milli
+   multipliers, compounded per node through exact integer chains (order-
+   independent), over the L1 effect vocabulary:
+   `recruit_arrival_interval_multiplier` (the whole arrival cadence —
+   normal interval, jitter AND the opening-rush ramp — scales together),
+   `building_cost_multiplier` (a fourth milli factor in the §10 upgrade
+   curve), `training_time_multiplier` (§11 durations; zero-hour stays
+   zero-hour), `gear_cost_multiplier` (§11 recipe lines, floored, min 1),
+   `stipend_bonus` (the `grant_resources` verb, floored, min 1).
+
+### Application — the regime-quirk pattern, one drain later
+
+`RunLifecycleSystem` (constructed with the optional `p_legacy` provider —
+`GameHost` and any host wires it) resolves ONE bundle at EVERY
+`run_start`/`run_restart` drain and applies it synchronously, exactly the
+way the regime economy quirk lands (`set_regime`): production and units
+take `set_legacy_modifiers(bundle)` at the same drain, and the run system
+applies the stipend field inside `grant_resources`. Consequences, all
+deliberate:
+
+- **Purchases land at the NEXT run start, never mid-run** — the tree is a
+  between-runs verb; the reset contract's clean-tick property is intact.
+- **Hash-visible, round-trip exact** (the T-ARCH-03 lesson): each
+  consumer carries its APPLIED multipliers as serialized + hashed state —
+  `run.legacy_stipend_milli`, `production.legacy_cost_milli`,
+  `units.legacy_modifiers` — emitted ONLY when non-identity (the
+  escalation_garrison emit-when-non-null discipline). An engine with NO
+  unlocks serializes nothing and hashes byte-identically to the pre-L1
+  build (unit-proven: same seed, provider vs no provider -> identical
+  `to_dict()` and `state_hash()`), which is why every existing suite's
+  recorded digest survives this layer unperturbed. A save made under
+  active modifiers restores them verbatim and continues in lockstep.
+- **Determinism**: the modifiers are a pure function of (tree, owned
+  set) resolved at the drain and then baked — same seed + same unlocks ->
+  identical world; same seed + different unlocks -> different world (the
+  oracle sees the bundle even before a tick diverges). This deliberately
+  narrows §12's "engines with the same seed hash identically regardless
+  of carried-over meta": the BANK still cannot perturb a run, but unlock
+  EFFECTS can — they are engine-visible economy config, like regime
+  quirks, not bank values.
+- **Identity is bit-exact**: every seam scales by exact integer milli
+  math where 1000 = identity reproduces the content value to the digit
+  (cost curves, timers, cadence, recipes, stipend) — the zero-impact
+  proof above is mathematical, not incidental.
+
+Measured: the two L1 suites (~60 cases) add ~0.4s to `make test`; every
+sibling marathon digest unchanged.
+

@@ -60,3 +60,12 @@ extends Resource
 ## with seeded rotation (docs/voice-bible.md). Absent/null = every surface
 ## falls back to CopyDeck.DEFAULTS — one voice, no format bump.
 @export var copy: CopyTable
+
+## The legacy unlock tree (L1, additive-optional): purchasable meta-
+## progression nodes fed by the banked legacy points of every run (R5:
+## always-on, Rogue Legacy manor pattern). Absent/null = the pack ships no
+## tree — the LegacySystem runs empty (no purchases possible, modifiers
+## identity), which is the pre-L1-B MVP shape and needs no format bump
+## (docs/content-schema.md §6). Validated by ContentValidator only when
+## attached; saves carry purchased node ids, never the tree.
+@export var unlock_tree: UnlockTreeDef

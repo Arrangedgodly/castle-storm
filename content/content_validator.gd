@@ -20,6 +20,11 @@ const SUPPORTED_FORMAT_VERSIONS: Array[int] = [1]
 const COMBAT_MODIFIER_KINDS: Array[StringName] = [&"garrison_multiplier", &"army_score_multiplier"]
 const ECONOMY_MODIFIER_KINDS: Array[StringName] = [&"production_multiplier", &"building_cost_multiplier"]
 
+## Legacy unlock effect kind registry (L1) — mirrors the resolution engine's
+## own vocabulary (sim/legacy_modifiers.gd), the single source; additive
+## entries are forward-compatible exactly like the regime kinds.
+const LEGACY_EFFECT_KINDS: Array[StringName] = LegacyModifiers.EFFECT_KINDS
+
 ## Identity variety floors — T-SIM-04 acceptance needs 100 visibly varied
 ## generated leaders; these floors keep combinatorial space honest.
 const MIN_LEADER_FIRST_NAMES := 6
@@ -72,6 +77,10 @@ static func validate_pack(pack: ContentPack) -> Array[String]:
 	_check_identity_pools(pack.identity, errors)
 	_check_copy_table(pack.copy, errors)
 	_check_tunables(pack.tunables, errors)
+	# L1 unlock tree: additive-optional on the pack — validated only when
+	# attached (absent = the pack ships no tree, the pre-L1-B MVP shape).
+	if pack.unlock_tree != null:
+		errors.append_array(validate_unlock_tree(pack.unlock_tree))
 	return errors
 
 
@@ -459,6 +468,95 @@ static func _check_name_pool(errors: Array[String], label: String, pool: Array, 
 			_err(errors, "identity: %s duplicate '%s'" % [label, key])
 		seen[key] = true
 
+
+# --- legacy unlock tree (L1) ---------------------------------------------------
+
+## Single-scope validation of one unlock tree (the pack calls this for its
+## attached tree; standalone so L1-B authoring and tests can validate a
+## draft without assembling a pack). Error grammar: `"unlock '<id>':
+## <problem>"` per node, `"unlock-tree: <problem>"` tree-scoped. Checks:
+## version >= 1, non-empty nodes, unique non-empty ids, non-empty display
+## names + branch labels, positive costs, prerequisites that resolve
+## within the tree, an ACYCLIC prerequisite graph (DFS, the promotion-graph
+## pattern — a cycle would be unpurchasable), and one known-kind positive
+## effect per node.
+static func validate_unlock_tree(tree: UnlockTreeDef) -> Array[String]:
+	var errors: Array[String] = []
+	if tree == null:
+		errors.append("unlock-tree: tree resource is null")
+		return errors
+	if tree.version < 1:
+		errors.append("unlock-tree: version must be >= 1 (got %d)" % tree.version)
+	if tree.nodes.is_empty():
+		errors.append("unlock-tree: nodes must not be empty (a tree with no nodes is content churn, not content)")
+		return errors
+	var ids: Array[String] = []
+	for node: UnlockNodeDef in tree.nodes:
+		if node == null:
+			errors.append("unlock <null>: node entry must not be null")
+			continue
+		ids.append(String(node.id))
+		if node.id == &"":
+			errors.append("unlock '': id must not be empty")
+		if node.display_name.is_empty():
+			errors.append("unlock '%s': display_name must not be empty" % node.id)
+		if node.branch == &"":
+			errors.append("unlock '%s': branch must not be empty (the tree UI's grouping label)" % node.id)
+		if node.cost <= 0:
+			errors.append("unlock '%s': cost must be > 0 legacy points (got %d)" % [node.id, node.cost])
+		if node.effect == null:
+			errors.append("unlock '%s': effect must be set (exactly one per node)" % node.id)
+		else:
+			if not LEGACY_EFFECT_KINDS.has(node.effect.kind):
+				var kind_names := ", ".join(PackedStringArray(LEGACY_EFFECT_KINDS.map(func(k: StringName) -> String: return String(k))))
+				errors.append("unlock '%s': effect kind '%s' not recognized (expected one of: %s)" % [node.id, node.effect.kind, kind_names])
+			if node.effect.value <= 0.0:
+				errors.append("unlock '%s': effect value must be > 0 (got %s)" % [node.id, node.effect.value])
+	_check_unique(errors, "unlock-tree: duplicate node id '%s'", ids)
+	# Cross-checks that need the full id set: prerequisite resolution, then
+	# the acyclicity proof (an unpurchasable cycle must fail the load).
+	var id_set := {}
+	for id in ids:
+		id_set[id] = true
+	for node: UnlockNodeDef in tree.nodes:
+		if node == null:
+			continue
+		for prerequisite in node.prerequisites:
+			if prerequisite == &"":
+				errors.append("unlock '%s': prerequisite id must not be empty" % node.id)
+			elif not id_set.has(String(prerequisite)):
+				errors.append("unlock '%s': prerequisite '%s' does not match any node in tree" % [node.id, prerequisite])
+	_check_prerequisite_graph(tree.nodes, errors)
+	return errors
+
+
+static func _check_prerequisite_graph(nodes: Array[UnlockNodeDef], errors: Array[String]) -> void:
+	var by_id := {}
+	for node: UnlockNodeDef in nodes:
+		if node != null and node.id != &"":
+			by_id[node.id] = node
+	var state := {}  # id -> 1 visiting, 2 done
+	var stack: Array[String] = []
+	for node: UnlockNodeDef in nodes:
+		if node != null:
+			_visit_prerequisites(node, by_id, state, stack, errors)
+
+
+static func _visit_prerequisites(node: UnlockNodeDef, by_id: Dictionary, state: Dictionary, stack: Array[String], errors: Array[String]) -> void:
+	if state.get(node.id) == 2:
+		return
+	if state.get(node.id) == 1:
+		var cycle: Array[String] = stack.slice(stack.find(String(node.id)))
+		cycle.append(String(node.id))
+		errors.append("unlock '%s': prerequisite cycle detected: %s" % [node.id, " -> ".join(cycle)])
+		return
+	state[node.id] = 1
+	stack.push_back(String(node.id))
+	for prerequisite in node.prerequisites:
+		if by_id.has(prerequisite):
+			_visit_prerequisites(by_id[prerequisite], by_id, state, stack, errors)
+	state[node.id] = 2
+	stack.pop_back()
 
 # --- tunables ----------------------------------------------------------------
 

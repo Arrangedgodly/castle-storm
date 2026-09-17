@@ -63,6 +63,13 @@ var engine: SimEngine
 ## session, shared by every engine this host builds.
 var meta: RunMeta
 
+## The legacy unlock tree service (L1) — meta-domain like RunMeta: owns
+## the purchase rules over the pack's tree and THIS meta's bank/owned set.
+## Wired into every engine the host builds (RunLifecycleSystem re-resolves
+## the modifier bundle at each run_start/restart drain), so a purchase
+## lands at the next run start; `unlock_purchase()` is the host command.
+var legacy: LegacySystem
+
 ## The foreground-boundary service (timestamps injected by callers).
 var catch_up: CatchUpService
 
@@ -109,6 +116,7 @@ var _ticks_since_autosave := 0
 func _init(p_run_seed: int, p_save_root: String = "") -> void:
 	run_seed = p_run_seed
 	meta = RunMeta.new()
+	legacy = LegacySystem.new(Inks.pack().unlock_tree, meta)
 	catch_up = CatchUpService.new(Inks.pack().tunables)
 	save_manager = SaveManager.new(p_save_root if not p_save_root.is_empty() else "user://saves")
 	engine = build_engine()
@@ -124,7 +132,7 @@ func build_engine() -> SimEngine:
 	var pack := Inks.pack()
 	var engine := SimEngine.new(run_seed)
 	engine.register_system(HeartbeatSystem.new())
-	engine.register_system(RunLifecycleSystem.new(pack.regimes, pack.identity, meta, pack.starting_grants))
+	engine.register_system(RunLifecycleSystem.new(pack.regimes, pack.identity, meta, pack.starting_grants, legacy))
 	engine.register_system(UnitLifecycleSystem.new(pack.units, pack.gear, pack.tunables))
 	engine.register_system(ProductionSystem.new(pack.buildings, pack.tunables, null))
 	engine.register_system(AssaultResolver.new(pack.tunables))
@@ -289,6 +297,50 @@ func save_all() -> bool:
 	var run_ok := save_manager.save_run(engine)
 	var meta_ok := save_manager.save_meta(meta)
 	return run_ok and meta_ok
+
+# --- legacy unlock tree (L1 — meta-progression reads + the purchase command) ---
+
+## THE unlock purchase command (the tree UI's write path): validates
+## affordability + prerequisites through the LegacySystem (which refuses
+## LOUDLY on any rule break — push_error + false, nothing mutated), and on
+## success persists the meta domain IMMEDIATELY (the press-card
+## write-through precedent: a purchase survives a crash the moment it is
+## made). Unlocks are meta-domain: they apply at the NEXT run start (the
+## run system re-resolves the modifier bundle at every fold), never
+## mid-run, and survive every restart by design.
+func unlock_purchase(node_id: StringName) -> bool:
+	if not legacy.purchase(node_id):
+		return false
+	save_manager.save_meta(meta)
+	return true
+
+
+## The banked legacy-points balance (every ended run accrues, win or lose).
+func unlock_bank() -> int:
+	return legacy.bank()
+
+
+## Owned node ids in purchase order (survives restarts; the tree UI's
+## "bought" state).
+func unlock_owned() -> Array[StringName]:
+	return legacy.owned_ids()
+
+
+## Node ids purchasable RIGHT NOW (rules all pass), tree order — the tree
+## UI's "affordable" highlight.
+func unlock_affordable() -> Array[StringName]:
+	return legacy.affordable_ids()
+
+
+## Every node id in the pack's tree, tree order (empty when the pack ships
+## no tree).
+func unlock_tree_nodes() -> Array[StringName]:
+	return legacy.node_ids()
+
+
+## One node def (id/display/branch/cost/prerequisites/effect), or null.
+func unlock_node(node_id: StringName) -> UnlockNodeDef:
+	return legacy.node(node_id)
 
 
 # --- typed read accessors (the systems' documented query surfaces) -----------------

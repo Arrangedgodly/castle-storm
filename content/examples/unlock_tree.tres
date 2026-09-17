@@ -1,0 +1,64 @@
+[gd_resource type="Resource" script_class="UnlockTreeDef" format=3]
+
+[ext_resource type="Script" path="res://content/schema/unlock_effect.gd" id="1_eff"]
+[ext_resource type="Script" path="res://content/schema/unlock_node_def.gd" id="2_node"]
+[ext_resource type="Script" path="res://content/schema/unlock_tree_def.gd" id="3_tree"]
+
+[sub_resource type="Resource" id="UnlockEffect_seed_capital"]
+script = ExtResource("1_eff")
+kind = &"stipend_bonus"
+value = 1.25
+
+[sub_resource type="Resource" id="UnlockEffect_cheap_walls"]
+script = ExtResource("1_eff")
+kind = &"building_cost_multiplier"
+value = 0.9
+
+[sub_resource type="Resource" id="UnlockEffect_busy_road"]
+script = ExtResource("1_eff")
+kind = &"recruit_arrival_interval_multiplier"
+value = 0.9
+
+[sub_resource type="Resource" id="UnlockEffect_quick_drills"]
+script = ExtResource("1_eff")
+kind = &"training_time_multiplier"
+value = 0.9
+
+[sub_resource type="Resource" id="UnlockNode_seed_capital"]
+script = ExtResource("2_node")
+id = &"seed_capital"
+display_name = "Seed Capital"
+branch = &"economy"
+cost = 40
+effect = SubResource("UnlockEffect_seed_capital")
+
+[sub_resource type="Resource" id="UnlockNode_cheap_walls"]
+script = ExtResource("2_node")
+id = &"cheap_walls"
+display_name = "Cheap Walls"
+branch = &"economy"
+cost = 60
+prerequisites = Array[StringName]([&"seed_capital"])
+effect = SubResource("UnlockEffect_cheap_walls")
+
+[sub_resource type="Resource" id="UnlockNode_busy_road"]
+script = ExtResource("2_node")
+id = &"busy_road"
+display_name = "A Busier Road"
+branch = &"people"
+cost = 50
+effect = SubResource("UnlockEffect_busy_road")
+
+[sub_resource type="Resource" id="UnlockNode_quick_drills"]
+script = ExtResource("2_node")
+id = &"quick_drills"
+display_name = "Quick Drills"
+branch = &"people"
+cost = 80
+prerequisites = Array[StringName]([&"busy_road"])
+effect = SubResource("UnlockEffect_quick_drills")
+
+[resource]
+script = ExtResource("3_tree")
+version = 1
+nodes = Array[ExtResource("2_node")]([SubResource("UnlockNode_seed_capital"), SubResource("UnlockNode_cheap_walls"), SubResource("UnlockNode_busy_road"), SubResource("UnlockNode_quick_drills")])
