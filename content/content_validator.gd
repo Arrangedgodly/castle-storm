@@ -667,3 +667,6 @@ static func _check_tunables(t: EconomyTunables, errors: Array[String]) -> void:
 		_err(errors, "tunables: assault_loss_fraction must be within (0, 1] — a failed assault is a set-back, never annihilation (got %s)" % t.assault_loss_fraction)
 	if t.assault_failure_suspicion < 0 or t.assault_failure_suspicion > t.suspicion_max:
 		_err(errors, "tunables: assault_failure_suspicion must be within [0, suspicion_max %d] (got %d)" % [t.suspicion_max, t.assault_failure_suspicion])
+	# --- Enemy escalation (L2 additive fields) ---
+	if t.escalation_garrison_cycle_step < 1.0 or t.escalation_garrison_cycle_step >= 4.0:
+		_err(errors, "tunables: escalation_garrison_cycle_step must be within [1.0, 4.0) — the ladder never shrinks (got %s)" % t.escalation_garrison_cycle_step)

@@ -128,6 +128,10 @@ func _init(p_run_seed: int, p_save_root: String = "") -> void:
 ## Builds one canonical five-system engine + heartbeat around the shared
 ## meta. System order is contractual (docs/sim-engine.md §4/§14/§15):
 ## heartbeat -> run -> units -> production -> assault -> suspicion LAST.
+## The assault resolver is wired with the pack's unit/gear/regime defs —
+## the L2 escalation garrison reads (a snapshot in the shared meta derives
+## the castle from it, docs/sim-engine.md §19); a fresh meta (no snapshot)
+## behaves byte-identically to the pre-L2 build.
 func build_engine() -> SimEngine:
 	var pack := Inks.pack()
 	var engine := SimEngine.new(run_seed)
@@ -135,7 +139,7 @@ func build_engine() -> SimEngine:
 	engine.register_system(RunLifecycleSystem.new(pack.regimes, pack.identity, meta, pack.starting_grants, legacy))
 	engine.register_system(UnitLifecycleSystem.new(pack.units, pack.gear, pack.tunables))
 	engine.register_system(ProductionSystem.new(pack.buildings, pack.tunables, null))
-	engine.register_system(AssaultResolver.new(pack.tunables))
+	engine.register_system(AssaultResolver.new(pack.tunables, pack.units, pack.gear, pack.regimes))
 	engine.register_system(SuspicionSystem.new(pack.tunables, pack.units, pack.copy))
 	return engine
 

@@ -240,6 +240,19 @@ func legacy_veterans_milli() -> int:
 	return _legacy_veterans_milli
 
 
+## The L2 escalation garrison snapshot ({} = none), through to the shared
+## meta — the stateless assault resolver's window onto the escalation
+## config, exactly the `current_regime`/`legacy_veterans_milli` shape (it
+## reads at odds time, never bakes). Copy: callers must not fork the meta.
+func escalation_garrison() -> Dictionary:
+	return meta.escalation_garrison.duplicate(true)
+
+
+## The L2 escalation cycle count (0 = pre-first-victory).
+func escalation_cycle() -> int:
+	return meta.escalation_cycle
+
+
 # --- Victory / failure entry point -----------------------------------------
 
 
@@ -497,6 +510,20 @@ func _end_run(engine: SimEngine, p_outcome: int, army_override: int) -> int:
 	meta.legacy_points += score
 	meta.runs_recorded += 1
 	meta.chronicle.append(_chronicle_entry(roster, army_power, duration, score))
+	# L2 escalation capture (docs/sim-engine.md §19, docs/save-schema.md §6):
+	# VICTORY ONLY — the winning army becomes the next cycle's castle
+	# garrison. An empty roster captures nothing (an empty castle garrisons
+	# nobody) and leaves any prior snapshot + the cycle count untouched; a
+	# loss/abort/crush never reaches this branch, so the regime that beat
+	# you STAYS until beaten (the snapshot survives every restart form — it
+	# lives in the meta domain, not the run payload the reset clears).
+	if p_outcome == OUTCOME_VICTORY:
+		var snapshot := Escalation.capture(
+			units, _regime, leader_name(), meta.runs_recorded, meta.escalation_cycle + 1
+		)
+		if not snapshot.is_empty():
+			meta.escalation_garrison = snapshot
+			meta.escalation_cycle += 1
 	match p_outcome:
 		OUTCOME_VICTORY:
 			engine.events.record(engine.tick_count, &"run_won", regime_id(), score, run_index)

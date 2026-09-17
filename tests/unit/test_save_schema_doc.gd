@@ -38,6 +38,8 @@ const EXPECTED_BLOCK_IDS: Array[String] = [
 	"system-production-quirks",
 	"meta-payload",
 	"meta-chronicle-entry",
+	"meta-escalation-garrison",
+	"meta-escalation-roster-entry",
 ]
 
 var _doc_text := ""
@@ -103,16 +105,23 @@ func test_version_axes_in_doc_match_the_code() -> void:
 	assert_int(int(pinned.get("meta-state", -1))).is_equal(RunMeta.META_FORMAT_VERSION)
 
 
-func test_l2_reserve_is_documented_and_absent_from_real_saves() -> void:
-	# The §6 additive-reserve argument PREMISES that MVP saves never carry the
-	# reserved key — if a write leaked in, the "no migration when L2 lands"
-	# claim would silently stop being about THIS schema.
+func test_l2_escalation_snapshot_is_live_and_shape_pinned() -> void:
+	# §6 since L2-A: the reserve is LIVE — the real save (which banks a
+	# victory) carries the snapshot with exactly the documented keys, and the
+	# RUN payload never carries an escalation key (the meta-domain-only rule:
+	# a run-save restore must not be able to fork the garrison).
 	assert_bool(_doc_text.contains("escalation_garrison")).is_true()
 	assert_bool(_doc_text.contains("L2 ESCALATION SNAPSHOT")).is_true()
 	var meta_payload: Dictionary = _meta_envelope["payload"]
-	assert_bool(not meta_payload.has("escalation_garrison")).is_true()
-	var run_system: Dictionary = (_run_envelope["payload"] as Dictionary)["systems"]["run"]
-	assert_bool(not run_system.has("escalation_garrison")).is_true()
+	assert_bool(meta_payload.has("escalation_garrison")).is_true()
+	assert_bool(meta_payload.has("escalation_cycle")).is_true()
+	assert_int(int(meta_payload["escalation_cycle"])).is_equal(1)
+	var run_payload: Dictionary = _run_envelope["payload"]
+	for system_key: String in (run_payload["systems"] as Dictionary).keys():
+		assert_str(system_key).is_not_equal("escalation")  # never a system key either
+		var system: Dictionary = (run_payload["systems"] as Dictionary)[system_key]
+		assert_bool(not system.has("escalation_garrison")).is_true()
+	assert_bool(not run_payload.has("escalation_garrison")).is_true()
 
 
 # --- The real save (built once; every test reads the parsed bytes) -------------
@@ -168,6 +177,12 @@ func _live_key_sets() -> Dictionary:
 	sets["system-production-quirks"] = _keys_of(systems["production"]["regime_quirks"])
 	sets["meta-payload"] = _keys_of(meta_payload)
 	sets["meta-chronicle-entry"] = _keys_of((meta_payload["chronicle"] as Array)[0])
+	# The L2 escalation snapshot (§6): the pinned save banks a victory, so
+	# the snapshot + its first roster line are on disk and shape-checked
+	# like every other nested entry.
+	var garrison: Dictionary = meta_payload["escalation_garrison"]
+	sets["meta-escalation-garrison"] = _keys_of(garrison)
+	sets["meta-escalation-roster-entry"] = _keys_of((garrison["roster"] as Dictionary).values()[0])
 	return sets
 
 

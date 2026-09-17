@@ -213,3 +213,21 @@ extends Resource
 ## at the meter max, and CAN crush the run if the meter was already at the
 ## edge. Default 20 = just above half a warn threshold.
 @export var assault_failure_suspicion: int = 20
+
+## --- Enemy escalation (L2 — docs/sim-engine.md §19; the curve placeholder
+## shipped by L2-A, TUNED BY THE L2-B BALANCE PASS) ---
+
+## Per-cycle compounding step of the escalation curve: when a garrison
+## snapshot stands in the meta, the castle's strength is the SNAPSHOT's
+## army-power-equivalent x step^(cycle-1) — cycle 1 (the first captured
+## victory) is x1.000 because the snapshot ITSELF is the first escalation
+## (a typical winning army ~100 power already doubles the static 50 wall,
+## re-establishing R5's "first L2 cycle is a full new campaign" arc);
+## every later captured cycle compounds this step (R5: the ladder the
+## player climbs, compressing ~2-5x per arc as legacy power compounds).
+## Exact integer milli math (SimFixed.milli_from_float ONCE at the
+## resolver's construction; one floored int division per hop, hops capped
+## at Escalation.MAX_CURVE_HOPS). Validator band [1.0, 4.0): the ladder
+## never shrinks. Default 1.25 is the L2-A PLACEHOLDER — L2-B owns the
+## tuned value (docs/balance.md §7).
+@export var escalation_garrison_cycle_step: float = 1.25

@@ -9,6 +9,7 @@ saving, and wall-clock drive are consumers.
   `sim/sim_command.gd` (command), `sim/sim_fixed.gd` (fixed-point math),
   `sim/run_meta.gd` (T-SIM-04 meta bank, §12),
   `sim/legacy_modifiers.gd` + `sim/legacy_system.gd` (L1 unlock tree, §18),
+  `sim/escalation.gd` (L2 escalation math, §19),
   `sim/systems/heartbeat_system.gd` (placeholder system),
   `sim/systems/production_system.gd` (T-SIM-02 production, §10),
   `sim/systems/unit_lifecycle_system.gd` (T-SIM-03 units, §11),
@@ -548,6 +549,17 @@ gets restarted (auto-resolved as abandoned). Thin score stub, T-SIM-08
 owns the real curve: `score = duration_hours + army_power + 100
 (victory only)`.
 
+**L2 escalation capture (post-MVP Layer 2-A, §19):** `_end_run` additionally
+snapshots the winning army into `RunMeta.escalation_garrison` on VICTORY
+ONLY — regime id, captured-at run number, the cycle this opens, the
+leader's name + the regime's crest (the "regime remembers" flavor), and
+the terminal roster as def → count + per-slot gear-tier counts. Loss,
+abort, and the crush NEVER touch a standing snapshot (the regime that beat
+you stays until beaten — the fantasy), and a victory over an empty roster
+captures nothing. The snapshot lives in the meta domain precisely so it
+survives the `run_restart` that follows a victory; the derivation that
+consumes it is §15/§19.
+
 ### The reset contract (documented choice)
 
 Restart is **in-engine, command-driven, orchestrated by the run system**
@@ -839,6 +851,9 @@ same-tick property the vignette replay relies on.
 ```gdscript
 var assault := AssaultResolver.new(pack.tunables)
 engine.register_system(assault)  # anywhere after run; suites: 5th, before suspicion
+# L2-wired hosts pass the content the escalation snapshot resolves against
+# (GameHost does; the unwired form above stays byte-identical to pre-L2):
+var escalation := AssaultResolver.new(pack.tunables, pack.units, pack.gear, pack.regimes)
 ```
 
 Opt-in per engine like suspicion (§14): the shared `_mvp_pack.full_stack`
@@ -873,6 +888,23 @@ multiplier, strength), `floor_power`, `floor_met`, and `win_permille` —
 and the parts SUM to the displayed probability exactly (unit-tested:
 per-unit totals = army power; power x multiplier = score_milli; the two
 sides reproduce the permille to the digit).
+
+**L2 escalation garrison (post-MVP Layer 2-A, §19):** when the shared meta
+carries a garrison snapshot AND the resolver was wired with content
+(`AssaultResolver.new(tunables, units, gear, regimes)` — GameHost wires
+the pack; the pre-L2 construction sites and the shared marathon fixtures
+stay unwired so their recorded digests stand), the castle side derives
+from the SNAPSHOT instead of the static base — the regime-static numbers
+above are REPLACED: `base = snapshot_power x curve_milli / 1000`,
+`strength = base x the SNAPSHOT regime's garrison multiplier` (the
+winning regime's modifier, save-schema §6; the current run's regime still
+scales the ARMY side only). The garrison breakdown then carries the
+static four keys with the derived values PLUS the transparency set —
+`source: &"escalation"`, `escalation_cycle`, `snapshot_power`,
+`curve_multiplier_milli`, `regime_id`, `leader`, `captured_at_run`, and
+the full `roster` tier mix: L2-C's "whose army, what tier mix" data. No
+snapshot (or an unwired resolver, or a snapshot whose every id left the
+pack) → the static branch to the digit — the zero-impact rule.
 
 ### The knight floor: a floor, never a trigger
 
@@ -1151,3 +1183,56 @@ between commands by construction. Consequences, all deliberate:
 Measured: the two L1 suites (~60 cases) add ~0.4s to `make test`; every
 sibling marathon digest unchanged.
 
+
+## 19. The escalation engine (L2-A — post-MVP enemy escalation, sim side)
+
+The post-MVP Layer 2, part A (town-hall L2: "on victory, a snapshot of
+your winning army becomes the next cycle's castle garrison — your previous
+knights are the enemy"; R5: milestone-gated at first victory, an escalating
+ladder the player climbs, first L2 cycle re-establishing a multi-day arc).
+Three pieces, no UI (L2-C owns the surface):
+
+1. **Capture** (`sim/escalation.gd` `Escalation.capture` + the §12
+   `_end_run` site): on VICTORY ONLY, the terminal army roster (the same
+   walk that feeds the chronicle's `army` line, plus per-unit
+   `gear_tier()`) composes the JSON-safe snapshot carried by
+   `RunMeta.escalation_garrison` — def id → `{count, gear_tiers: {slot →
+   {tier → count}}}` + regime id, captured-at run, opening cycle, leader
+   name, crest id (the L2-C flavor). Shape, rules, and the
+   additive-no-migration argument: docs/save-schema.md §6 (the T-DATA-03
+   reserve, landed exactly as sketched). An empty-roster victory captures
+   NOTHING; loss/abort/crush NEVER touch a standing snapshot — the regime
+   that beat you stays until beaten. `RunMeta.escalation_cycle` counts
+   captured victories (incremented only by a capturing victory).
+2. **Derivation** (the stateless §15 resolver, wired with content at
+   construction — `AssaultResolver.new(tunables, units, gear, regimes)`;
+   GameHost wires the pack, the shared fixtures stay unwired until the
+   L2-B balance re-sweep): when a snapshot stands in the shared meta, the
+   castle side of the odds is
+   `snapshot_power x curve_milli / 1000 x snapshot_regime_garrison_mult`
+   where `snapshot_power` recomputes the units system's `army_power()`
+   arithmetic from the compact snapshot (ids resolved against boot
+   content, unknown ids skipped loudly-once, never silently defaulted —
+   an all-unknown snapshot falls back to the static garrison rather than a
+   zero-strength castle), and the curve is
+   `EconomyTunables.escalation_garrison_cycle_step` compounded (cycle−1)
+   times in exact integer milli (validator band [1.0, 4.0); cycle 1 is
+   identity — the SNAPSHOT ITSELF is the first escalation: a typical
+   winning power ~100 already doubles the static 50 wall, per
+   docs/balance.md). The L2-A default 1.25 is the PLACEHOLDER — L2-B owns
+   the tuned value.
+3. **Transparency** (§15's breakdown): the garrison dict carries the
+   derivation (whose army: regime id + leader + captured-at run; what
+   tier mix: the full roster; the raw vs curved power + the curve
+   multiplier + the cycle), distinct from the regime-static composition.
+
+**Zero-impact rule (unit-pinned, the L1 discipline):** no snapshot in the
+meta → the odds are the static branch to the digit, `RunMeta.to_dict()`
+emits no escalation key (byte-identical meta payload), and no engine-side
+state exists anywhere (the snapshot is meta-domain config the stateless
+resolver reads at odds time — the `current_regime` shape, never baked).
+Same seed + same meta-with-snapshot → identical odds and identical
+commits (the oracle sees the garrison through the commit exactly the way
+it sees unlock EFFECTS, §18's narrowing — the bank still cannot perturb a
+run, the snapshot's DERIVATION can, by design); a save made with a
+snapshot active round-trips both domains and continues in lockstep.

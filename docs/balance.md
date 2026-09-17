@@ -315,3 +315,22 @@ lay-low recovery and the post-crackdown dip; deliberately small so the
 Crown keeps its bite). Baseline digests: byte-identical (every existing
 marathon suite green, unchanged); the zero-impact proof extends to both
 new seams (serialized + hashed only when non-identity).
+
+## 7. L2 — enemy escalation: the L2-A placeholder curve (2026-09-17)
+
+Worker: Iron Man + Mr Fantastic lane (L2-A, the engine). The escalation
+garrison derives the castle from the captured snapshot: `snapshot army
+power x step^(cycle-1)` — cycle 1 is x1.000 by DESIGN (the snapshot itself
+is the first escalation: a typical winning army ~100 power already doubles
+the static 50 wall, re-establishing R5's "first L2 cycle is a full new
+campaign" arc), and every later captured cycle compounds
+`escalation_garrison_cycle_step`. **The shipped default 1.25 is the
+PLACEHOLDER** — the L2-A contract is engine + shape + zero-impact, not
+tuning; **L2-B owns the balance pass** (sweep the step + the snapshot-power
+interaction against the canonical host with escalation wired — the shared
+suites run unwired until then, per the §19 zero-impact rule) and re-records
+this section. Anchor numbers for that pass: static baseline first win
+79 h mean / 127 h slowest (12/12); floor assault 315 permille neutral;
+typical winning power ~100–115 (5 knights + 5 archers, mixed tiers), so
+cycle 1 opens at ~500 permille against a like-for-like rebuild and the
+~23-power floor assault drops to ~190 — the ladder bites immediately.

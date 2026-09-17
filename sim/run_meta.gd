@@ -111,6 +111,27 @@ func set_reduced_motion_preference(on: bool) -> void:
 ## right. Spending decrements `legacy_points` through LegacySystem only.
 var unlocks := {}
 
+## The L2 escalation garrison snapshot (docs/save-schema.md §6 — the
+## T-DATA-03 reserve, live since L2-A): the WINNING army of the last
+## victorious run, captured by RunLifecycleSystem at the victory resolution
+## and read by the next run's assault resolver INSTEAD of the static
+## garrison base. {} = no snapshot = the static baseline (every pre-L2
+## save). META domain deliberately: the garrison must survive the
+## run_restart that immediately follows a victory AND engine re-inits, and
+## must never be forkable from a run save (rule §3.6, same rule as the
+## bank). Loss/abort/crush NEVER clears it — the regime that beat you
+## stays until beaten (town-hall L2 fantasy). Emit-when-non-null in
+## `to_dict()`; a pre-L2 meta reads back as {} = first-cycle default.
+var escalation_garrison := {}
+
+## Escalation cycle count (L2): how many snapshots have been captured —
+## incremented ONLY by a victory that captures one (an empty-roster
+## victory captures nothing). Cycle 1 is the first snapshot's ladder rung
+## (the snapshot itself is the first escalation); the curve compounds from
+## cycle 2. Emit-when-non-zero in `to_dict()` (the escalation_garrison
+## discipline — a pre-L2 meta reads back 0).
+var escalation_cycle := 0
+
 
 ## True when the beat's flag is set (never-printed beats read false).
 func first_session_flag(key: StringName) -> bool:
@@ -134,7 +155,7 @@ func to_dict() -> Dictionary:
 	var session := {}
 	for key in first_session.keys():
 		session[key] = first_session[key]
-	return {
+	var state := {
 		"format_version": META_FORMAT_VERSION,
 		"legacy_points": legacy_points,
 		"runs_recorded": runs_recorded,
@@ -144,6 +165,16 @@ func to_dict() -> Dictionary:
 		"preferences": preferences.duplicate(true),
 		"unlocks": unlocks.duplicate(true),
 	}
+	# The L2 escalation keys ride along ONLY when there is something to say
+	# (the emit-when-non-null discipline, save-schema §6): a pre-first-
+	# victory meta serializes byte-identically to the pre-L2 build, and a
+	# pre-L2 save reads back as no-snapshot/0 — the additive-reserve
+	# argument's tolerant-reader premise.
+	if not escalation_garrison.is_empty():
+		state["escalation_garrison"] = escalation_garrison.duplicate(true)
+	if escalation_cycle > 0:
+		state["escalation_cycle"] = escalation_cycle
+	return state
 
 
 ## Restores a to_dict() payload. Returns false (and refuses, state
@@ -190,4 +221,14 @@ func apply_dict(state: Dictionary) -> bool:
 	for key in stored_unlocks.keys():
 		if bool(stored_unlocks[key]):
 			unlocks[String(key)] = true
+	# Same discipline for the L2 escalation snapshot (save-schema §6): an
+	# absent key is a pre-L2 (or pre-first-victory) meta -> no garrison ->
+	# the static baseline. Read verbatim (the chronicle rule): ids resolve
+	# against boot content at derivation time, where unknowns warn loudly —
+	# a non-dict value degrades to the no-snapshot default, never a crash.
+	escalation_garrison = {}
+	var stored_garrison: Variant = state.get("escalation_garrison", {})
+	if typeof(stored_garrison) == TYPE_DICTIONARY:
+		escalation_garrison = (stored_garrison as Dictionary).duplicate(true)
+	escalation_cycle = maxi(0, int(state.get("escalation_cycle", 0)))
 	return true

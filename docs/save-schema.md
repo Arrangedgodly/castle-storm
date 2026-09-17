@@ -343,6 +343,8 @@ last_seen_epoch
 first_session
 preferences
 unlocks
+escalation_garrison
+escalation_cycle
 ```
 
 | Field | Type | Meaning / restore notes |
@@ -355,6 +357,8 @@ unlocks
 | `first_session` | Dictionary | the once-only onboarding flags (T-UI-10): `seen` (this install has had its first session — a returning player is never nudged), the five beat flags (`gate`/`assign`/`build`/`trickle`/`train` — each printed cue fires at most once, ever), and `done` (arc complete or the run ended). META domain because the arc must survive engine rebuilds and process restarts; the flag flip is persisted the moment it prints. Additive-optional with a tolerant reader (absent key reads as `{}` — pre-T-UI-10 metas upgrade to nudge-free, which is right) |
 | `preferences` | Dictionary | the press-room card's persisted player settings (finishing refinement #5): `type_scale` (float, clamped to the TypeScale range 1.0–1.3 on write AND read — the boot seam applies it before any chrome bakes sizes) and `reduced_motion` (bool, mirrored into `MotionProfile.forced`). A key appears only once the player sets it; until then the project-settings defaults rule. META domain deliberately: preferences must survive restarts and engine rebuilds, and a run-save restore must never fork them; the card saves the meta file the moment a step changes. Additive-optional with a tolerant reader (absent block reads as `{}` — pre-feature metas upgrade to project defaults, no migration) |
 | `unlocks` | Dictionary | the L1 legacy unlock tree purchases: purchased node id (String) → `true`, insertion order = purchase order (`LegacySystem.purchase` is the only writer; it decrements `legacy_points` in the same write and the host persists the meta domain the moment a purchase lands). META domain by the same rule as the bank: unlocks are meta-progression banked from every run, must survive restarts/engine re-inits, and must never be forkable from a run save. The TREE itself is boot-injected content (`ContentPack.unlock_tree`) and never serialized; an owned id that left the tree is kept (historical purchase) while contributing no effect. Additive-optional with a tolerant reader (absent key reads as `{}` — a pre-L1 meta owns nothing, which is right; a present-but-falsy value is filtered on read) |
+| `escalation_garrison` | Dictionary | OPTIONAL (L2-A, emit-when-non-null — the §6 reserve, now LIVE): the WINNING army of the last victorious run, captured by `RunLifecycleSystem._end_run` at the victory resolution and read by the next run's assault resolver instead of the static garrison base. `{}` / absent = no snapshot = the static baseline. Written by victory ONLY: loss/abort/crush leave a standing snapshot untouched (the regime that beat you stays until beaten), and a victory over an EMPTY roster captures nothing (leaving any prior snapshot + cycle intact). Full shape in §6. |
+| `escalation_cycle` | int | OPTIONAL (L2-A, emit-when-non-zero): how many snapshots have been captured — incremented only by a victory that captures one. Cycle 1 = the first snapshot's ladder rung; the escalation curve compounds from cycle 2 (`EconomyTunables.escalation_garrison_cycle_step`). Absent key reads as 0 (pre-L2 / pre-first-victory). |
 
 ### 5.1 `chronicle[*]` — one entry per ended run
 
@@ -387,25 +391,28 @@ score
 Meta corruption policy (single file, save-format.md §8): quarantine the
 bytes, return a FRESH bank, never touch the run slots.
 
-## 6. L2 ESCALATION SNAPSHOT — reserved, unused at MVP
+## 6. L2 ESCALATION SNAPSHOT — live since L2-A (was the MVP reserve)
 
-**Status: reserve only.** Nothing writes or reads this at MVP. The section
-exists so the post-MVP Layer 2 (enemy escalation, R5: milestone-gated at
-first victory, cycles compressing 2–5× per arc) lands WITHOUT a save
-migration and without a format argument later. It is a name claim plus a
-binding shape sketch, not code.
+**Status: LIVE (post-MVP Layer 2-A, enemy escalation).** The section was
+reserved — name claimed, shape sketched, nothing written — at MVP so the
+layer could land without a save migration; L2-A landed it exactly as
+reserved. When a run ends in VICTORY, the winning army becomes the next
+cycle's castle garrison: a read-only snapshot the NEXT run's assault
+resolver (docs/sim-engine.md §15/§19) derives the castle side from instead
+of the static garrison baseline. R5's cadence governs the design:
+milestone-gated at first victory, an escalating ladder the player climbs.
 
-**What it will hold:** when a run ends in VICTORY, the winning army becomes
-the next cycle's castle — a read-only garrison snapshot the NEXT run's
-assault (T-SIM-06 under L2) reads instead of a fresh-regime baseline.
-
-**Exact shape** (a single optional top-level key added to the META payload
-of §5 — `RunMeta.to_dict()` would emit it only when non-null):
+**Exact shape** (a single optional top-level key of the META payload §5 —
+`RunMeta.to_dict()` emits it only when non-null; `escalation_cycle` rides
+alongside, emitted when non-zero):
 
 ```json
 "escalation_garrison": {
 	"regime_id": "gilded_crown",
 	"captured_at_run": 7,
+	"cycle": 1,
+	"leader": "Bran the Unbearable",
+	"crest_id": "crest_gilded_crown",
 	"roster": {
 		"knight": {"count": 12, "gear_tiers": {"weapon": {"1": 2, "3": 10}, "armor": {"2": 12}}},
 		"archer": {"count": 9, "gear_tiers": {"weapon": {"1": 9}}}
@@ -413,38 +420,80 @@ of §5 — `RunMeta.to_dict()` would emit it only when non-null):
 }
 ```
 
-- `regime_id` (String) — the winning regime's pack id; the reader resolves
-  its combat modifier against boot content (the pack's four regimes carry
-  DISTINCT garrison modifiers ×1.2/×0.9 and army modifiers ×1.1/×0.95 by
-  T-DATA-02 design — L2 reads them, never re-serializes them; rule §3.2).
+```save-keys meta-escalation-garrison
+regime_id
+captured_at_run
+cycle
+leader
+crest_id
+roster
+```
+
+```save-keys meta-escalation-roster-entry
+count
+gear_tiers
+```
+
+- `regime_id` (String) — the WINNING run's regime pack id; the reader (the
+  assault resolver) resolves its combat modifier against boot content (the
+  pack's four regimes carry DISTINCT garrison modifiers ×1.2/×0.9 and army
+  modifiers ×1.1/×0.95 by T-DATA-02 design — L2 reads them, never
+  re-serializes them; rule §3.2). An unknown/empty id resolves neutral.
 - `captured_at_run` (int) — the meta-monotonic run number that produced the
   garrison; supports R5's cycle-arc display ("held since run 7").
+- `cycle` (int) — the escalation cycle this snapshot OPENS (the cycle count
+  before capture + 1); the curve's exponent input. Redundant with the
+  top-level `escalation_cycle` history by design: the snapshot is a
+  self-contained historical document (delete/restore one without the other
+  and the reader still narrates correctly).
+- `leader` / `crest_id` (String) — the winning leader's full display name
+  and the regime's crest id: the "regime remembers" flavor L2-C's UI shows
+  (WHOSE former army stands on the wall).
 - `roster` (Dictionary[String, Dictionary]) — army-eligible def id →
-  `{"count": int, "gear_tiers": {slot id → {tier (String) → count}}}`.
+  `{"count": int, "gear_tiers": {slot id → {tier (String) → count}}}`, def
+  first-appearance order in roster order (rule §3.5 — ordered state).
   `gear_tiers` tier keys are STRINGS because JSON object keys are strings;
-  counts per tier sum to `count`. This is strictly more than the chronicle
-  entry's `army` (§5.1) carries: tiers per slot, not just bodies — the
-  assault's odds input. The capture site composes both from the same
+  body counts per tier sum to `count`. This is strictly more than the
+  chronicle entry's `army` (§5.1) carries: tiers per slot, not just bodies —
+  the assault's odds input. The capture site composes both from the same
   terminal-roster walk.
 
-**Where it attaches and why there:** `RunMeta` (meta domain), captured in
-`RunLifecycleSystem._end_run` on victory — the exact site that already
-snapshots `army_roster()` into the chronicle entry; it would additionally
-walk the units system's per-unit `gear_tier()` and write the reserve into a
-new `RunMeta.escalation_garrison` field. Meta domain, not run domain,
-because the garrison must survive the `run_restart` that immediately follows
-a victory AND engine re-inits (the run payload is emptied by the reset
-contract — §4.4's sibling systems reset at the drain), and because it must
-not be forkable from a run save (rule §3.6, same rule as the bank).
+**The three binding rules (unit-pinned):**
 
-**Why MVP saves need NO migration when this lands (the additive-reserve
-argument):**
+1. **Victory-only capture.** `RunLifecycleSystem._end_run` writes the
+   snapshot ONLY on `OUTCOME_VICTORY`. Loss (assault or crush) and abort
+   NEVER clear or change a standing snapshot — the regime that beat you
+   STAYS until beaten (the town-hall L2 fantasy). A victory over an EMPTY
+   roster captures nothing (an empty castle garrisons nobody) and leaves
+   the prior snapshot + cycle count untouched.
+2. **Meta domain, not run domain.** The garrison must survive the
+   `run_restart` that immediately follows a victory AND engine re-inits
+   (the run payload is emptied by the reset contract — §4.4's sibling
+   systems reset at the drain), and must not be forkable from a run save
+   (rule §3.6, same rule as the bank). The engine-side run payload NEVER
+   carries an escalation key (doc-pinned).
+3. **No snapshot = byte-identical behavior.** The odds derivation, the
+   serialization (emit-when-non-null), everything: an engine whose meta
+   carries no snapshot behaves byte-identically to the pre-L2 build —
+   every existing digest stands.
+
+**Derivation (docs/sim-engine.md §19 has the full contract):** castle
+strength = the snapshot's army-power-equivalent (roster ids resolved
+against boot content — count × UnitDef.combat_power + tier_count ×
+GearDef.combat_power, `sim/escalation.gd`) × the escalation curve
+(`escalation_garrison_cycle_step` compounded cycle−1 times, exact integer
+milli; cycle 1 = ×1.000 — the snapshot itself is the first escalation) ×
+the SNAPSHOT regime's garrison modifier. The resolver's odds breakdown
+carries the whole derivation transparently (L2-C's data).
+
+**Why MVP saves needed NO migration when this landed (the additive-reserve
+argument, now proven live):**
 
 1. *MVP file → L2 build:* the key is simply absent from every MVP meta
    payload. `RunMeta.apply_dict` reads known keys with `.get()` defaults, so
-   an absent `escalation_garrison` loads as `null` = "no garrison" = L2's
-   first-cycle default (play the fresh-regime baseline). No envelope
-   `schema_version` bump is required because the FILE format did not change
+   an absent `escalation_garrison` loads as `{}` = "no garrison" = L2's
+   first-cycle default (play the static baseline). No envelope
+   `schema_version` bump was required because the FILE format did not change
    — only the set of optional keys a reader understands did.
 2. *L2 file → MVP build (dev matrix only):* the extra key parses fine, the
    checksum covers the payload as written, and `apply_dict` ignores keys it
@@ -453,13 +502,15 @@ argument):**
    legal in both directions (§8).
 3. *Precedents already shipped this way:* `regime_quirks` (added to the
    production sub-dict post-verifier, no version bump, absent-key fallback
-   unit-tested) and `stipend_run` (additive run-system key). The reserve is
-   the third instance of the same pattern.
+   unit-tested), `stipend_run` (additive run-system key), and the five L1
+   emit-when-non-identity modifier keys. The escalation snapshot is the
+   same pattern with a dict payload.
 
-The ONLY binding constraints the reserve adds TODAY: nothing else may squat
-the key name `escalation_garrison` in the meta payload, and `RunMeta`
-serialization must stay key-additive (a rewrite of the §5 fields would force
-the §7 machinery — do not).
+The standing binding constraints: nothing else may squat the key name
+`escalation_garrison` in the meta payload, and `RunMeta` serialization
+must stay key-additive (a rewrite of the §5 fields would force the §7
+machinery — do not). The shape is versioned by `META_FORMAT_VERSION`
+(axis 3) like every other meta field — no nested version key.
 
 ## 7. Worked migration example — v1 → v2 field rename
 
@@ -554,7 +605,7 @@ exists for rewrites, not for growth.
 
 | Change | Bump? | Mechanism | Shipped precedent |
 |---|---|---|---|
-| Add an optional payload key; readers use `.get()` defaults (absent key = documented fallback) | **no** | nothing — old files load with the fallback, new files load everywhere | `regime_quirks` (§4.6), `stipend_run` (§4.4), `unlocks` + the five L1/B2 emit-when-non-identity modifier keys (`legacy_stipend_milli` + `legacy_veterans_milli` §4.4; `units.legacy_modifiers` §4.5; `production.legacy_cost_milli` §4.6; `suspicion.legacy_decay_milli` — sim-engine.md §14; `unlocks` §5); `escalation_garrison` when L2 lands (§6) |
+| Add an optional payload key; readers use `.get()` defaults (absent key = documented fallback) | **no** | nothing — old files load with the fallback, new files load everywhere | `regime_quirks` (§4.6), `stipend_run` (§4.4), `unlocks` + the five L1/B2 emit-when-non-identity modifier keys (`legacy_stipend_milli` + `legacy_veterans_milli` §4.4; `units.legacy_modifiers` §4.5; `production.legacy_cost_milli` §4.6; `suspicion.legacy_decay_milli` — sim-engine.md §14; `unlocks` §5); `escalation_garrison` + `escalation_cycle` (§6 — the reserve, landed at L2-A exactly as sketched, no migration) |
 | Add an envelope field | **no** | envelope readers use `.get()` | — |
 | Change `state_hash()` composition (mix more state) | **no** (disk untouched) | recorded hash VALUES migrate; every reproducibility assertion stays twin-based, never absolute-hash-pinned | the quirks-hash fix (T-ARCH-03 re-dispatch) |
 | Rename / move / retype / remove an existing payload field | **envelope `schema_version` + registered migration** (and the payload's own `format_version` when the run/meta payload's shape changed — §7's interlock) | migration rewrites old files on load | none yet — §7 is the template for the first one |
@@ -586,9 +637,11 @@ Two asymmetries worth restating (they surprise field authors):
    sub-dicts, per-entry shapes, chronicle entry). Drift in EITHER direction
    — code grew a field the doc misses, or the doc lists one the code no
    longer writes — fails with the exact diff.
-3. Asserts the §6 reserve holds: the reserved `escalation_garrison` key is
-   documented AND absent from the real meta payload on disk (a reserve that
-   leaked into MVP writes would break the additivity argument's premise).
+3. Asserts the §6 escalation snapshot is live and shape-pinned: the real
+   save (which banks a victory) CARRIES `escalation_garrison` with exactly
+   the documented keys (top level + roster entry), while the RUN payload
+   never carries an escalation key (the meta-domain-only rule — a run-save
+   restore must not be able to fork the garrison).
 4. Asserts the doc's stated save-schema version matches
    `SaveManager.CURRENT_SCHEMA_VERSION`.
 
@@ -610,3 +663,4 @@ extraction map.
 | `system-units-entry` / `system-production-building` / `system-production-quirks` | nested entry shapes (§4.5–4.6) |
 | `meta-payload` | meta domain payload top level (§5) |
 | `meta-chronicle-entry` | one chronicle record (§5.1) |
+| `meta-escalation-garrison` / `meta-escalation-roster-entry` | the L2 escalation snapshot + one roster line (§6) |

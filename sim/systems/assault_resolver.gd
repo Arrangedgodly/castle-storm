@@ -31,6 +31,14 @@
 ##                     commit gate or the banked lp)
 ##     garrison      = tunables.assault_garrison_base_power
 ##                     x garrison_multiplier (regime)
+##                     — OR, when the shared meta carries an L2 ESCALATION
+##                     snapshot and this resolver was wired with content
+##                     (docs/sim-engine.md §19): the SNAPSHOT's army-power-
+##                     equivalent x the escalation curve x the SNAPSHOT
+##                     regime's garrison modifier ("your previous knights
+##                     are the enemy"). No snapshot — or an unwired
+##                     resolver — runs the static branch above,
+##                     byte-identical to the pre-L2 build.
 ##     win_permille  = army_milli * 1000 / (army_milli + garrison_milli)
 ##                     — floor-truncated, monotone: more power NEVER lowers
 ##                     odds (unit-tested across the growth curve and all 4
@@ -114,9 +122,28 @@ var _floor_power := 0
 var _garrison_base := 0
 var _loss_milli := 0  # assault_loss_fraction, converted once at construction
 var _failure_suspicion := 0
+# --- L2 escalation wiring (additive, default unwired = pre-L2 behavior) ---
+# Content the snapshot's ids resolve against at odds time (rule §3.2: ids,
+# not objects). An UNWIRED resolver (no defs passed — the pre-L2
+# construction sites) can derive no snapshot power and falls back to the
+# static garrison for every odds read: byte-identical to the pre-L2 build
+# by construction, so every existing suite digest stands.
+var _unit_defs: Array[UnitDef] = []
+var _gear_defs: Array[GearDef] = []
+var _regimes_by_id: Dictionary = {}  # String id -> RegimeDef
+var _escalation_step_milli := SimFixed.MILLI  # curve step, converted once
+# Ids already warned about while resolving a snapshot (unknown content):
+# the odds query runs per frame — one warning per id, not one per frame.
+# Deliberately NOT serialized/hashed: it is a log damper, not state.
+var _escalation_warned := {}
 
 
-func _init(p_tunables: EconomyTunables = null) -> void:
+func _init(
+	p_tunables: EconomyTunables = null,
+	p_units: Array[UnitDef] = [],
+	p_gear: Array[GearDef] = [],
+	p_regimes: Array[RegimeDef] = []
+) -> void:
 	var tunables := p_tunables if p_tunables != null else EconomyTunables.new()
 	_floor_power = maxi(1, tunables.assault_knight_floor_power)
 	_garrison_base = maxi(1, tunables.assault_garrison_base_power)
@@ -124,6 +151,15 @@ func _init(p_tunables: EconomyTunables = null) -> void:
 		SimFixed.milli_from_float(tunables.assault_loss_fraction), 1, SimFixed.MILLI
 	)
 	_failure_suspicion = maxi(0, tunables.assault_failure_suspicion)
+	_escalation_step_milli = clampi(
+		SimFixed.milli_from_float(tunables.escalation_garrison_cycle_step),
+		SimFixed.MILLI, 3999
+	)
+	_unit_defs = p_units.duplicate()
+	_gear_defs = p_gear.duplicate()
+	for regime in p_regimes:
+		if regime != null:
+			_regimes_by_id[String(regime.id)] = regime
 
 
 func system_name() -> StringName:
@@ -174,6 +210,13 @@ func floor_met(engine: SimEngine) -> bool:
 ##       "modifier_kind": StringName,  # the regime combat kind, or &"" neutral
 ##       "regime_multiplier_milli": int,
 ##       "strength_milli": int,      # base x multiplier — the other side
+##       # ...when an L2 escalation snapshot is ACTIVE, the same four keys
+##       # carry the DERIVED base/kind/mult/strength plus: "source"
+##       # (&"escalation"), "escalation_cycle", "snapshot_power",
+##       # "curve_multiplier_milli", "regime_id", "leader",
+##       # "captured_at_run", "roster" (the snapshot's tier mix) — L2-C's
+##       # "whose army, what tier mix" data. No snapshot -> exactly the
+##       # four static keys, byte-identical to pre-L2.
 ##     },
 ##   }
 ##
@@ -206,7 +249,21 @@ func assault_odds(engine: SimEngine) -> Dictionary:
 	# odds math only — `power` and `floor_met` above stay RAW.
 	var veterans_mult := _veterans_multiplier_milli(engine)
 	var army_milli := army_power * army_mult * veterans_mult / SimFixed.MILLI
-	var garrison_milli := _garrison_base * garrison_mult
+	# L2 escalation (docs/sim-engine.md §19): when the meta carries a
+	# garrison snapshot AND this resolver is wired to resolve it, the
+	# castle side derives from the SNAPSHOT (army-power-equivalent x the
+	# escalation curve) instead of the static base — the regime-static
+	# branch below stays byte-identical for every no-snapshot engine (the
+	# zero-impact rule).
+	var garrison: Dictionary = _escalation_garrison(engine)
+	if garrison.is_empty():
+		garrison = {
+			"base_power": _garrison_base,
+			"modifier_kind": _combat_kind(engine),
+			"regime_multiplier_milli": garrison_mult,
+			"strength_milli": _garrison_base * garrison_mult,
+		}
+	var garrison_milli := int(garrison["strength_milli"])
 	return {
 		"floor_power": _floor_power,
 		"floor_met": army_power >= _floor_power,
@@ -221,12 +278,7 @@ func assault_odds(engine: SimEngine) -> Dictionary:
 			"score_milli": army_milli,
 			"per_unit": per_unit,
 		},
-		"garrison": {
-			"base_power": _garrison_base,
-			"modifier_kind": _combat_kind(engine),
-			"regime_multiplier_milli": garrison_mult,
-			"strength_milli": garrison_milli,
-		},
+		"garrison": garrison,
 	}
 
 
@@ -399,6 +451,84 @@ func _garrison_multiplier_milli(engine: SimEngine) -> int:
 	if regime.combat_modifier.kind != &"garrison_multiplier":
 		return SimFixed.MILLI
 	return SimFixed.milli_from_float(regime.combat_modifier.value)
+
+
+# --- L2 escalation internals ---------------------------------------------------
+
+
+## The escalation garrison breakdown (the odds screen's castle-side data),
+## or {} when the STATIC baseline rules — the zero-impact gate. Escalation
+## is active only when ALL hold: the run system exposes the shared meta, a
+## non-empty snapshot stands there, and this resolver can resolve it to a
+## positive power (an UNWIRED resolver — no content passed at construction,
+## the pre-L2 sites — or a snapshot whose every id left the pack — derives
+## 0 and falls back to the static garrison rather than a zero-strength
+## castle that would auto-win every assault).
+##
+## The math (exact integers, two floored divisions — pinned by test):
+##   snapshot_power = Escalation.roster_power(snapshot, unit+gear defs)
+##   curve_milli    = Escalation.curve_multiplier_milli(step, cycle)
+##   base_power     = snapshot_power * curve_milli / 1000
+##   mult           = the SNAPSHOT regime's garrison_multiplier milli
+##                    (save-schema §6: the reader resolves the winning
+##                    regime's combat modifier; unknown/absent/army-kind
+##                    regime -> neutral x1000. The CURRENT run's regime
+##                    still scales the ARMY side only.)
+##   strength_milli = base_power * mult
+##
+## Transparency (L2-C's data): the dict carries the static four keys FIRST
+## (base_power/modifier_kind/regime_multiplier_milli/strength_milli — same
+## invariants: strength == base x mult, and the two sides reproduce
+## win_permille to the digit) plus `source: &"escalation"`, the cycle, the
+## snapshot's raw + curved power, and WHOSE army stands on the wall —
+## regime id, leader, captured-at run, and the full roster/tier mix.
+func _escalation_garrison(engine: SimEngine) -> Dictionary:
+	var run: Variant = engine.get_system(&"run")
+	if run == null or not run.has_method("escalation_garrison"):
+		return {}
+	var snapshot: Dictionary = run.escalation_garrison()
+	if snapshot.is_empty():
+		return {}
+	var snapshot_power := Escalation.roster_power(
+		snapshot, _unit_defs, _gear_defs, _escalation_warned
+	)
+	if snapshot_power <= 0:
+		return {}
+	var cycle := maxi(1, int(run.escalation_cycle()))
+	var curve_milli := Escalation.curve_multiplier_milli(_escalation_step_milli, cycle)
+	var base_power := snapshot_power * curve_milli / SimFixed.MILLI
+	var regime := _snapshot_regime(snapshot)
+	var mult := SimFixed.MILLI
+	var kind := &""
+	if regime != null and regime.combat_modifier != null:
+		kind = regime.combat_modifier.kind
+		if kind == &"garrison_multiplier":
+			mult = SimFixed.milli_from_float(regime.combat_modifier.value)
+	var roster: Dictionary = snapshot.get("roster", {})
+	return {
+		"base_power": base_power,
+		"modifier_kind": kind,
+		"regime_multiplier_milli": mult,
+		"strength_milli": base_power * mult,
+		"source": &"escalation",
+		"escalation_cycle": cycle,
+		"snapshot_power": snapshot_power,
+		"curve_multiplier_milli": curve_milli,
+		"regime_id": String(snapshot.get("regime_id", "")),
+		"leader": String(snapshot.get("leader", "")),
+		"captured_at_run": int(snapshot.get("captured_at_run", 0)),
+		"roster": roster.duplicate(true),
+	}
+
+
+## The SNAPSHOT's regime def, resolved against the wired pack (null when
+## unresolvable — the meta-domain reader's neutral fallback, mirroring the
+## run system's unknown-regime rule without the per-query warning spam).
+func _snapshot_regime(snapshot: Dictionary) -> RegimeDef:
+	var id := String(snapshot.get("regime_id", ""))
+	if id.is_empty():
+		return null
+	return _regimes_by_id.get(id)
 
 
 ## The run's APPLIED veterans multiplier (L1-B2), read through the run
