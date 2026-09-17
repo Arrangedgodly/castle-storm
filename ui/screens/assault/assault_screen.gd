@@ -345,14 +345,16 @@ func _on_event(event: Dictionary) -> void:
 			_banked_points = int(event["value"])
 		&"assault_denied":
 			# The sim's own last-line defense (e.g. the run died between
-			# open and commit): print it and fall back to the odds — the
+			# open and commit): fall back to the odds and print the refusal
+			# AFTER the rebind (bind_odds re-lays the table and clears the
+			# strip — printing before it would erase the line unread); the
 			# failed cast disarms; the next raise starts from the pen.
 			_commit_armed = false
 			state = State.ODDS
 			set_process(false)  # the drain ended in a refusal
+			_bind_odds()
 			_stage.print_line(Inks.LineClass.WARN,
 				"The assault is refused — the army is not yet an army (power %d)." % int(event["value2"]))
-			_bind_odds()
 			_focus_chip("retreat")
 
 
