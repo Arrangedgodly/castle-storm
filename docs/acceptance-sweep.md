@@ -5,9 +5,9 @@ The final production gate: the town-hall acceptance criteria
 PRODUCT.md §"Accessibility & Inclusion") verified as a coherent whole.
 Every row below names the evidence that stands behind it in `make test`.
 
-**State: `make test` green — 715 gdUnit4 unit/property cases + 1,362
-acceptance checks, ~39s wall (budget <60s). Rows below name the evidence
-at the sweep that wrote them; Layer 1's rows are §11.**
+**State: `make test` green — 742 gdUnit4 unit/property cases + 1,455
+acceptance checks, ~44s wall (budget <60s). Rows below name the evidence
+at the sweep that wrote them; Layer 1's rows are §11, Layer 2's are §12.**
 
 ## The matrix results, criterion by criterion
 
@@ -189,6 +189,56 @@ The Layer-1 loop as one continuous acceptance arc, `journeys_sweep.gd`
   79 h / 12/12 unchanged, full-tree 70 h / 12/12, greed crushes at 27 h
   on both seeds).
 
+### 12. Layer 2 — the escalation cycle (L2-D, 2026-09-17) — PASS
+
+The Layer-2 ladder as one continuous acceptance arc through the REAL
+FRONT DOOR, `journeys_sweep.gd` **J7** (+38 checks, 103 total), one save
+root, booting twice — the META thread (snapshot, cycle, bank) and the
+FELT thread (reveal line, odds garrison line, header mark) asserted at
+every step:
+
+- **The fresh gate**: a fresh install carries NO snapshot (cycle 0) and
+  the first deal's reveal carries no escalation presence — the
+  zero-impact rule read at the door itself.
+- **Cycle 1**: the knight-fixture army takes the STATIC wall by the
+  two-step keyboard COMMIT; the outcome prints the CAPTURE BEAT beside
+  the seal; the meta captures the first garrison EXACTLY (cycle 1,
+  captured at run 1, the old leader's name + regime + crest, and the
+  snapshot's roster power == the army that took the wall, 30 power);
+  the chronicle entry records the cycle it opened and the bank holds
+  the score.
+- **The handoff felt**: run 2's win-restart reveal names the OLD
+  LEADER's veterans at cycle 1 (escalation block + the re-faced regime
+  card's crest/line + the third print in the escalation voice), and
+  the letterhead carries the CYCLE MARK (1) — the only spread chrome.
+- **The odds against your own army**: run 2's consult derives the
+  castle side from the SNAPSHOT (source `escalation`, power 30, cycle 1
+  identity curve); the castle card's line names whose veterans hold
+  the wall and the strip prints the composition + the snapshot's
+  tier-mix detail row. Retreat is free — the consult never commits.
+- **The layers compose**: a legacy card bought BETWEEN the cycles
+  through the table's own header verb (Grandma's Recipes, one Enter,
+  bank pays exactly the price mid-run, the deck folds on back).
+- **Cycle 2**: run 2's own veterans take the wall back (deterministic
+  on the seeded die — try 1 at 60 power vs the 30-veteran wall); the
+  SECOND capture is the LATEST victor's army (cycle 2, captured at run
+  2); the chronicle records both captures; run 3's reveal names run
+  2's veterans, the letterhead's mark reads 2, and run 3's odds show
+  the ×1.10 rung EXACTLY (snapshot 60 ×1.10 = 66 garrison).
+- **The records agree + the boundary**: bank + spent == the two banked
+  scores (358 + 60 == 418), the deck's own arithmetic reads the same;
+  and after the platform boundary (background flush + a fresh boot),
+  the returning door CONTINUEs run 3 with the garrison STILL in the
+  meta save — the check-in reveal reads cycle 2 and the resumed table
+  carries the cycle-2 mark.
+- Supporting pins: the L2-A/B/C unit suites (the engine's
+  capture/derivation/round-trip math; the reveal, odds, header and
+  chronicle presence), the `escalation_ladder_band` chained-campaign
+  suite (55 checks), and the balance evidence in `docs/balance.md` §7
+  (re-verified at L2-D close: baseline band 79 h / 12/12 unchanged,
+  the ×1.10 row and the ladder table reproduce exactly, full-tree
+  70 h / 12/12, greed 27 h both seeds).
+
 ## Accepted deviations (with rationale)
 
 | Deviation | Rationale |
@@ -206,7 +256,8 @@ The Layer-1 loop as one continuous acceptance arc, `journeys_sweep.gd`
 |---|---|---|
 | `tests/acceptance/suites/input_parity_matrix.gd` | 153 | the three-mode matrix (§3 above) |
 | `tests/acceptance/suites/responsive_sweep.gd` | 56 | the four-size whole-screen sweep (§4) + the 1.3× spot |
-| `tests/acceptance/suites/journeys_sweep.gd` | 33 → **65** | the five journeys at the screen (§10) + J6 the Layer-1 loop (§11, L1-D) |
+| `tests/acceptance/suites/journeys_sweep.gd` | 33 → **103** | the five journeys at the screen (§10) + J6 the Layer-1 loop (§11, L1-D) + J7 the escalation cycle (§12, L2-D) |
+| `tests/acceptance/suites/escalation_ladder_band.gd` | 55 | the chained-campaign ladder band (§12, L2-B; docs/balance.md §7) |
 | `tests/unit/test_type_scale.gd` | 8 | the font-scale mechanism (§9) |
 | `tests/unit/test_colorblind_audit.gd` | 6 | the consolidated colorblind audit (§8) |
 

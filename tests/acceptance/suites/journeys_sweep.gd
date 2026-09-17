@@ -27,6 +27,18 @@
 ##      the REAL command -> the next run's opening stipend pays the
 ##      effect EXACTLY (content line x the card's milli) -> chronicle and
 ##      meta agree: the progression loop is always on.
+##   J7 THE ESCALATION CYCLE (L2-D) — the full cycle arc through the same
+##      front door, one save root: a fresh campaign takes the static wall
+##      -> the victory CAPTURES the winning army (the meta's first
+##      snapshot; the outcome prints the capture beat) -> run 2's reveal
+##      shows the OLD LEADER's regime (the veterans' crest + line) and
+##      the letterhead carries the cycle mark -> the odds consult reads
+##      the SNAPSHOT garrison (whose veterans, what tier mix) -> a legacy
+##      card is bought BETWEEN the cycles -> run 2's own veterans take
+##      the wall back (cycle 2 captures the LATEST victor) -> run 3 faces
+##      the x1.10 rung -> the garrison rides the meta save across a
+##      session boundary: every victory garrisons the castle with your
+##      own veterans, and the ladder climbs.
 ##
 ## No wall waits: paced paper runs under Engine.time_scale (the T-UI-05
 ## injected-time strategy), restored at the end.
@@ -58,6 +70,7 @@ func run(harness) -> void:
 	await _journey_4_failure_restart(harness)
 	await _journey_5_victory_restart(harness)
 	await _journey_6_legacy_loop(harness)
+	await _journey_7_escalation_cycle(harness)
 
 	(harness as Node).get_tree().root.size = Vector2i(720, 720)
 	Engine.time_scale = 1.0
@@ -614,6 +627,265 @@ func _journey_6_legacy_loop(harness) -> void:
 	await _frames(harness, 3)
 
 
+# --- J7: the escalation cycle (L2-D) --------------------------------------------------
+
+
+func _journey_7_escalation_cycle(harness) -> void:
+	# THE FULL CYCLE ARC through the real front door, ONE save root, both
+	# threads asserted at every step: the META thread (snapshot shape,
+	# cycle count, bank arithmetic) and the FELT thread (the reveal's
+	# veterans line, the odds garrison line, the letterhead's cycle mark).
+	var root := "user://cs_journeys/l2-cycle"
+	_erase_dir(root)
+
+	# -- the FRESH door: no snapshot anywhere (the zero-impact gate) -----
+	var shell = await _booted_shell(harness, root, WIN_SEED)
+	harness.check(String(shell.route) == String(MainShell.ROUTE_BEGIN_FRESH),
+		"J7: the fresh install boots the single-BEGIN title")
+	var host: GameHost = shell.host
+	harness.check(host.run().escalation_garrison().is_empty() and host.run().escalation_cycle() == 0,
+		"J7: the fresh meta carries no snapshot (cycle 0 — the pre-first-victory state)")
+
+	shell._begin_chip.pressed.emit()
+	var spread = shell.spread
+	spread.host.driving = false  # journeys drive the world by fast_forward
+	for i in 60:
+		await _frame(harness)
+		if spread._intro.is_open():
+			break
+	await _key(harness, 4194309)  # unfold the first deal's reveal
+	for i in 200:
+		await _frame(harness)
+		if not spread._intro.is_open():
+			break
+	var fresh_view: Dictionary = spread._intro.view()
+	harness.check(String(fresh_view["variant"]) == "first_run"
+			and (fresh_view.get("escalation", {}) as Dictionary).is_empty()
+			and not (fresh_view["regime"] as Dictionary).has("veterans_line"),
+		"J7: the first deal carries no escalation presence (the reveal cannot invent a garrison)")
+
+	# -- run 1: the static wall falls; the victory CAPTURES the army -----
+	var leader1 := host.run().leader_name()
+	var regime1: StringName = host.run().regime_id()
+	var crest1 := _regime_crest(regime1)
+	_raise_knights(host, 2)
+	var army1: int = host.units().army_power()
+	var outcomes: Array = []  # every storm this journey closes, in order
+	spread._assault.finished.connect(func(outcome: StringName, _script: Dictionary) -> void:
+		outcomes.append(String(outcome)))
+	var outcome1 := await _storm_by_keyboard(harness, spread)
+	harness.check(outcome1 == "win",
+		"J7: run 1's storm takes the static wall (%s)" % str(outcomes))
+	harness.check(_capture_beat_printed(spread, 1),
+		"J7: the outcome prints the CAPTURE beat beside the seal — the veterans take the wall")
+	var snapshot: Dictionary = host.run().escalation_garrison()
+	harness.check(not snapshot.is_empty() and host.run().escalation_cycle() == 1
+			and int(snapshot["cycle"]) == 1 and int(snapshot["captured_at_run"]) == 1,
+		"J7: the victory captures the first garrison (cycle 1, captured at run 1)")
+	harness.check(String(snapshot["leader"]) == leader1
+			and StringName(String(snapshot["regime_id"])) == regime1
+			and StringName(String(snapshot["crest_id"])) == crest1,
+		"J7: the snapshot remembers the old leader's regime (leader, regime, crest)")
+	harness.check(Escalation.roster_power(snapshot, Inks.pack().units, Inks.pack().gear) == army1,
+		"J7: the snapshot's roster IS the army that took the wall (%d power)" % army1)
+	var entry1: Dictionary = host.meta.chronicle[0]
+	harness.check(String(entry1["outcome"]) == "victory"
+			and int(entry1.get("escalation_cycle", 0)) == 1
+			and host.meta.legacy_points == int(entry1["score"]),
+		"J7: the won hand banks its score and records the cycle it opened (%d lp)" % host.meta.legacy_points)
+
+	# -- run 2's reveal: the old leader's regime holds the walls ---------
+	var restart := false
+	for i in 240:
+		await _frame(harness)
+		if spread._intro.is_open() and spread._intro.variant == &"win_restart":
+			restart = true
+			break
+	harness.check(restart, "J7: the win-restart reveal deals run 2")
+	var reveal2: Dictionary = spread._intro.view()
+	var escalation2: Dictionary = reveal2.get("escalation", {})
+	harness.check(int(escalation2.get("cycle", 0)) == 1
+			and String(escalation2.get("leader_first", "")) == leader1.split(" ")[0],
+		"J7: the reveal's escalation block names the old leader at cycle 1")
+	harness.check(StringName(String((reveal2["regime"] as Dictionary).get("veterans_crest", &""))) == crest1
+			and String((reveal2["regime"] as Dictionary).get("veterans_line", "")).contains("veterans"),
+		"J7: the regime face card re-faces to the victor's line (crest + veterans)")
+	var lines2: Array = reveal2["lines"]
+	harness.check(String(lines2[2]["text"]).to_lower().contains("veterans")
+			and String(lines2[2]["text"]).to_lower().contains("cycle 1"),
+		"J7: the reveal's third print is the escalation voice: %s" % String(lines2[2]["text"]))
+	harness.check(host.is_run_running(), "J7: run 2 is live beneath the reveal")
+	await _key(harness, 4194309)  # deal run 2, one gesture
+	for i in 200:
+		await _frame(harness)
+		if not spread._intro.is_open():
+			break
+	var leader2 := host.run().leader_name()
+	var regime2: StringName = host.run().regime_id()
+	await _frames(harness, 6)  # the restart's full refresh rebinds the header
+	var mark := _cycle_mark(spread)
+	harness.check(mark != null and mark.visible and int(mark.get("value")) == 1,
+		"J7: the letterhead carries the cycle mark (1) — the only spread chrome")
+
+	# -- the odds consult: the walls are the SNAPSHOT's veterans ---------
+	_raise_knights(host, 2)  # run 2's own rebuild — the arc is a campaign again
+	spread.open_assault()
+	await _frames(harness, 6)
+	harness.check(spread._assault.is_open() and spread._assault.state == spread._assault.State.ODDS,
+		"J7: the odds table opens against the captured garrison")
+	var odds_view: Dictionary = AssaultPresenter.odds_view(host.assault().assault_odds(host.engine))
+	harness.check(String(odds_view.get("garrison_source", "")) == "escalation"
+			and int(odds_view["garrison_cycle"]) == 1
+			and int(odds_view["garrison_snapshot_power"]) == army1
+			and int(odds_view["garrison_curve_milli"]) == SimFixed.MILLI,
+		"J7: the castle side derives from the snapshot (power %d, cycle 1 = identity curve)" % army1)
+	var castle_line := AssaultPresenter.garrison_line(odds_view, Inks.regime_name(regime2))
+	harness.check(castle_line.contains(leader1.split(" ")[0]) and castle_line.contains("cycle 1"),
+		"J7: the castle card's line names whose veterans hold the wall: %s" % castle_line)
+	var strip_rows: Array = spread._assault.stage().printed_lines()
+	harness.check(strip_rows.size() >= 2 and String(strip_rows[0]["text"]).contains("veterans")
+			and String(strip_rows[1]["text"]).contains("cycle 1"),
+		"J7: the odds strip prints the composition + the snapshot's tier-mix detail row")
+	spread._assault.close()  # retreat is free — the consult never commits
+	await _frames(harness, 3)
+
+	# -- a legacy node BETWEEN the cycles (the two layers compose) -------
+	var legacy_chip := _ledger_verb(spread, "legacy_chip")
+	harness.check(legacy_chip != null, "J7: the table's header carries The Legacy verb")
+	legacy_chip.grab_focus()
+	await _frames(harness, 2)
+	await _key(harness, 4194309)
+	var deck = spread._legacy
+	harness.check(deck != null and deck.is_open(),
+		"J7: The Legacy opens as paper over the LIVE table (the mount rule)")
+	var seeded: Button = null
+	for i in 40:
+		await _frame(harness)
+		var focus := _focus(harness)
+		if focus is BaseButton and deck.sheet().is_ancestor_of(focus) \
+				and focus != deck.sheet().back_chip():
+			seeded = focus
+			break
+	harness.check(seeded != null
+			and StringName(String(seeded.model()["id"])) == LEGACY_FIRST_NODE,
+		"J7: the deck recommends the first affordable card over the live hand")
+	var bank_before: int = host.unlock_bank()
+	var price: int = host.unlock_node(LEGACY_FIRST_NODE).cost
+	await _key(harness, 4194309)  # the focused card's press IS the buy
+	harness.check(int(deck.stats[&"purchases"]) == 1 and host.legacy.is_owned(LEGACY_FIRST_NODE)
+			and host.unlock_bank() == bank_before - price,
+		"J7: the between-cycles buy pays exactly the price (%d -> %d)" % [bank_before, host.unlock_bank()])
+	await _key(harness, 4194305)  # Esc — the deck folds
+	harness.check(not deck.is_open(), "J7: the deck folds on back — the storm is next")
+
+	# -- cycle 2: run 2's own veterans take the wall back ----------------
+	var tries := 0
+	var took := false
+	while not took and tries < 4:
+		tries += 1
+		host.suspicion().set_suspicion(0)  # the long rebuild stays off the crush line
+		_raise_knights(host, 2)  # the rebuild (a lost storm costs knights — top up)
+		took = (await _storm_by_keyboard(harness, spread)) == "win"
+	harness.check(took, "J7: run 2's veterans take the wall back (try %d, %s)"
+		% [tries, str(outcomes)])
+	harness.check(_capture_beat_printed(spread, 2),
+		"J7: the second capture beat prints — the LATEST victor's line")
+	var snapshot2: Dictionary = host.run().escalation_garrison()
+	var power2: int = Escalation.roster_power(snapshot2, Inks.pack().units, Inks.pack().gear)
+	harness.check(host.run().escalation_cycle() == 2 and int(snapshot2["cycle"]) == 2
+			and int(snapshot2["captured_at_run"]) == 2
+			and String(snapshot2["leader"]) == leader2
+			and StringName(String(snapshot2["regime_id"])) == regime2,
+		"J7: cycle 2 captures the latest victor's army (run 2, %d power)" % power2)
+	harness.check(String(host.meta.chronicle[1]["outcome"]) == "victory"
+			and int(host.meta.chronicle[1].get("escalation_cycle", 0)) == 2,
+		"J7: the chronicle records both captures (cycles 1 and 2)")
+
+	# -- run 3's reveal: the ladder's second rung, on screen --------------
+	var restart3 := false
+	for i in 240:
+		await _frame(harness)
+		if spread._intro.is_open() and spread._intro.variant == &"win_restart":
+			restart3 = true
+			break
+	harness.check(restart3, "J7: the second win-restart reveal deals run 3")
+	var reveal3: Dictionary = spread._intro.view()
+	var escalation3: Dictionary = reveal3.get("escalation", {})
+	harness.check(int(escalation3.get("cycle", 0)) == 2
+			and String(escalation3.get("leader_first", "")) == leader2.split(" ")[0],
+		"J7: run 3's reveal names RUN 2's veterans at cycle 2")
+	await _key(harness, 4194309)  # deal run 3
+	for i in 200:
+		await _frame(harness)
+		if not spread._intro.is_open():
+			break
+	await _frames(harness, 6)
+	var mark3 := _cycle_mark(spread)
+	harness.check(mark3 != null and mark3.visible and int(mark3.get("value")) == 2,
+		"J7: the letterhead's mark reads 2 — every cycle is a wall taken")
+	spread.open_assault()  # the fresh estate consults the rung it faces
+	await _frames(harness, 6)
+	var rung: Dictionary = AssaultPresenter.odds_view(host.assault().assault_odds(host.engine))
+	harness.check(String(rung.get("garrison_source", "")) == "escalation"
+			and int(rung["garrison_cycle"]) == 2
+			and int(rung["garrison_snapshot_power"]) == power2
+			and int(rung["garrison_curve_milli"]) == 1100
+			and int(rung["garrison_base"]) == power2 * 1100 / SimFixed.MILLI,
+		"J7: run 3 faces the x1.10 rung (snapshot %d x1.10 = %d garrison)"
+			% [power2, int(rung["garrison_base"])])
+	spread._assault.close()
+	await _frames(harness, 3)
+
+	# -- the records agree, and the garrison survives the session boundary
+	var scores: int = int(host.meta.chronicle[0]["score"]) + int(host.meta.chronicle[1]["score"])
+	harness.check(host.meta.runs_recorded == 2
+			and host.meta.legacy_points + price == scores,
+		"J7: bank + spent == the two banked scores (%d + %d == %d)"
+			% [host.meta.legacy_points, price, scores])
+	var final_deck: Dictionary = LegacyPresenter.view(host)
+	harness.check(int(final_deck["total_earned"]) == scores
+			and int(final_deck["bank"]) == scores - price,
+		"J7: the deck's arithmetic reads the same record (earned %d)" % scores)
+	host.driving = false
+	host.background(T0 + 4 * 3600)  # the WM_CLOSE_REQUEST seam: anchor + both domains flushed
+	shell.queue_free()
+	await _frames(harness, 3)
+
+	var shell2 = await _booted_shell(harness, root, WIN_SEED)
+	var host2: GameHost = shell2.host
+	harness.check(String(shell2.route) == String(MainShell.ROUTE_CONTINUE),
+		"J7: the returning door finds run 3 live (CONTINUE)")
+	harness.check(host2.run().escalation_cycle() == 2
+			and not host2.run().escalation_garrison().is_empty(),
+		"J7: the captured garrison rides the meta save across the boundary")
+	shell2.injected_now_epoch = T0 + 5 * 3600  # the away window resolves at the press
+	shell2._continue_chip.pressed.emit()
+	var spread2 = shell2.spread
+	var resumed := false
+	for i in 90:
+		await _frame(harness)
+		if spread2._intro.is_open():
+			resumed = true
+			break
+	var reveal_back: Dictionary = spread2._intro.view() if resumed else {}
+	harness.check(resumed and String(reveal_back["variant"]) == "resumed"
+			and int((reveal_back.get("escalation", {}) as Dictionary).get("cycle", 0)) == 2,
+		"J7: the check-in reveal still reads cycle 2 — the walls remember")
+	await _key(harness, 4194309)  # the check-in's one gesture
+	for i in 200:
+		await _frame(harness)
+		if not spread2._intro.is_open():
+			break
+	var mark_back := _cycle_mark(spread2)
+	harness.check(mark_back != null and mark_back.visible and int(mark_back.get("value")) == 2,
+		"J7: the resumed table carries the cycle-2 mark — the loop is always on")
+	print("[journeys_sweep] J7 escalation cycle: walls %d then %d (x1.10 rung %d), cycle 2 taken on try %d, bank %d (%d spent), %s"
+		% [army1, power2, int(rung["garrison_base"]), tries, host2.meta.legacy_points, price,
+			"snapshot survived the boundary" if not host2.run().escalation_garrison().is_empty() else "SNAPSHOT LOST"])
+	shell2.queue_free()
+	await _frames(harness, 3)
+
+
 # --- shared helpers ----------------------------------------------------------------------------
 
 
@@ -723,6 +995,99 @@ func _assault_chip(spread, id: String) -> Button:
 		if chip is Button and String((chip as Button).action.get("id", "")) == id:
 			return chip
 	return null
+
+
+## The storm's whole arc at the screen (J5/J6's keyboard flow as one
+## reusable step): open the odds, the two-step COMMIT by keyboard, wait
+## the outcome, close through its chip. Returns the outcome ("win" /
+## "loss"), "" if the storm never resolved (refused / never staged).
+func _storm_by_keyboard(harness, spread) -> String:
+	var collected: Array = []  # lambdas capture arrays, not assigned locals
+	var receiver := func(finished_outcome: StringName, _script: Dictionary) -> void:
+		collected.append(String(finished_outcome))
+	spread._assault.finished.connect(receiver)
+	spread.host.driving = true  # the commit's one-tick drain runs through pacing
+	spread.open_assault()
+	await _frames(harness, 4)
+	var commit: Button = _assault_chip(spread, "commit")
+	commit.grab_focus()
+	await _frames(harness, 2)
+	await _key(harness, 4194309)  # the FIRST keyboard COMMIT arms the die
+	await _frames(harness, 3)
+	commit = _assault_chip(spread, "commit")  # the armed table re-laid its chips
+	commit.grab_focus()
+	await _frames(harness, 2)
+	await _key(harness, 4194309)  # the SECOND Enter casts
+	for i in 90:
+		await _frame(harness)
+		if spread._assault.state != spread._assault.State.ODDS:
+			break
+	for i in 240:
+		await _frame(harness)
+		if spread._assault.state == spread._assault.State.OUTCOME:
+			break
+	if spread._assault.state != spread._assault.State.OUTCOME:
+		spread._assault.close()  # never staged — bail without a stray press
+		spread.host.driving = false
+		spread._assault.finished.disconnect(receiver)
+		return ""
+	var close_chip: Button = null
+	for i in 60:
+		await _frame(harness)
+		close_chip = _assault_chip(spread, "close")
+		if close_chip != null:
+			break
+	if close_chip != null:
+		close_chip.grab_focus()
+		await _frames(harness, 2)
+		await _key(harness, 4194309)  # hand the outcome off, by keyboard
+	spread.host.driving = false
+	spread._assault.finished.disconnect(receiver)
+	return String(collected[0]) if not collected.is_empty() else ""
+
+
+## The letterhead's cycle mark (L2-C) on the ACTIVE slot's bound header —
+## null until the header has bound.
+func _cycle_mark(spread) -> Control:
+	var slot = spread.get_active_slot()
+	if slot == null:
+		return null
+	var strip: Control = slot.get_header()
+	if strip == null or strip.get_child_count() == 0:
+		return null
+	return strip.get_child(0).get("_cycle_mark") as Control
+
+
+## One header ledger verb chip by focus id (the verbs row's own identity).
+func _ledger_verb(spread, focus_id: String) -> Control:
+	var slot = spread.get_active_slot()
+	if slot == null:
+		return null
+	var strip: Control = slot.get_header()
+	if strip == null or strip.get_child_count() < 2:
+		return null
+	for chip in strip.get_child(1).get_children():
+		if chip is BaseButton and String((chip as BaseButton).action.get("id", "")) == focus_id:
+			return chip
+	return null
+
+
+## The pack's crest for a regime id (the snapshot's crest expectation).
+func _regime_crest(regime_id: StringName) -> StringName:
+	for regime: RegimeDef in Inks.pack().regimes:
+		if regime.id == regime_id:
+			return regime.crest_id
+	return &""
+
+
+## The VICTORY-class capture beat for one cycle is on the stage's printed
+## record (both CopyDeck variants carry "cycle {n}"; the seal row does not).
+func _capture_beat_printed(spread, cycle: int) -> bool:
+	for row: Dictionary in spread._assault.stage().printed_lines():
+		if int(row["class"]) == Inks.LineClass.VICTORY \
+				and String(row["text"]).to_lower().contains("cycle %d" % cycle):
+			return true
+	return false
 
 
 func _erase_dir(path: String) -> void:

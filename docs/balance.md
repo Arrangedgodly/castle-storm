@@ -334,6 +334,15 @@ gained the additive `p_meta` injection — the host's one-shared-meta
 rule). Cadence 6h, commit 450 permille, cap 360h/cycle, 12 seeds.
 CI pin: `tests/acceptance/suites/escalation_ladder_band.gd`.
 
+Re-verified at L2-D close (2026-09-17, the layer's acceptance
+integration): the full `make balance-sweep` re-run reproduces every
+§7 row exactly — the ×1.10 row (75/79/82/73/102 h, walls 44→71), the
+ladder table, and every pre-L2 section byte-unmoved (baseline band
+12/12 / 79 h mean / 127 h slowest / 11 losses; full tree 70 h / 9
+losses; greed 27 h both seeds). The two-cycle front-door journey that
+closes the layer (`journeys_sweep.gd` J7) walks the same curve live:
+walls 30 then 60, the ×1.10 rung reading 66 exactly.
+
 **The L2-A anchor was wrong, and the sweep corrects it:** §7's
 placeholder note estimated "a typical winning army ~100-115 power already
 doubles the static 50 wall". Measured: the sensible player's winning army

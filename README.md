@@ -8,7 +8,7 @@ The whole game plays out as **"The Conspiracy's Spread"**: a cheap-print tarot t
 
 ## Status
 
-Playable MVP plus Layer 1 (the persistent legacy tree), production-complete and verified in CI. The full loop — recruit, economy, suspicion, storm, win/loss, restart — runs headlessly in accelerated time as an acceptance suite, alongside 1,000-hour stability runs, chaos-tested saves, and an input-parity matrix across touch, gamepad, and keyboard. What's in the loop:
+Playable MVP plus Layers 1–2 (the persistent legacy tree; enemy escalation), production-complete and verified in CI. The full loop — recruit, economy, suspicion, storm, win/loss, restart — runs headlessly in accelerated time as an acceptance suite, alongside 1,000-hour stability runs, chaos-tested saves, and an input-parity matrix across touch, gamepad, and keyboard. What's in the loop:
 
 - 3 resources (food, timber, iron), 4 upgradeable buildings, worker and militia-to-knight training plus an archer branch
 - 2 gear slots across 3 tiers; 4 regime flavors, each with a combat modifier and an economy quirk
@@ -17,6 +17,7 @@ Playable MVP plus Layer 1 (the persistent legacy tree), production-complete and 
 - Randomized leader identities and regimes on every restart; a persistent chronicle of past runs
 - Offline progress resolved on return (capped at 8h) and printed as a while-you-were-away report
 - **The Legacy (Layer 1, shipped)**: every ended run — win, loss, or abandon — banks legacy points. Between runs, the growing deck on the title screen (or the header's The-Legacy verb) spends them on 15 cards across 4 families: a richer stipend, cheaper walls and gear, faster drills, a cooler Watchful Eye, veterans that fight above their power. A card bought is kept forever and takes effect with the next hand — losing never costs the bank.
+- **The ladder (Layer 2, shipped)**: every victory garrisons the castle with your own veterans — the next run's walls are held by your last winning army, at the exact power and gear tiers it took them with, and each cycle taken compounds the garrison ×1.10. The next hand's reveal says whose veterans hold the walls, the odds table prints the tier mix you armed them with, and the letterhead counts cycles taken. Your veterans are beatable (a full rebuild, not a wall) — until the compounding asks for the Legacy tree's help.
 
 Balance is measured, not guessed: first recruit at ~7 minutes, first food trickle at minute 12, first win in the 2–4 wall-day band at a 4-check-ins-a-day rhythm ([docs/balance.md](docs/balance.md)).
 
@@ -75,7 +76,7 @@ Artifacts: `castle-storm.exe` (~110 MB, embedded PCK), `castle-storm.dmg` (~70 M
 
 ## Playing
 
-Start with one peasant and a stipend. Assign recruits as workers to produce food, timber, and iron; raise and upgrade four buildings; train militia into knights along the melee path or the archer branch; craft gear into two slots across three tiers. Growth draws the Watchful Eye — suspicion climbs as your camp grows, arms a telegraph, and lands crackdowns that seize resources and scatter followers unless you lay low or act. When the odds meter looks right, commit the storm: an auto-resolved assault with visible confidence bands and a card-played vignette. Win, and you restart under a new randomized regime and leader; lose, and you bank the run's chronicle and deal the next hand the same way. Every ended hand also banks legacy points — the growing deck (The Legacy, on the title card or the table's header verbs) spends them between runs on permanent cards that join your next hand. Time away resolves when you return and prints on the table.
+Start with one peasant and a stipend. Assign recruits as workers to produce food, timber, and iron; raise and upgrade four buildings; train militia into knights along the melee path or the archer branch; craft gear into two slots across three tiers. Growth draws the Watchful Eye — suspicion climbs as your camp grows, arms a telegraph, and lands crackdowns that seize resources and scatter followers unless you lay low or act. When the odds meter looks right, commit the storm: an auto-resolved assault with visible confidence bands and a card-played vignette. Win, and the castle is garrisoned by your own veterans — the next run's reveal says so, its odds table prints the exact army you left on the wall, and beating your old army opens the next cycle of a ladder that compounds ×1.10 per victory taken. Lose, and you bank the run's chronicle and deal the next hand the same way. Every ended hand also banks legacy points — the growing deck (The Legacy, on the title card or the table's header verbs) spends them between runs on permanent cards that join your next hand. Time away resolves when you return and prints on the table.
 
 Every verb works three ways, at parity:
 
@@ -107,14 +108,15 @@ D-pad and sticks drive focus navigation. Touch targets are at least 48dp, state 
 ## Testing
 
 ```sh
-make test    # ~39s: 715 gdUnit4 unit/property cases + 1,362 acceptance checks
+make test    # ~44s: 742 gdUnit4 unit/property cases + 1,455 acceptance checks
 ```
 
 `make test` runs `scripts/ci.sh`: the gdUnit4 suites, then a SceneTree-based acceptance runner built for marathon suites with no framework timeout. What the suites pin:
 
 - **Full runs in CI** — recruit through economy, a failed first storm, rebuild, victory, banking, restart, and bit-identical replay
 - **Stability** — 1,000 simulated hours with no runaway or collapse; the balance band (first win 2–4 wall days, 12/12 seeds)
-- **Saves** — chaos and corruption probes across rotating slots and both save domains
+- **The escalation ladder** — chained campaigns on one shared meta: cycles 1–5 climbable (full tree 12/12 every cycle, walls rising 44 → 71), cycle 1 beatable barefoot; and the two-cycle journey through the real front door — capture, the veterans' reveal, the odds against your own army, the ×1.10 rung — in the journeys sweep
+- **Saves** — chaos and corruption probes across rotating slots and both save domains (the captured-garrison snapshot rides the meta save)
 - **Input parity** — 153-check matrix: every verb through touch, pad, and keyboard, including full pad-only and touch-only storms
 - **Responsive and Deck posture** — every surface at four canonical sizes, pad navigation across every screen, idle battery discipline (zero processing, zero animation at rest), and memory boundedness
 
@@ -129,7 +131,7 @@ Art and fonts are vendored and attributed in [assets/vendor/ATTRIBUTIONS.md](ass
 The honest one, in order:
 
 1. **L1 — persistent legacy unlock tree: SHIPPED.** Every ended run banks legacy points (win, loss, or abandon — the bank survives everything). Between runs, the Legacy deck — reachable from the title card once a hand has ended, or the header's The-Legacy verb mid-session — spends them on permanent cards across four families (The Old Guard's stipend ladder, The Workshop's cheaper walls and gear, The Yard's faster drills, The Survivors' cooler suspicion and veteran fighters). Buying is one step, the bank and the deck update live, and the card joins the NEXT hand: the loop is always on. The whole arc — bank, buy, next run's opening pays the effect exactly, chronicle consistent — runs in CI as the journeys sweep's sixth journey.
-2. **L2 — enemy escalation**: your victorious army becomes the next cycle's garrison
+2. **L2 — enemy escalation: SHIPPED.** Every victory garrisons the castle with your own veterans. The next run's walls are held by your last winning army — same units, same gear tiers, the old leader's crest on the regime card — and each cycle taken compounds the garrison ×1.10 (docs/balance.md §7: cycles 1–5 climbable, the tree is the handrail when the exponent surfaces). The whole arc — capture, the veterans' reveal, the odds against the snapshot, a legacy buy between cycles, the second capture, and the rung the third run faces — runs in CI as the journeys sweep's seventh journey.
 3. **Steam Deck hardware validation**: the checklist in [docs/deck-validation.md](docs/deck-validation.md) — 60Hz lock, battery target, live Steam Input loop, suspend/resume on real hardware
 4. **Android** (mobile is in the design foundation; iOS is post-MVP)
 
