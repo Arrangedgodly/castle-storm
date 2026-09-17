@@ -747,12 +747,19 @@ func test_unclipped_at_four_sizes_focus_never_stranded() -> void:
 	var screen: SpreadScreen = await _mounted_screen(host)
 	var chronicle := screen._chronicle
 	var router: LayoutRouter = screen.get_router()
+	# Harness-budget trim (finishing #5 re-dispatch): the router's 0.25s
+	# dwell is the only wall-paced thing under these polls — age it under
+	# the injected clock; the audits read SETTLED state at the true clock
+	# (the dwell's flapping premise stays pinned at 1.0x in
+	# test_responsive_layout's flapping test).
+	Engine.time_scale = 60.0
 	for i in TEST_SIZES.size():
 		get_window().size = TEST_SIZES[i]
 		for f in 240:
 			await get_tree().process_frame
 			if router.is_portrait() == EXPECTED_PORTRAIT[i] and router.design_size().x > 1.0:
 				break
+		Engine.time_scale = 1.0
 		for f in 3:
 			await get_tree().process_frame
 		chronicle.open(host, router)
@@ -768,6 +775,8 @@ func test_unclipped_at_four_sizes_focus_never_stranded() -> void:
 		assert_that(get_viewport().gui_get_focus_owner()).is_not_null()
 		chronicle.close()
 		await get_tree().process_frame
+		Engine.time_scale = 60.0
+	Engine.time_scale = 1.0
 	screen.queue_free()
 
 

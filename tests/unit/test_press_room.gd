@@ -452,14 +452,21 @@ func test_unclipped_at_both_orientations_and_sheet_rects_pin_all_sizes() -> void
 	# LIVE half: one portrait iteration (chip reachable on the active
 	# header, the card opens unclipped, focus never strands) and one
 	# landscape iteration, plus the orientation swap UNDER the open card.
+	# (Harness-budget trim, finishing #5 re-dispatch: the router's 0.25s
+	# dwell is the only wall-paced thing under these polls — age it under
+	# the injected clock; the audits read SETTLED state at the true clock.
+	# The dwell's flapping premise stays pinned at 1.0x in
+	# test_responsive_layout's flapping test.)
 	var live := [Vector2i(720, 1280), Vector2i(1280, 800)]
 	var live_portrait := [true, false]
 	for i in live.size():
 		get_window().size = live[i]
+		Engine.time_scale = 60.0
 		for f in 240:
 			await get_tree().process_frame
 			if router.is_portrait() == live_portrait[i] and router.design_size().x > 1.0:
 				break
+		Engine.time_scale = 1.0
 		for f in 2:
 			await get_tree().process_frame
 		var chip := SpreadScreen.header_chip(screen.get_active_slot() as OrientationSlot, "press_room_chip")
@@ -477,10 +484,12 @@ func test_unclipped_at_both_orientations_and_sheet_rects_pin_all_sizes() -> void
 			# Swap orientation UNDER the open card — the paper relays, the
 			# focus never strands (the papers' own contract, one leg pins it).
 			get_window().size = Vector2i(1280, 800)
+			Engine.time_scale = 60.0
 			for f in 240:
 				await get_tree().process_frame
 				if not router.is_portrait() and router.design_size().x > 1.0:
 					break
+			Engine.time_scale = 1.0
 			for f in 2:
 				await get_tree().process_frame
 			assert_bool(press_room.is_open()).is_true()

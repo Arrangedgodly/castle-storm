@@ -466,14 +466,28 @@ const TEST_SIZES: Array[Vector2i] = [
 ]
 const EXPECTED_PORTRAIT := [true, false, false, true]
 
+## Injected-time scale for the router-dwell polls only (see
+## _settle_window): accelerates the 0.25s dwell, never the settled-state
+## reads around it, and never the flapping test (which pins the dwell's
+## own premise at the true clock).
+const SWEEP_SCALE := 60.0
+
 
 func _settle_window(lab: ResponsiveScreen, window_size: Vector2i, want_portrait: bool) -> void:
+	# Harness-budget trim (finishing #5 re-dispatch): age the router's
+	# 0.25s dwell under the injected clock — the swap still lands through
+	# the REAL deadband + dwell path (candidate observed, aged, then
+	# applied); the poll still guards it. Handed back to the true clock
+	# before the caller reads settled geometry.
 	get_window().size = window_size
 	var router := lab.get_router()
+	Engine.time_scale = SWEEP_SCALE
 	for i in 240:
 		await get_tree().process_frame
 		if router.is_portrait() == want_portrait and router.design_size().x > 1.0:
-			return
+			break
+	Engine.time_scale = 1.0
+	await get_tree().process_frame
 
 
 func test_lab_at_all_four_test_sizes() -> void:

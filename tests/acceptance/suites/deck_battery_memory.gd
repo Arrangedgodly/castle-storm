@@ -32,8 +32,11 @@ const SpreadScreen := preload("res://ui/screens/spread/spread_screen.gd")
 const SPREAD_SCENE := preload("res://ui/screens/spread/spread_screen.tscn")
 const QUIET_SEED := 20261103
 const DECK_WINDOW := Vector2i(1280, 800)
-## Injected-time scale for the passive paper's dwell (restored at exit).
-const WATCH_SCALE := 20.0
+## Injected-time scale for the passive paper's dwell + the mount/entrance
+## tweens (restored at exit). Every paced wait is a forward state poll,
+## so the scale rides the same premise at 60 as it did at 20 — raised in
+## the finishing #5 re-dispatch's harness-budget trim.
+const WATCH_SCALE := 60.0
 const T0 := 1_800_000_000
 
 ## The documented per-frame seams (script file names): the pacing process

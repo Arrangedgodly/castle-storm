@@ -38,6 +38,13 @@
 ## in GAME code — this suite INJECTS TIME via Engine.time_scale = 20 (a
 ## watched ~4s beat costs ~0.2s of wall while the REAL paced path runs
 ## end to end); after() restores 1.0 so no sibling sees the fast clock.
+## The scale is a PREMISE, not just a budget: the crush beat must stay
+## observable mid-flight (the polls that catch it own the table enter
+## after a full drive), so it deliberately stays BELOW the point where
+## per-frame injected time (~0.14 game-seconds) swallows whole beat
+## phases — probed in the finishing #5 re-dispatch: at 60 (0.41
+## game-seconds/frame) the beat starts and resolves inside single frames
+## and the mid-beat pins never see it.
 ##
 ## Meter states are constructed through the documented set_suspicion
 ## test seam (mirrors SimEngine.set_resource — the sim's own suite owns

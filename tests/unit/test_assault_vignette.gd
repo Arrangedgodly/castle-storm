@@ -33,21 +33,23 @@
 ## vignette's authored pacing is real SceneTreeTimers + Tweens living in
 ## GAME code (untouchable here), so this suite INJECTS TIME instead of
 ## waiting the wall clock: `Engine.time_scale = WATCH_SCALE` makes every
-## beat timer, march tween and wash tween advance ~20x per frame, and a
-## watched ~10s paced replay costs ~0.5s of wall while the REAL paced
+## beat timer, march tween and wash tween advance ~60x per frame, and a
+## watched ~10s paced replay costs ~0.17s of wall while the REAL paced
 ## path still runs end to end (every await, tween, generation guard and
 ## signal order — the settled-state contract is separately pinned by the
 ## cold-twin test, which needs no time at all). The scale stays below
 ## every pinned in-flight window (nothing here asserts mid-motion against
 ## frame counts; all waits are state polls with generous frame caps), and
 ## after() restores 1.0 so no sibling suite ever sees the fast clock.
+## (Finishing #5 re-dispatch: 20 -> 60 — the polls-only premise is
+## unchanged, the same trim the harness budget demanded.)
 extends GdUnitTestSuite
 
 const SPREAD_SCENE := "res://ui/screens/spread/spread_screen.tscn"
 const SpreadScreen := preload("res://ui/screens/spread/spread_screen.gd")
 
 ## Injected-time scale for watched pacing (see WAITING STRATEGY above).
-const WATCH_SCALE := 20.0
+const WATCH_SCALE := 60.0
 
 ## Probed deterministic floor-assault outcomes (2 t1 knights, power 30):
 ## 20261207 iron_rotunda WINS (army-side modifier); 20261200

@@ -30,6 +30,12 @@ const TEST_SIZES: Array[Vector2i] = [
 ]
 const EXPECTED_PORTRAIT := [true, false, false, true]
 
+## Injected-time scale for the router-dwell polls only (see
+## _settle_window): accelerates the 0.25s dwell, never the settled-state
+## reads around it. Matches the T-UI-05 waiting strategy's premise —
+## nothing here asserts mid-motion against frame counts.
+const SWEEP_SCALE := 60.0
+
 var _dir_seq := 0
 
 
@@ -275,12 +281,22 @@ func _mounted_screen(host: GameHost) -> SpreadScreen:
 
 
 func _settle_window(screen: SpreadScreen, window_size: Vector2i, want_portrait: bool) -> void:
+	# Harness-budget trim (finishing #5 re-dispatch): the router's 0.25s
+	# dwell is the only wall-paced thing under this poll — inject time for
+	# the poll itself (the swap still lands through the REAL deadband +
+	# dwell path, just aged faster), then hand the true clock back before
+	# the caller reads settled geometry. The dwell's own premise (rapid
+	# flapping never swaps) stays pinned at scale 1.0 by
+	# test_responsive_layout.test_flapping_window_resizes_never_swap.
 	get_window().size = window_size
-	var router: LayoutRouter = screen.get_router()
+	var router := screen.get_router()
+	Engine.time_scale = SWEEP_SCALE
 	for i in 240:
 		await get_tree().process_frame
 		if router.is_portrait() == want_portrait and router.design_size().x > 1.0:
-			return
+			break
+	Engine.time_scale = 1.0
+	await get_tree().process_frame
 
 
 func _clipped_controls(root: Control, design: Vector2) -> Array[String]:
@@ -549,10 +565,14 @@ func test_armed_eye_plate_countdown_rule_and_clear_lane() -> void:
 	# The relief plays the retreat flinch (a 0.45s scale tween) — the pin
 	# waits it out: a scaled control's global origin breathes with the
 	# pulse, and the perch formula compares against the settled rect.
+	# (Harness-budget trim: the tween ages under the injected clock; the
+	# poll still guards on its TRUE completion signal retreat_t >= 1.0.)
+	Engine.time_scale = SWEEP_SCALE
 	for i in 120:
 		await get_tree().process_frame
 		if eye.retreat_t >= 1.0:
 			break
+	Engine.time_scale = 1.0
 	await get_tree().process_frame  # the reserve lift's re-layout settles
 	await get_tree().process_frame
 	screen._bind_eye()  # rebind against the settled geometry, then pin (this suite's pattern)

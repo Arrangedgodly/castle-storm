@@ -590,12 +590,20 @@ func test_reveal_unclipped_at_four_sizes_focus_never_stranded() -> void:
 	var host := _test_host()
 	var screen: SpreadScreen = await _mounted_screen(host)
 	var router: LayoutRouter = screen.get_router()
+	# Harness-budget trim (finishing #5 re-dispatch): the only wall-paced
+	# thing under these polls is the router's 0.25s dwell — age it under
+	# the injected clock (the swap still lands through the real deadband +
+	# dwell path); the audits themselves read SETTLED state at the true
+	# clock. The dwell's flapping premise stays pinned at 1.0x in
+	# test_responsive_layout's flapping test.
+	Engine.time_scale = 60.0
 	for i in TEST_SIZES.size():
 		get_window().size = TEST_SIZES[i]
 		for f in 240:
 			await get_tree().process_frame
 			if router.is_portrait() == EXPECTED_PORTRAIT[i] and router.design_size().x > 1.0:
 				break
+		Engine.time_scale = 1.0
 		for f in 3:
 			await get_tree().process_frame
 		assert_bool(screen._intro.is_open()).is_true()
@@ -605,4 +613,6 @@ func test_reveal_unclipped_at_four_sizes_focus_never_stranded() -> void:
 			assert_str(offender).is_equal("<no clipping expected>")
 		# Focus stays on the one gesture across swaps.
 		assert_that(get_viewport().gui_get_focus_owner()).is_not_null()
+		Engine.time_scale = 60.0
+	Engine.time_scale = 1.0
 	screen.queue_free()

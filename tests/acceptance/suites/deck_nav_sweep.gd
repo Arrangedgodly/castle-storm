@@ -45,7 +45,12 @@ const SpreadScreen := preload("res://ui/screens/spread/spread_screen.gd")
 const SPREAD_SCENE := preload("res://ui/screens/spread/spread_screen.tscn")
 
 const DECK_WINDOW := Vector2i(1280, 800)
-const WATCH_SCALE := 20.0
+## Injected-time scale for the paced paths (the storm's vignette beats,
+## the intro unfold, the choice card's slide). Every paced wait in this
+## sweep is a forward state poll (nothing asserts mid-motion against
+## frame counts), so the scale rides the same premise at 60 as it did at
+## 20 — raised in the finishing #5 re-dispatch's harness-budget trim.
+const WATCH_SCALE := 60.0
 const QUIET_SEED := 20261103
 ## Probed in test_assault_vignette.gd: 2 t1 knights (power 30 > floor 23),
 ## iron_rotunda's army-side modifier — a deterministic pad-driven WIN.
