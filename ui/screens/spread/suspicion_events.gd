@@ -703,6 +703,11 @@ class ChoiceCard:
 	func open(for_model: Dictionary) -> void:
 		model = for_model
 		var urgent := bool(model.get("urgent", false))
+		# The baked plate sizes re-apply on every open — the press-room's
+		# live type-scale change (finishing refinement #5) re-flows a card
+		# composed at another factor the next time the moment arrives.
+		_title.add_theme_font_size_override("font_size", TypeScale.scaled(22))
+		_countdown.add_theme_font_size_override("font_size", TypeScale.scaled(17))
 		_rule.set("form", 3 if urgent else 0)  # RuleForm.DOUBLE / SOLID
 		_rule.set("rule_ink", Inks.RED if urgent else Inks.INK)
 		_title.text = String(model.get("title", ""))

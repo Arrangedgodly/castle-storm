@@ -20,11 +20,14 @@
 ## shortens every motion to NEAR-INSTANT: flips still fire their signals,
 ## still call the content swap in contract order, and still land on the
 ## same end state — the reveal is CONTENT, not animation — while entrance
-## slides are skipped entirely. `MotionProfile.forced` is the STUB SETTING
-## HOOK the future settings screen (T-UI-10's polish pass) writes: -1
-## unset (project setting rules), 0 full motion, 1 reduced. Tests drive
-## `forced` because ProjectSettings are process-global and cannot be
-## flipped per-case.
+## slides are skipped entirely. `MotionProfile.forced` is the hook the
+## PRESS-ROOM CARD (finishing refinement #5) writes: -1 unset (the
+## project setting rules — a player who never touched the card), 0 full
+## motion, 1 reduced. The card's write is persisted in RunMeta.preferences
+## and re-applied at boot; the change itself is LIVE by construction
+## (every motion owner asks this class at motion time — no restart).
+## Tests drive `forced` because ProjectSettings are process-global and
+## cannot be flipped per-case.
 class_name MotionProfile
 extends RefCounted
 
@@ -41,7 +44,7 @@ const FLOURISH_SECONDS := 0.40
 ## <= 0.05s as "go synchronous" (same signals, same order, same end state).
 const REDUCED_FRACTION := 0.05
 
-## The stub settings-screen hook (-1 unset, 0 full motion, 1 reduced).
+## The press-room card's hook (-1 unset, 0 full motion, 1 reduced).
 static var forced := -1
 
 

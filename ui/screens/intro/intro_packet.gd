@@ -182,10 +182,16 @@ func _tune_plates(face: BoxContainer, title_size: int) -> void:
 
 
 ## Bind the presenter's view. Same view => same render (snapshot_hash).
+## The baked plate sizes re-apply on every bind — the press-room's live
+## type-scale change (finishing refinement #5) re-flows a packet composed
+## at another factor the next time the reveal opens.
 func bind(view: Dictionary) -> void:
 	var variant: StringName = view["variant"]
 	var leader: Dictionary = view["leader"]
 	var regime: Dictionary = view["regime"]
+	_title_label.add_theme_font_size_override("font_size", TypeScale.scaled(34))
+	_tune_plates(_leader_face, 22)
+	_tune_plates(_regime_face, 20)
 	_title_label.text = _title_for(variant)
 	_leader_frame.set("edge_form", Inks.EdgeForm.SOLID)
 	_leader_frame.set("regime_id", regime["id"])

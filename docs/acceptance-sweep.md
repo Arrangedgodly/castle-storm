@@ -126,10 +126,15 @@ acceptance checks, ~55s wall (budget <60s).**
   (`run_header.gd`, the debug chip); re-captured and inspected clean.
   The header leader-name truncation on long names is pre-existing at
   1.0× (a copy/name-budget matter, T-COPY-01 territory, recorded).
-- **Documented deviation**: the scale applies at BOOT (main scene, the
-  spread screen, the test runners). A live settings toggle needs a
-  whole-view rebind and ships with the (post-MVP) settings screen; at
-  MVP it is a project setting, like `motion/reduced_motion`.
+- **Documented deviation (RESOLVED by finishing refinement #5)**: the
+  scale originally applied at BOOT only (main scene, the spread screen,
+  the test runners) — a live toggle was deferred to a settings screen.
+  The press-room card now IS that surface: the 1.0–1.3 steps apply LIVE
+  (the theme rewrite + the whole-view rebind) and persist in the META
+  domain (`RunMeta.preferences`, additive-optional), re-applied at boot
+  before any chrome bakes sizes. The project setting remains the
+  pre-feature default for a player who never touched the card;
+  `motion/reduced_motion` gained the same live + persisted surface.
 
 ### 10. The journeys 1–5 — PASS
 
@@ -150,7 +155,7 @@ the missing J1/J2/J3 screen-level arcs.
 | Deviation | Rationale |
 |---|---|
 | **Deck hardware validation deferred** | No Deck hardware in this environment. `docs/deck-validation.md` carries the concrete hardware checklist (SteamOS run, 60Hz lock, battery, Steam Input, suspend/resume, first-boot). The M-series windowed pass (T-PERF-02) is necessary-not-sufficient with 3–5× budget margins. |
-| **Font scale applies at boot** | A live toggle needs a whole-view rebind + settings screen (post-MVP). Project setting at MVP, like reduced motion. |
+| **Font scale applies at boot** | Originally: a live toggle needs a whole-view rebind + settings screen (post-MVP). RESOLVED by finishing refinement #5 — the press-room card applies the 1.0–1.3 steps live and persists them in the meta domain (see §9 above); the recorded evidence of this sweep predates that surface. |
 | **Journey-1 literal payoff timing** (~min 49 trickle / ~min 141 trainee at 1×) | Accepted at T-UI-10 (the "I get it" arc lands at minute 8); content-side levers routed to the T-SIM-08 follow-up. |
 | **Header long-name truncation at 1.0×** | Pre-existing (visible in both 1.0× and 1.3× captures); a name/copy budget decision, T-COPY-01 territory. |
 | **The vsync-cadence max gate flakes on this macOS host** | T-PERF-02's recorded non-blocking caveat (~24ms OS compositor hitch, not game cost); belongs on the hardware checklist. NOT in `make test`. |

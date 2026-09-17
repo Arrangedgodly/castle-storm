@@ -255,8 +255,9 @@ static func decode_exact_ints(value: Variant) -> Variant:
 ## Deterministic, formatter-independent textual form of a JSON-safe value:
 ## dictionary keys are sorted; ints and integral floats share one token
 ## (JSON parse erases the int/float distinction, so both sides of a
-## round-trip must canonicalize identically); non-integral floats use %.17g;
-## strings are JSON-quoted. This is what the envelope checksum hashes.
+## round-trip must canonicalize identically); non-integral floats use
+## str()'s shortest round-trip form; strings are JSON-quoted. This is
+## what the envelope checksum hashes.
 static func canonical_form(value: Variant) -> String:
 	match typeof(value):
 		TYPE_NIL:
@@ -269,7 +270,15 @@ static func canonical_form(value: Variant) -> String:
 			var floating := float(value)
 			if is_finite(floating) and floating == floor(floating) and absf(floating) < float(JSON_SAFE_INT_LIMIT):
 				return "i%d" % int(floating)
-			return "f%.17g" % floating
+			# Godot's `%` operator carries no %g specifier (a runtime
+			# formatting error — surfaced when finishing refinement #5's
+			# type-scale preferences put 1.1 into the meta payload, the
+			# first non-integral float any domain ever saved), so the
+			# canonical token is str()'s shortest round-trip form: same
+			# double => same token, distinct doubles => distinct tokens,
+			# and stable across the JSON round-trip (the parser restores
+			# the exact double).
+			return "f" + str(floating)
 		TYPE_STRING:
 			return JSON.stringify(String(value))
 		TYPE_DICTIONARY:

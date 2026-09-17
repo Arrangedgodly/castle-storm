@@ -91,6 +91,16 @@ Where a row is owned by a different suite, it is named.
 | Turn pages (NEWER/OLDER) | tap chip | A on focused chip | Enter | §E all three |
 | Close (BACK TO THE TABLE) | tap BACK chip | B | Esc | §E all three |
 
+### The press-room card (finishing refinement #5 — the settings surface)
+
+| Action | Touch | Pad | Keyboard | Owning test |
+|---|---|---|---|---|
+| Open from the header's Press-Room chip | tap chip | A on focused chip | Enter | §G all three |
+| Walk the steps | tap = direct | dpad (rail left/right within a row, up/down across rows) | arrows | §G + `test_press_room.gd` |
+| Set the letter size (1.0x–1.3x) | tap step chip | A on focused step | Enter | §G all three (applied LIVE + persisted) |
+| Set the presswork (Full turn / Steady hand) | tap step chip | A on focused step | Enter | §G all three (reduced motion, live, no restart) |
+| Close (BACK TO THE TABLE) | tap BACK chip | B | Esc | §G all three |
+
 ### The leader intro / restart reveal (T-UI-05)
 
 | Action | Touch | Pad | Keyboard | Owning test |

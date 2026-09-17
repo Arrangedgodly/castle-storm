@@ -201,6 +201,10 @@ func _rebuild_chips(view: Dictionary) -> void:
 ## Bind the presenter's view. Same view => same render (snapshot_hash).
 func bind(view: Dictionary) -> void:
 	_bind_token += 1  # any settle still holding the previous page aborts
+	# The title's baked size re-applies on every bind — the press-room's
+	# live type-scale change (finishing refinement #5) re-flows a ledger
+	# composed at another factor the next time it opens.
+	_title_label.add_theme_font_size_override("font_size", TypeScale.scaled(30))
 	_title_label.text = String(view["title"])
 	_title_label.add_theme_color_override("font_color", Inks.INK)
 	_count_label.text = _count_line(view)

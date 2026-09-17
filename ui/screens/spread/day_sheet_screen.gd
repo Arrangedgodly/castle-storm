@@ -345,7 +345,11 @@ class DaySheetSheet:
 
 
 	## Bind the view: same view => same render (snapshot_hash pins it).
+	## The title's baked size re-applies on every bind — the press-room's
+	## live type-scale change (finishing refinement #5) re-flows a page
+	## that was composed at another factor the next time it opens.
 	func bind(view: Dictionary) -> void:
+		_title_label.add_theme_font_size_override("font_size", TypeScale.scaled(30))
 		_title_label.text = String(view["title"])
 		_title_label.add_theme_color_override("font_color", Inks.INK)
 		_count_label.text = String(view["count_line"])

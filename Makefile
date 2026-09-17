@@ -89,6 +89,10 @@ run-responsive:
 #   CS_SPREAD_SHOT=/p.png CS_SPREAD_DAYSHEET=1 make run-game   # the run's own page open over a printed history (finishing #2:
 #                                                               # the day-sheet — 14h of prints, newest first, dashed count rule)
 #   CS_SPREAD_SHOT=/p.png CS_SPREAD_DAYSHEET=2 make run-game   # the header verbs row itself (letterhead + both ledger chips)
+#   CS_SPREAD_SHOT=/p.png CS_SPREAD_PRESS=1 make run-game      # the press-room card — the settings surface (finishing #5: the
+#                                                               # type-scale + motion steps, the kept rule, the back verb)
+#   CS_SPREAD_SHOT=/p.png CS_SPREAD_PRESS=2 make run-game      # the same card after the 1.3x step is pressed through the real
+#                                                               # chip — the LIVE re-flow (card + veiled table at the larger hand)
 #   CS_SPREAD_SHOT=/p.png CS_SPREAD_FIRST=1 make run-game      # the first session, moment 1: the EMPTY SPREAD (staked plots)
 #                                                               # + the first gate hint at the 7-minute arrival (T-UI-10)
 #   CS_SPREAD_SHOT=/p.png CS_SPREAD_FIRST=2 make run-game      # moment 2: the assignment + build-order hints, focus on the plot

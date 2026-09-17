@@ -57,6 +57,45 @@ var last_seen_epoch := 0
 ## lack it and read back as {} — nobody is nudged, which is right.
 var first_session := {}
 
+## Player preferences (finishing refinement #5): the press-room card's
+## persisted settings — `type_scale` (float, the TypeScale factor the
+## boot seam applies) and `reduced_motion` (bool, mirrored into
+## MotionProfile.forced). A key appears ONLY once the player sets it
+## (the press card writes through the host, which saves the meta domain
+## immediately); before that the project-settings defaults rule. META
+## domain deliberately: preferences must survive restarts and engine
+## rebuilds, and a run-save restore must never fork them. Additive-
+## optional with a tolerant reader (save-schema §5): pre-feature metas
+## lack the block and read back as {} — project defaults, no migration.
+var preferences := {}
+
+
+## The persisted type-scale factor, or -1.0 when the player never set
+## one (the project setting rules; clamped to the TypeScale range on
+## write AND on read — a hand-edited meta cannot smuggle in a 9.0).
+func type_scale_preference() -> float:
+	if not preferences.has("type_scale"):
+		return -1.0
+	return clampf(float(preferences["type_scale"]), TypeScale.MIN_SCALE, TypeScale.MAX_SCALE)
+
+
+## Record the type-scale preference (the press card's step chips).
+func set_type_scale_preference(value: float) -> void:
+	preferences["type_scale"] = clampf(value, TypeScale.MIN_SCALE, TypeScale.MAX_SCALE)
+
+
+## The persisted reduced-motion choice: 1 on, 0 off, -1 never set (the
+## project setting rules — MotionProfile.forced's own convention).
+func reduced_motion_preference() -> int:
+	if not preferences.has("reduced_motion"):
+		return -1
+	return 1 if bool(preferences["reduced_motion"]) else 0
+
+
+## Record the reduced-motion choice (the press card's steady-hand verb).
+func set_reduced_motion_preference(on: bool) -> void:
+	preferences["reduced_motion"] = on
+
 
 ## True when the beat's flag is set (never-printed beats read false).
 func first_session_flag(key: StringName) -> bool:
@@ -87,6 +126,7 @@ func to_dict() -> Dictionary:
 		"chronicle": entries,
 		"last_seen_epoch": last_seen_epoch,
 		"first_session": session,
+		"preferences": preferences.duplicate(true),
 	}
 
 
@@ -111,6 +151,17 @@ func apply_dict(state: Dictionary) -> bool:
 	first_session = {}
 	for key in state.get("first_session", {}).keys():
 		first_session[key] = bool(state["first_session"][key])
+	# Same discipline for the press-room preferences (finishing
+	# refinement #5): absent block -> {} -> project defaults rule; each
+	# present key is re-validated through its own accessor discipline
+	# (the scale re-clamped, the flag boolified) so a tampered meta
+	# degrades to a legal preference, never a crash or a 9.0x hand.
+	preferences = {}
+	var stored_prefs: Dictionary = state.get("preferences", {})
+	if stored_prefs.has("type_scale"):
+		set_type_scale_preference(float(stored_prefs["type_scale"]))
+	if stored_prefs.has("reduced_motion"):
+		set_reduced_motion_preference(bool(stored_prefs["reduced_motion"]))
 	chronicle.clear()
 	for entry in state.get("chronicle", []):
 		chronicle.append(entry)

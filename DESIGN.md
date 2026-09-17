@@ -291,7 +291,7 @@ overrides for capture; `TypeScale.scaled(base)` keeps local overrides on the lad
 ### Copy integration (the printed voice)
 
 Every line is rendered by `sim/copy_deck.gd` (CopyDeck) from
-`content/mvp/copy_table.tres` — 96 keys, 2–4 variants each, rotated by data already in
+`content/mvp/copy_table.tres` — 101 keys, 1–4 variants each, rotated by data already in
 the view (event seq, run number, from_tick, beat hash — never RNG, never wall time).
 Copy may embellish tone; it may never invent facts. The no-clip line budgets
 (`docs/voice-bible.md` §4, font-metric-pinned in `tests/unit/test_copy_voice.gd`
@@ -527,6 +527,24 @@ All screens compose the same grammar; none fork a component:
   itself is work in progress); an open page is live paper (new prints land on top);
   focus walks the rows with scroll-follow; back returns focus to the chip.
 
+- **PressRoomScreen** (`ui/screens/spread/press_room_screen.gd`): the game's
+  settings card — the
+  accessibility surface, as paper rather than chrome. THE HAND (the letter
+  size, four numeral steps 1.0×–1.3×, the audited range) and THE PRESSWORK
+  (Full turn / Steady hand = reduced motion); the step in force carries the
+  DOUBLE red rule (the ActionChip's signature mark — state by line form,
+  never hue alone); the kept rule prints SOLID ink where the day-sheet's
+  count rule prints dashed (settled fact vs work in hand). A step press
+  applies LIVE (TypeScale rewrites the shared theme + the spread rebinds
+  the whole view; MotionProfile answers immediately — no restart), writes
+  `RunMeta.preferences` (additive-optional, META domain) and saves the meta
+  file at once; the boot seam re-applies both before any chrome bakes
+  sizes. Pressing the step already in force is a quiet no-op. Mutually
+  exclusive with the chronicle and day-sheet (whichever paper opens folds
+  the others); story paper (choice card, beat, reveal, vignette) folds it —
+  the story never waits on the table's papers. No debug/show-fps here: dev
+  chrome stays gated on `CS_DEBUG_CHROME`.
+
 ### Motion grammar
 
 Three named transitions, paced in one place (`ui/theme/motion_profile.gd`), all
@@ -562,7 +580,7 @@ the reveal is content, not animation; entrance slides skip entirely):
 | MotionProfile / TypeScale | `ui/theme/motion_profile.gd` · `type_scale.gd` |
 | Component gallery (visual inspection) | `ui/theme/theme_gallery.tscn` (`make run-gallery`) |
 | LayoutRouter / OrientationSlot / CardSpread / ResponsiveScreen | `ui/layout/layout_router.gd` · `orientation_slot.gd` · `card_spread.gd` · `responsive_screen.gd` |
-| The Spread + card factory + fan + Eye + header + motion | `ui/screens/spread/` (spread_screen.gd, spread_cards.gd, card_actions.gd, action_fan.gd, card_motion.gd, watchful_eye.gd, run_header.gd, suspicion_events.gd, catch_up_print.gd, first_session.gd, day_sheet_screen.gd) |
+| The Spread + card factory + fan + Eye + header + motion | `ui/screens/spread/` (spread_screen.gd, spread_cards.gd, card_actions.gd, action_fan.gd, card_motion.gd, watchful_eye.gd, run_header.gd, suspicion_events.gd, catch_up_print.gd, first_session.gd, day_sheet_screen.gd, press_room_screen.gd) |
 | Intro / Assault / Chronicle screens | `ui/screens/intro/` · `ui/screens/assault/` · `ui/screens/chronicle/` |
 | Regime inks (content) | `content/mvp/regimes/{gilded_crown,iron_rotunda,paper_crown,velvet_fist}.tres` |
 | Copy system | `sim/copy_deck.gd` + `content/mvp/copy_table.tres` + `docs/voice-bible.md` |

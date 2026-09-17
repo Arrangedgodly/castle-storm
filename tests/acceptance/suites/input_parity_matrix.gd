@@ -34,6 +34,10 @@
 ##      handoff) beside the pad-only storm deck_nav_sweep already ran.
 ##   E. THE CHRONICLE LEDGER — open / page turn / close, three ways.
 ##   F. THE LEADER INTRO — the one gesture, three ways.
+##   G. THE PRESS-ROOM CARD (finishing refinement #5) — open from the
+##      header verb, set the 1.2x hand + the steady hand, close — three
+##      ways, each setting verified LIVE (the factor/motion flip) and
+##      PERSISTED (the host's meta domain).
 ##
 ## Passive paper (the while-you-were-away print, the first-session cues)
 ## has no verbs by design: nothing to reach, nothing stolen — pinned in
@@ -100,6 +104,8 @@ func run(harness) -> void:
 	if OS.get_environment("CS_PARITY_TRACE") == "1": print("[prof] chronicle %d" % (Time.get_ticks_msec() - _ms))
 	await _matrix_intro(harness)
 	if OS.get_environment("CS_PARITY_TRACE") == "1": print("[prof] intro %d" % (Time.get_ticks_msec() - _ms))
+	await _matrix_press_room(harness)
+	if OS.get_environment("CS_PARITY_TRACE") == "1": print("[prof] press-room %d" % (Time.get_ticks_msec() - _ms))
 
 	(harness as Node).get_tree().root.size = Vector2i(720, 720)
 	Engine.time_scale = 1.0
@@ -1016,3 +1022,126 @@ func _matrix_intro(harness) -> void:
 			"parity/intro: the table takes focus back after the unfold (%s)" % leg)
 		screen.queue_free()
 		await _frames(harness, 3)
+
+
+# --- G. The press-room card (finishing refinement #5) --------------------------------------------
+
+
+## The settings surface, three ways: OPEN via the header's Press-Room
+## chip, SET the 1.2x hand step + the steady-hand motion step, CLOSE —
+## one leg per input mode, through the real pipelines. The preferences
+## are process-global (TypeScale/MotionProfile statics) and persisted in
+## the host's own scratch meta, so each leg mounts its OWN host and the
+## section leaves the globals at the authored truth (later suites pin
+## pixel budgets at 1.0x).
+func _matrix_press_room(harness) -> void:
+	for leg: String in ["touch", "kb", "pad"]:
+		TypeScale.reset()
+		MotionProfile.forced = -1
+		var host := _test_host(QUIET_SEED + (977 if leg == "kb" else 0))
+		var screen = SPREAD_SCENE.instantiate()
+		screen.host = host
+		screen.intro_enabled = false
+		harness.mount(screen)
+		host.driving = false  # frozen table: the sweep reads settled chrome
+		await _frames(harness, 4)
+		var chip: Control = null
+		var verbs = screen.get_active_slot().get_header().get_child(1)
+		for child in verbs.get_children():
+			if child is Control and String((child as Control).get_meta(&"focus_id", "")) == "press_room_chip":
+				chip = child
+
+		# OPEN x3 — the header verb is the only affordance.
+		match leg:
+			"touch":
+				await _tap_control(harness, chip)
+			"kb":
+				chip.grab_focus()
+				await _frames(harness, 1)
+				await _key(harness, KEY_ENTER)
+			"pad":
+				chip.grab_focus()
+				await _frames(harness, 1)
+				await _pad(harness, BTN_A)
+		await _frames(harness, 2)
+		if not harness.check(screen._press_room.is_open(),
+				"parity/press-room: %s opens the card" % leg.to_upper()):
+			screen.queue_free()
+			await _frames(harness, 3)
+			continue
+		var seeded := false
+		for i in 16:
+			await _frame(harness)
+			var focus := _focus_owner(harness)
+			if focus != null and screen._press_room.sheet().is_ancestor_of(focus):
+				seeded = true
+				break
+		harness.check(seeded, "parity/press-room: focus seeds inside the card (%s)" % leg)
+
+		# SET the 1.2x hand step x3 — the preference lands live + persisted.
+		var step_12: Control = null
+		for found in screen._press_room.sheet().type_steps():
+			if is_equal_approx(float(found.step_value), 1.2):
+				step_12 = found
+		if harness.check(step_12 != null, "parity/press-room: the 1.2x step exists (%s)" % leg):
+			match leg:
+				"touch":
+					await _tap_control(harness, step_12)
+				"kb":
+					step_12.grab_focus()
+					await _frames(harness, 1)
+					await _key(harness, KEY_ENTER)
+				"pad":
+					step_12.grab_focus()
+					await _frames(harness, 1)
+					await _pad(harness, BTN_A)
+			await _frames(harness, 2)
+			harness.check(is_equal_approx(TypeScale.factor(), 1.2),
+				"parity/press-room: %s sets the 1.2x hand — applied live" % leg.to_upper())
+			harness.check(is_equal_approx(host.meta.type_scale_preference(), 1.2),
+				"parity/press-room: %s sets the 1.2x hand — persisted" % leg.to_upper())
+
+		# SET the steady hand x3 — reduced motion, live, no restart.
+		var steady: Control = null
+		for found in screen._press_room.sheet().motion_steps():
+			if bool(found.step_value):
+				steady = found
+		if harness.check(steady != null, "parity/press-room: the steady-hand step exists (%s)" % leg):
+			match leg:
+				"touch":
+					await _tap_control(harness, steady)
+				"kb":
+					steady.grab_focus()
+					await _frames(harness, 1)
+					await _key(harness, KEY_ENTER)
+				"pad":
+					steady.grab_focus()
+					await _frames(harness, 1)
+					await _pad(harness, BTN_A)
+			await _frames(harness, 2)
+			harness.check(MotionProfile.reduced(),
+				"parity/press-room: %s holds the press steady — live, no restart" % leg.to_upper())
+
+		# CLOSE x3 — back chip by touch/enter, B by pad.
+		match leg:
+			"touch":
+				var back: Control = screen._press_room.sheet().back_chip()
+				if back != null:
+					await _tap_control(harness, back)
+			"kb":
+				await _key(harness, KEY_ESCAPE)
+			"pad":
+				await _pad(harness, BTN_B)
+		await _frames(harness, 2)
+		harness.check(not screen._press_room.is_open(),
+			"parity/press-room: %s closes the card" % leg.to_upper())
+		harness.check(_focus_owner(harness) != null,
+			"parity/press-room: focus survives the close (%s)" % leg)
+		if screen._press_room.is_open():
+			screen._press_room.close()
+			await _frames(harness, 2)
+		screen.queue_free()
+		await _frames(harness, 2)
+	# Leave the authored truth for every later suite.
+	TypeScale.reset()
+	MotionProfile.forced = -1

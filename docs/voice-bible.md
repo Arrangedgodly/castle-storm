@@ -194,7 +194,7 @@ Shape rules, then the numbers (`content/mvp/identity_pools.tres`):
 
 ## 6. The template table (keys, tokens, variants, consumers)
 
-The complete vocabulary is `CopyTable.KEY_TOKENS` (92 keys; content
+The complete vocabulary is `CopyTable.KEY_TOKENS` (101 keys; content
 cannot invent keys the code never reads). The shipped variant counts and
 the surface consuming each key print into the test log as the COPY
 COVERAGE REPORT (`CopyDeck.coverage_report`) — the machine-checked
@@ -274,7 +274,7 @@ punished — the copy IS the policy's tone).
 | Artifact | Role |
 |---|---|
 | `content/schema/copy_table.gd` | The key/token vocabulary, variant caps, rotating keys, banned list (validated) |
-| `content/mvp/copy_table.tres` | THE shipped voice — 92 keys, 2–4 variants each |
+| `content/mvp/copy_table.tres` | THE shipped voice — 101 keys, 1–4 variants each |
 | `ui/screens/spread/first_session.gd` | The first session's five printed cues (T-UI-10) |
 | `content/schema/identity_pools.gd` + `content/mvp/identity_pools.tres` | The names (firsts, epithets, tags, recruits, traits) |
 | `sim/copy_deck.gd` | The renderer: variant selection, substitution, fallback floor, coverage report |

@@ -59,6 +59,10 @@ func _ready() -> void:
 ## one frame in the tree before focus lands.
 func open(for_card_id: String, actions: Array[Dictionary]) -> void:
 	card_id = for_card_id
+	# The hint's baked size re-applies on every open — the press-room's
+	# live type-scale change (finishing refinement #5) re-flows a fan
+	# composed at another factor the next time it opens.
+	_hint.add_theme_font_size_override("font_size", TypeScale.scaled(16))
 	for chip in _chips:
 		chip.queue_free()
 	_chips.clear()

@@ -153,6 +153,12 @@ const KEY_TOKENS: Dictionary = {
 	&"autosave_filed": [&"hours"],
 	&"daysheet_empty_1": [],
 	&"daysheet_empty_2": [],
+	# --- the finishing refinements (refinement #5, the press-room) ---
+	&"prefs_kept": [],
+	&"prefs_type_note": [],
+	&"prefs_motion_note": [],
+	&"prefs_motion_full": [],
+	&"prefs_motion_steady": [],
 }
 
 ## Automated register floor: whole WORDS that BREAK the voice (modern

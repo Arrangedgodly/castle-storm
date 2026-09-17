@@ -326,6 +326,22 @@ const DEFAULTS: Dictionary = {
 	&"daysheet_empty_2": [
 		"The first print of the hand will head the page.",
 	],
+	# --- the finishing refinements (refinement #5) ---
+	&"prefs_kept": [
+		"The clerk keeps these across hands.",
+	],
+	&"prefs_type_note": [
+		"The size of the hand, for tired eyes.",
+	],
+	&"prefs_motion_note": [
+		"Steady: the papers move less, and nothing is lost.",
+	],
+	&"prefs_motion_full": [
+		"Full turn",
+	],
+	&"prefs_motion_steady": [
+		"Steady hand",
+	],
 }
 
 
@@ -430,6 +446,11 @@ const CONSUMERS: Dictionary = {
 	&"autosave_filed": "autosave strip row (the background flush) — SpreadScreen",
 	&"daysheet_empty_1": "day-sheet empty page — DaySheetScreen.view_for",
 	&"daysheet_empty_2": "day-sheet empty page — DaySheetScreen.view_for",
+	&"prefs_kept": "press-room kept line (persistence) — PressRoomScreen.view_for",
+	&"prefs_type_note": "press-room hand-row note — PressRoomScreen.view_for",
+	&"prefs_motion_note": "press-room presswork-row note — PressRoomScreen.view_for",
+	&"prefs_motion_full": "press-room presswork step (full motion) — PressRoomScreen",
+	&"prefs_motion_steady": "press-room presswork step (reduced motion) — PressRoomScreen",
 }
 
 

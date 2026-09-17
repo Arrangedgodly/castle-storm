@@ -79,7 +79,10 @@
 ## INSIDE the away window: the print's STRIKE row + signed seizures),
 ## with CS_SPREAD_DAYSHEET=1/2 for the run's own page (finishing
 ## refinement #2: the day-sheet open over a printed history / the
-## header verbs row itself), or with CS_SPREAD_FIRST=1/2/3 for the
+## header verbs row itself), with CS_SPREAD_PRESS=1/2 for the press-room
+## card (finishing refinement #5: the preferences card open / the same
+## card after the 1.3x step is pressed through the real chip — the live
+## re-flow), or with CS_SPREAD_FIRST=1/2/3 for the
 ## first-session beats (T-UI-10:
 ## the empty spread + the gate hint / the assignment + build hints with
 ## the focused plot card / the trickle print + the pacing report).
@@ -96,6 +99,7 @@ const INTRO_SCENE := preload("res://ui/screens/intro/intro_screen.tscn")
 const ChronicleScreenScript := preload("res://ui/screens/chronicle/chronicle_screen.gd")
 const CHRONICLE_SCENE := preload("res://ui/screens/chronicle/chronicle_screen.tscn")
 const DaySheetScreenScript := preload("res://ui/screens/spread/day_sheet_screen.gd")
+const PressRoomScreenScript := preload("res://ui/screens/spread/press_room_screen.gd")
 
 ## Default demo seed (deterministic identity + arrival draw; override
 ## with CS_SEED).
@@ -139,6 +143,8 @@ var stats := {
 	&"crushes_played": 0, &"eye_strikes": 0, &"ground_flashes": 0,
 	&"chronicles_opened": 0, &"chronicles_closed": 0,
 	&"day_sheets_opened": 0, &"day_sheets_closed": 0,
+	&"press_rooms_opened": 0, &"press_rooms_closed": 0,
+	&"type_scale_changes": 0, &"motion_changes": 0,
 	&"catch_up_prints": 0, &"quiet_lines": 0,
 	&"first_nudges": 0, &"first_focuses": 0,
 	&"primer_lines": 0, &"autosave_lines": 0,
@@ -164,6 +170,12 @@ var _pre_assault_focus: Control
 ## from the header's Day-Sheet verb; run-scoped, never persisted (the
 ## durable record of a run is the chronicle entry it becomes).
 var _day_sheet: DaySheetScreen
+## THE PRESS-ROOM (finishing refinement #5): the game's settings card —
+## the surface for the accessibility seams (the type scale, reduced
+## motion), paper like its siblings and opened from the header's
+## Press-Room verb. Its steps write preferences into the META domain
+## (persisted across hands, sessions and restarts) and apply LIVE.
+var _press_room: PressRoomScreen
 ## The line-form primer's session latch (finishing refinement #2, P2):
 ## one printed teaching line at the first dashed (in-progress) edge the
 ## session shows — once per session, the lightest honest cadence.
@@ -208,6 +220,11 @@ var _entrances_armed := false
 
 
 func _ready() -> void:
+	# THE PRESS-ROOM'S BOOT SEAM (finishing refinement #5): the persisted
+	# preferences apply BEFORE the type-scale boot seam and BEFORE any
+	# chrome bakes sizes — a player who set 1.3x last session boots at
+	# 1.3x. The host's boot already loaded the meta domain.
+	_apply_boot_preferences()
 	# The T-QA-05 type-scale seam FIRST: every label this screen (and the
 	# paper layers below) creates reads the scaled sizes at build time.
 	TypeScale.ensure_applied()
@@ -230,6 +247,7 @@ func _ready() -> void:
 	_build_assault_screen()
 	_build_intro_screen()
 	_build_day_sheet_screen()
+	_build_press_room_screen()
 	_build_chronicle_screen()
 	host.event_observed.connect(_on_event)
 	host.sim_advanced.connect(_on_ticks)
@@ -605,10 +623,24 @@ func _build_day_sheet_screen() -> void:
 	_day_sheet.closed.connect(_on_day_sheet_closed)
 
 
+## Build the press-room screen ONCE, BESIDE the day-sheet in z-order
+## (the three table papers — chronicle, day-sheet, press-room — are
+## mutually exclusive, whichever opens folds the others; the chronicle
+## stays topmost of the three). Paper over the table while open, never
+## modal chrome.
+func _build_press_room_screen() -> void:
+	_press_room = PressRoomScreenScript.new()
+	_press_room.name = "PressRoomScreen"
+	_press_room.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(_press_room)
+	_press_room.closed.connect(_on_press_room_closed)
+	_press_room.preference_changed.connect(_on_preference_changed)
+
+
 ## Open the chronicle ledger (the header chip's verb): the run header's
 ## chronicle affordance, in world grammar. Focus is remembered so
-## closing returns the pad player to the chip that opened it. The two
-## ledger papers never stack: the run's page folds first.
+## closing returns the pad player to the chip that opened it. The table
+## papers never stack: the run's page and the press-room fold first.
 func open_chronicle() -> void:
 	if _chronicle == null:
 		return
@@ -616,14 +648,16 @@ func open_chronicle() -> void:
 	close_fan()
 	if _day_sheet != null and _day_sheet.is_open():
 		_day_sheet.close()
+	if _press_room != null and _press_room.is_open():
+		_press_room.close()
 	_chronicle.open(host, get_router())
 
 
 ## Open the run's own page (the header's Day-Sheet verb): every line
-## this hand has printed, newest first. The same paper discipline as the
-## chronicle — focus is remembered so closing returns the pad player to
-## the chip that opened it, and the chronicle ledger folds first (the
-## two papers never stack).
+## this hand has printed, newest first. The same paper discipline as
+## the chronicle — focus is remembered so closing returns the pad
+## player to the chip that opened it, and the other table papers fold
+## first (the papers never stack).
 func open_day_sheet() -> void:
 	if _day_sheet == null or host == null:
 		return
@@ -631,6 +665,8 @@ func open_day_sheet() -> void:
 	close_fan()
 	if _chronicle != null and _chronicle.is_open():
 		_chronicle.close()
+	if _press_room != null and _press_room.is_open():
+		_press_room.close()
 	_day_sheet.open(host, get_router(), presenter)
 
 
@@ -644,6 +680,104 @@ func _on_day_sheet_closed() -> void:
 		chip.grab_focus()
 		return
 	_focus_first_card()
+
+
+## Open the press-room card (the header's Press-Room verb): the settings
+## surface for the accessibility seams — the type scale and reduced
+## motion, persisted in the meta domain, applied live. The same paper
+## discipline as its siblings: the other table papers fold first (one
+## paper at a time owns the table), and NO run needs to be live — a
+## player can set their hand in the aftermath too.
+func open_press_room() -> void:
+	if _press_room == null or host == null:
+		return
+	stats[&"press_rooms_opened"] += 1
+	close_fan()
+	if _chronicle != null and _chronicle.is_open():
+		_chronicle.close()
+	if _day_sheet != null and _day_sheet.is_open():
+		_day_sheet.close()
+	_press_room.open(host, get_router())
+
+
+## The press-room folded away: focus returns to the Press-Room chip on
+## the active slot's header verbs row (the affordance that opened it).
+func _on_press_room_closed() -> void:
+	stats[&"press_rooms_closed"] += 1
+	var active := get_active_slot() as OrientationSlot
+	var chip := header_chip(active, "press_room_chip") if active != null else null
+	if chip != null:
+		chip.grab_focus()
+		return
+	_focus_first_card()
+
+
+# --- the press-room's verbs (finishing refinement #5) --------------------------------------
+
+
+## THE BOOT SEAM: the persisted preferences apply before any chrome
+## bakes sizes (see _ready). A player who never touched the card has no
+## keys in the meta — the project settings rule, untouched.
+func _apply_boot_preferences() -> void:
+	if host == null:
+		return
+	var scale_pref := host.meta.type_scale_preference()
+	if scale_pref > 0.0:
+		TypeScale.apply_preference(scale_pref)
+	var motion_pref := host.meta.reduced_motion_preference()
+	if motion_pref >= 0:
+		MotionProfile.forced = motion_pref
+
+
+## A press-room step landed (not the one already in force). The spread
+## owns the verb's three halves, in order: APPLY (live), PERSIST (the
+## meta domain), SAVE (the meta file, at once — the choice survives a
+## crash before the next autosave by construction; the run ring is not
+## touched, preferences are not run state).
+func _on_preference_changed(kind: StringName, value: Variant) -> void:
+	if kind == &"type_scale":
+		stats[&"type_scale_changes"] += 1
+		host.meta.set_type_scale_preference(float(value))
+		_apply_type_scale_live(float(value))
+	elif kind == &"motion":
+		stats[&"motion_changes"] += 1
+		host.meta.set_reduced_motion_preference(bool(value))
+		# LIVE by construction: every motion owner asks MotionProfile at
+		# motion time — flips still fire their signals and land on the
+		# same end state, entrance slides simply stop; no restart.
+		MotionProfile.forced = 1 if bool(value) else 0
+	host.save_manager.save_meta(host.meta)
+
+
+## THE LIVE RE-FLOW (the whole-view rebind the recorded deviation
+## deferred): the theme rewrite carries every theme-driven label the
+## moment the factor lands; the chrome that BAKES a size at build — the
+## letterhead (its name-plate size + the regime/time plates' minimums)
+## and the Eye plates — is rebuilt; the full refresh re-derives the
+## columns and rebinds the table. The paper layers rebuild their plates
+## on their next open (their bind re-applies the few baked sizes — the
+## countdown plate's own pattern). The paper layers never rebuild under
+## the open card: the papers are mutually exclusive, so the rebind is
+## race-free by construction.
+func _apply_type_scale_live(new_factor: float) -> void:
+	TypeScale.apply_factor(new_factor)
+	for slot: OrientationSlot in [get_portrait_slot(), get_landscape_slot()]:
+		var strip := slot.get_header()
+		if strip != null:
+			# Remove NOW (not queue_free's deferred release): the rebuild
+			# below re-creates the header + verbs row through _bind_header,
+			# which must not find the dying children.
+			for child in strip.get_children():
+				strip.remove_child(child)
+				child.queue_free()
+		var old_eye := eye_of(slot)
+		if old_eye != null:
+			slot.remove_child(old_eye)
+			old_eye.queue_free()
+		var eye := WATCHFUL_EYE_SCRIPT.new()
+		eye.name = "WatchfulEye"
+		slot.add_child(eye)
+	refresh_from_state()
 
 
 ## The ledger chip with this focus id on a slot's header verbs row (the
@@ -674,14 +808,18 @@ func _on_chronicle_closed() -> void:
 	_focus_first_card()
 
 
-## Story paper outranks BOTH ledger papers: fold the chronicle and the
-## run's page before a story layer opens over them (choice card,
-## vignette, crush beat, reveal).
+## Story paper outranks EVERY table paper: fold the chronicle, the run's
+## page and the press-room before a story layer opens over them (choice
+## card, vignette, crush beat, reveal). The documented rule, one shape:
+## the story never waits on the table's papers, and the papers never
+## stack on the story — the player returns to each from its header chip.
 func _close_chronicle() -> void:
 	if _chronicle != null and _chronicle.is_open():
 		_chronicle.close()
 	if _day_sheet != null and _day_sheet.is_open():
 		_day_sheet.close()
+	if _press_room != null and _press_room.is_open():
+		_press_room.close()
 
 
 ## Open the assault odds table (the army card's storm action, or the
@@ -1520,11 +1658,11 @@ func _bind_header() -> void:
 			slot.layout_topology()
 		header.bind(_view["leader"], _view["sim_hours"], _view["army_power"],
 			Inks.ground_for(_view["leader"]["regime_id"], _view["phase"]))
-		# THE LEDGER VERBS ROW (T-UI-08 + finishing refinement #2): the
-		# chronicle chip and the day-sheet chip at the row's right end —
-		# the same ActionChip grammar as every verb, one of each per slot
-		# (the router's focus_id equivalence carries the pad player's
-		# place across orientation swaps).
+		# THE LEDGER VERBS ROW (T-UI-08 + refinements #2/#5): the
+		# chronicle chip, the day-sheet chip and the press-room chip at
+		# the row's right end — the same ActionChip grammar as every
+		# verb, one of each per slot (the router's focus_id equivalence
+		# carries the pad player's place across orientation swaps).
 		var verbs := strip.get_child(1) if strip.get_child_count() > 1 else null
 		if verbs == null:
 			verbs = _build_ledger_verbs()
@@ -1532,8 +1670,8 @@ func _bind_header() -> void:
 			slot.layout_topology()
 
 
-## The header's verbs row: a right-aligned HBox (spacer + the two ledger
-## chips). Built once per slot by _bind_header.
+## The header's verbs row: a right-aligned HBox (spacer + the three
+## table-paper chips). Built once per slot by _bind_header.
 func _build_ledger_verbs() -> Control:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 12)
@@ -1544,6 +1682,7 @@ func _build_ledger_verbs() -> Control:
 	row.add_child(spacer)
 	row.add_child(_ledger_chip("chronicle_chip", "The Chronicle", 172.0, open_chronicle))
 	row.add_child(_ledger_chip("day_sheet_chip", "The Day-Sheet", 160.0, open_day_sheet))
+	row.add_child(_ledger_chip("press_room_chip", "The Press-Room", 150.0, open_press_room))
 	return row
 
 
@@ -1879,6 +2018,8 @@ func _capture_hook() -> void:
 		_catch_up_then_capture(int(OS.get_environment("CS_SPREAD_CATCHUP")), settle)
 	elif not OS.get_environment("CS_SPREAD_DAYSHEET").is_empty():
 		_day_sheet_then_capture(int(OS.get_environment("CS_SPREAD_DAYSHEET")), settle)
+	elif not OS.get_environment("CS_SPREAD_PRESS").is_empty():
+		_press_room_then_capture(int(OS.get_environment("CS_SPREAD_PRESS")), settle)
 	elif OS.get_environment("CS_SPREAD_LOUD") == "1":
 		# The loud/pressure drive owns its prelude (see _unfold_boot_intro):
 		# its captures were among the four veil-contaminated finds.
@@ -2261,6 +2402,45 @@ func _day_sheet_then_capture(mode: int, settle: float) -> void:
 		% [int(host.engine.sim_hours()), presenter.day_sheet.size(),
 			String((presenter.day_sheet_newest_first()[0]["text"]) if not presenter.day_sheet.is_empty() else ""),
 			"printed" if _primer_printed else "unprinted", presenter.chronicle.size()])
+	_settle_then_capture(settle if settle > 0.0 else 0.4)
+
+
+## CS_SPREAD_PRESS=1 (finishing refinement #5): the press-room card —
+## the settings surface — open on the quiet table via the header verb,
+## captured at CS_SPREAD_SHOT (the letterpress card, the kept rule, both
+## preference rails, the back verb). =2: the LIVE re-flow — the 1.3x step
+## is pressed through the REAL chip first, so the capture shows the card
+## AND the re-typed table beneath the veil (letterhead, strip, pips at
+## the larger hand), with the preference persisted to the meta domain.
+func _press_room_then_capture(mode: int, settle: float) -> void:
+	await _unfold_boot_intro()
+	if mode == 2:
+		# Reach the card through the player's own verb, press the 1.3x
+		# step through the real chip, and let the re-flow settle.
+		open_press_room()
+		for i in 90:
+			await get_tree().process_frame
+			if get_viewport().gui_get_focus_owner() != null:
+				break
+		var pressed := false
+		for chip in _press_room.sheet().type_steps():
+			if is_equal_approx(float(chip.step_value), 1.3):
+				chip.pressed.emit()
+				pressed = true
+		for i in 30:
+			await get_tree().process_frame
+		print("[spread] press-room capture: 1.3x step pressed %s — factor %.2f, meta %.2f, motion reduced %s"
+			% [str(pressed), TypeScale.factor(), host.meta.type_scale_preference(),
+				str(MotionProfile.reduced())])
+	else:
+		open_press_room()
+		for i in 90:
+			await get_tree().process_frame
+			if get_viewport().gui_get_focus_owner() != null:
+				break
+	print("[spread] press-room capture: factor %.2f, reduced %s, steps %d"
+		% [TypeScale.factor(), str(MotionProfile.reduced()),
+			_press_room.sheet().type_steps().size()])
 	_settle_then_capture(settle if settle > 0.0 else 0.4)
 
 

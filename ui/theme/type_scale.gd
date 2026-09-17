@@ -21,8 +21,12 @@
 ##     castle_storm/type/scale = 1.0   (float, clamped to [MIN, MAX])
 ##
 ## Applied at BOOT (main scene, the spread screen's _ready, and the test
-## runners) — a live settings toggle would need a whole-view rebind and is
-## deferred with the settings screen (recorded deviation, acceptance-sweep).
+## runners) from the project setting — and, since finishing refinement
+## #5, from the PERSISTED player preference first (RunMeta.preferences,
+## written by the press-room card; see apply_preference). The card also
+## applies a new factor LIVE (apply_factor + the spread's whole-view
+## rebind: the theme rewrites carry every theme-driven label, and the
+## few sites that bake a local size re-apply it on their next bind).
 class_name TypeScale
 extends RefCounted
 
@@ -96,6 +100,18 @@ static func ensure_applied(theme: Theme = null) -> void:
 	if _applied and is_equal_approx(_factor, want):
 		return
 	apply_factor(want, theme)
+
+
+## Boot seam for the PERSISTED preference (finishing refinement #5): the
+## player's stored hand (RunMeta.preferences, set from the press-room
+## card) applies at boot BEFORE any chrome bakes sizes — the spread
+## screen calls this in _ready ahead of ensure_applied. CS_TYPE_SCALE
+## (the capture/inspection hook) still WINS: an inspection drive pins
+## what it pins, and a stale preference must never bend the harness.
+static func apply_preference(new_factor: float, theme: Theme = null) -> void:
+	if not OS.get_environment("CS_TYPE_SCALE").is_empty():
+		return
+	apply_factor(new_factor, theme)
 
 
 ## Test seam: restore the authored 1.0 theme (leaves no scaled sizes behind

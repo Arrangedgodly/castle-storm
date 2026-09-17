@@ -98,6 +98,12 @@ const KEY_BUDGETS: Dictionary = {
 	# quote budget
 	&"primer_lineform": QUOTE_BUDGET, &"autosave_filed": QUOTE_BUDGET,
 	&"daysheet_empty_1": QUOTE_BUDGET, &"daysheet_empty_2": QUOTE_BUDGET,
+	# the finishing refinements (refinement #5, the press-room card) —
+	# notes print on the card's ~536px inner width, pinned at the tighter
+	# quote budget
+	&"prefs_kept": QUOTE_BUDGET, &"prefs_type_note": QUOTE_BUDGET,
+	&"prefs_motion_note": QUOTE_BUDGET,
+	&"prefs_motion_full": QUOTE_BUDGET, &"prefs_motion_steady": QUOTE_BUDGET,
 }
 
 
