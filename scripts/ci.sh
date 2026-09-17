@@ -30,6 +30,23 @@ fi
 
 start=$SECONDS
 
+# T-QA-01 harness budget (L1-C re-dispatch, 2026-09-17): both stages run under
+# `--fixed-fps 144`. Probed on the vendored 4.7.2 headless: every
+# `await process_frame` floors at ~6.90ms of wall regardless of load,
+# Engine.max_fps or Engine.time_scale — that floor is the engine's REAL-TIME
+# frame synchronization, not compute (the FAIL round's 63s `make test` was
+# ~39% CPU; the acceptance stage alone idled ~16s across its frame-stepped
+# polls). `--fixed-fps` "disables real-time synchronization" (engine docs):
+# frames advance at compute speed while the per-frame delta is PINNED at
+# 1/144s = 6.94ms — within 1% of the floor the suites' green baseline already
+# runs at, so every per-frame premise keeps its exact dynamics (paced paper,
+# LayoutRouter dwell aging, the suspicion suite's mid-beat windows, the
+# flapping pins at the true clock; deltas become CONSTANT, removing the
+# slow-host variance real deltas carried). Chosen over per-suite micro-trims
+# because it reclaims the idle under EVERY frame-stepped poll in both stages
+# with zero test-file edits — coverage provably byte-identical.
+FIXED_FPS_ARGS=(--fixed-fps 144)
+
 # Runs gdUnit4 suites headless. Arguments: one or more res:// suite dirs.
 run_gdunit() {
 	local dirs=("$@")
@@ -45,7 +62,7 @@ run_gdunit() {
 	# gdUnit4's own runtest.sh. --ignoreHeadlessMode switches off gdUnit4's
 	# headless refusal (our suites are pure logic, no InputEvents needed).
 	# -c continues past the first failure so CI reports everything.
-	"$GODOT_BIN" --headless --path . \
+	"$GODOT_BIN" --headless --path . "${FIXED_FPS_ARGS[@]}" \
 		-s -d --remote-debug tcp://127.0.0.1:0 \
 		res://addons/gdUnit4/bin/GdUnitCmdTool.gd \
 		--ignoreHeadlessMode -c -rd res://reports "${args[@]}" || rc=$?
@@ -59,7 +76,7 @@ run_gdunit() {
 run_acceptance() {
 	echo "==> acceptance (SceneTree marathon runner)"
 	local rc=0
-	"$GODOT_BIN" --headless --path . -s res://tests/acceptance/run_headless.gd || rc=$?
+	"$GODOT_BIN" --headless --path . "${FIXED_FPS_ARGS[@]}" -s res://tests/acceptance/run_headless.gd || rc=$?
 	if [[ $rc -ne 0 ]]; then
 		echo "==> acceptance stage FAILED (exit $rc)" >&2
 		exit "$rc"
