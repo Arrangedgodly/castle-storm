@@ -18,7 +18,11 @@
 ##   - THE LINE BUDGETS (finishing refinement #6): the letterhead holds
 ##     the WIDEST pool leader name at the 1.3x max type scale (the name
 ##     wraps at word boundaries, the regime/clock plates fit their own
-##     measured text — real font metrics, never a mid-word clip), and the
+##     measured text — real font metrics, never a mid-word clip), and
+##     every wrapped line RENDERS — no clip_text on the autowrap name
+##     label, pinned at render level through the label's own
+##     visible-line count (the re-dispatch defect: 4.7's autowrap+clip
+##     drew only line 1 while the metrics stayed green); and the
 ##     resting Eye's share numeral fits its plate and reads at phone
 ##     scale at every creep depth (the old caption both shrank to ~11px
 ##     effective and drew past the plate onto the table).
@@ -716,6 +720,25 @@ func test_letterhead_holds_the_longest_pool_name_at_max_type() -> void:
 		for i in 4:
 			await get_tree().process_frame
 		var name_label: Label = header._name_label
+		# RENDER-LEVEL (the re-dispatch pin): every wrapped line must DRAW,
+		# not merely compute. get_visible_line_count() is the bound the
+		# label's own draw loop iterates; with clip_text it reads 1 while
+		# get_line_count() reports 2/3 — the Godot 4.7 autowrap+clip defect
+		# the #6 verifier's pixel audit caught (the epithet vanished from
+		# the letterhead while every font-metric probe stayed green; a
+		# SubViewport pixel render cannot pin this under --headless — the
+		# dummy rendering driver returns a NULL viewport texture — so the
+		# renderer's own visible-line accounting is the render-level seam,
+		# corroborated windowed by the ink-band captures).
+		assert_bool(name_label.clip_text).is_false() \
+			.override_failure_message("an autowrap name label must not clip_text (4.7 draws only line 1)")
+		assert_int(name_label.get_visible_line_count()).is_equal(name_label.get_line_count()) \
+			.override_failure_message("every wrapped line of the name must be visible to the renderer")
+		assert_int(name_label.get_line_count()).is_greater_equal(2) \
+			.override_failure_message("the widest pool name must wrap at this scale")
+		if factor > 1.0:
+			assert_int(name_label.get_line_count()).is_greater_equal(3) \
+				.override_failure_message("the widest pool name at 1.3x wraps three lines")
 		# The name wraps (never clips): every word fits the plate's width
 		# and the wrapped height fits the plate (the row grew to hold it).
 		assert_int(name_label.autowrap_mode).is_equal(TextServer.AUTOWRAP_WORD_SMART)

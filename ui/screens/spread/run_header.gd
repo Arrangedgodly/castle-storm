@@ -34,6 +34,7 @@ const PLATE_PAD := 6.0
 ## The HBox's plate separation (kept in sync with _ready's override).
 const PLATE_SEPARATION := 14.0
 
+var _name_plate: Control
 var _name_label: Label
 var _rule: Control
 var _regime_label: Label
@@ -43,23 +44,35 @@ var _time_label: Label
 func _ready() -> void:
 	add_theme_constant_override("separation", 14)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# FINISHING #6 (re-dispatch): the name prints on a PLATE — a plain
+	# Control wrapper whose custom_minimum_size the refit below owns —
+	# with the Label full-rect inside it, unclipped. Two findings meet
+	# here. (1) RENDER: in Godot 4.7 an autowrap Label with clip_text
+	# draws ONLY its first line (the label's draw loop bounds itself at
+	# one visible line while get_line_count() reports 2/3 — the wrapped
+	# epithet vanished from the letterhead at 1.0x AND 1.3x while every
+	# font-metric probe stayed green; the verifier's pixel audit caught
+	# it, pinned at render level by the letterhead test's visible-line
+	# assertion), so the name label must NOT clip. (2) DETERMINISM: an
+	# unclipped label's OWN minimum carries its asynchronously-shaped
+	# height, which lags the width a resize just granted (the layout-hash
+	# pin caught the layout settling at a stale-moment header height that
+	# only a full refresh corrected). A plain Control ignores its
+	# children's minimums, so the plate makes the EXPLICIT refit the one
+	# authority on the row's size — a pure function of text + type factor
+	# + strip width — while the label inside renders every wrapped line.
+	_name_plate = Control.new()
+	_name_plate.custom_minimum_size = Vector2(160, 0)
+	_name_plate.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_name_plate.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_name_label = Label.new()
 	_name_label.theme_type_variation = &"CardTitle"
 	_name_label.add_theme_font_size_override("font_size", TypeScale.scaled(28))  # the letterhead fits long names at table width
-	# FINISHING #6: the name wraps at word boundaries instead of clipping —
-	# the row's height grows with the wrapped lines (the strip column's
-	# topology follows its combined minimum). clip_text keeps the label's
-	# own text OUT of its minimum (the original fail-safe's own semantics)
-	# so the EXPLICIT refit below is the one authority on the row's size —
-	# an autowrap label's own minimum evaluation otherwise drifts with the
-	# width it was last laid at (stale in hidden slots; the layout-hash
-	# determinism pin caught it).
 	_name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_name_label.clip_text = true
-	_name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_name_label.custom_minimum_size = Vector2(160, 0)
+	_name_label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(_name_label)
+	_name_plate.add_child(_name_label)
+	add_child(_name_plate)
 	_rule = RULE_SCENE.instantiate()
 	_rule.set("form", 0)  # RuleMark.RuleForm.SOLID — the regime's signature
 	_rule.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -122,7 +135,7 @@ func _fit_plates() -> void:
 ## width — never of which width a previous layout pass happened to leave
 ## behind; the layout-hash determinism pin caught exactly that drift).
 func refit(strip_w: float) -> void:
-	if _name_label == null or _rule == null:
+	if _name_plate == null or _rule == null:
 		return
 	_fit_plates()
 	var others := _rule.get_combined_minimum_size().x \
@@ -134,13 +147,12 @@ func refit(strip_w: float) -> void:
 	var size_now: int = _name_label.get_theme_font_size(&"font_size")
 	var wrapped := font.get_multiline_string_size(_name_label.text,
 		HORIZONTAL_ALIGNMENT_LEFT, avail, size_now)
-	# The WIDTH floor is load-bearing (the chronicle live-label's own
-	# find): an autowrap label evaluates its OWN minimum against its
-	# minimum width — floor it at the width this row actually grants the
-	# name and the label's own wrap evaluation agrees with the measured
-	# height instead of drifting with whatever width a previous layout
-	# left behind.
-	_name_label.custom_minimum_size = Vector2(avail, wrapped.y)
+	# The plate's minimum is the row's one authority (the wrapper ignores
+	# its child's own minimum, so the label's asynchronous re-shaping can
+	# never leak a stale height into the layout): width = the share this
+	# strip actually grants the name (the chronicle live-label's own
+	# width-floor find), height = the measured wrap at that width.
+	_name_plate.custom_minimum_size = Vector2(avail, wrapped.y)
 
 
 ## Bind from the view model's leader block + run clock + the ground the
