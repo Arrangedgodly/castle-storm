@@ -169,3 +169,95 @@ resources of spends (timber 86 / food 28 / iron 35).
   `make balance-sweep`, update this doc's tables, then the band bounds.
   The sweep's decomposition rows ("before" = R4 seeds + no dismissal) exist
   so the next pass always has its before/after on one harness.
+
+## 6. L1 — the legacy unlock tree (L1-B, 2026-09-17): cost curve + the full-tree probe
+
+Worker: Mr Fantastic + Prof X lane. Harness: `make balance-sweep`'s
+"L1 full-tree probe" section (the first-win player model above, cadence 6h,
+commit 450 permille, the shipped tree purchased whole through the REAL
+LegacySystem -> run-start modifier path — `_full_stack.session` gained the
+optional legacy provider exactly as GameHost wires it).
+
+**The shipped tree** (`content/mvp/unlock_tree.tres`, attached to the MVP
+pack; CopyDeck-voiced per docs/voice-bible.md): 12 nodes, 3 branches —
+
+| branch | nodes (costs) | effects (compound) |
+|---|---|---|
+| The Old Guard — the pantry ladder | Grandma's Recipes 60 -> The Seed Drawer 140 -> The Emergency Cheese 260 | stipend x1.10 / x1.10 / x1.08 = **x1.306** |
+| The Workshop — the makers | The Union of Unpaid Artisans 80 -> The Mason's Secret 180 -> The Salvage Charter 310 (the charter also gated by The Smith's Signature 220 <- A Cousin in Ironmongery 120) | building x0.95 / x0.93 / x0.91 = **x0.803**; gear x0.95 / x0.90 = **x0.855** |
+| The Yard — the drills | The Sergeant's Primer 100 -> The Drill-Song Book 140 + The Sand Yard 170 -> War Games on Sundays 230 | training x0.98 / x0.97 / x0.97 / x0.96 = **x0.884** |
+
+The **arrival lever is deliberately absent** (the one L1-A effect kind the
+tree does not use — measured dead above x1.0 and harmful below; evidence
+below). Exact compounds are pinned in `tests/unit/test_mvp_unlock_tree.gd`
+(milli: 1306 / 803 / 855 / 884 / identity).
+
+**The cost curve, against the measured earn rates.** Score = duration +
+army power + 100 win bonus -> the recorded ~150-260 lp/run band: a 79 h
+first win banks ~230-260; an early loss/crush ~150. The curve:
+
+| tier | nodes | costs | buyable from |
+|---|---|---|---|
+| 1 (ungated) | 4 | 60 / 80 / 100 / 120 | run 1's bank (even a losing run) |
+| 2 (one gate) | 5 | 140 / 140 / 170 / 180 / 220 | runs 2-4 |
+| 3 (capstones) | 3 | 230 / 260 / 310 | runs 5-10 |
+
+- **Total 2010 lp = ~8-12 runs** at the mean ~205 lp/run (wins ~240,
+  losses ~150) — the L1-B contract band; pinned [1600, 2400] so a node-add
+  cannot silently halve or double the campaign.
+- Rationale: tier-1 is cheap and plural (R5's Rogue-Legacy finding:
+  breadth-first economy nodes first, something visible per early run);
+  costs strictly increase along every prerequisite edge (one rising curve
+  per branch, never a cheap capstone behind an expensive approach — the
+  monotonic pin); each branch rises ~2.3-4x gate -> capstone.
+
+**The full-tree probe** (12 seeds, 20261201+, recorded 2026-09-17):
+
+| config | won | win mean | slowest | losses |
+|---|---|---|---|---|
+| baseline (zero purchases) | 12/12 | **79 h** | 127 h | 11 |
+| full tree (all 12 nodes) | 12/12 | **83 h** | 175 h | 13 |
+
+(24-seed confirmation: baseline 85 h / 24/24, full tree 87 h — the +2-4 h
+delta is inside the band's seed noise; every run still winning either way.
+Pressure at full tree — the 1000 h sensible stream, T-QA-02 seed:
+**0 crushes / 0 strikes / 0 warns, suspicion peak 27** (< warn 35): the
+suspicion model is intact under the whole tree.)
+
+**The honest finding: the first-win band is act-rate-limited, not
+resource-limited — no L1-A effect composition compresses it.** The L1-B
+brief hoped for ~20-35% faster at full tree. Measured (branch-isolation +
+raw-bundle probes, 12-24 seeds each):
+
+| probe | win mean | reading |
+|---|---|---|
+| gear x0.75 alone | 79 h — **identical to baseline to the digit** | gear is never the binding cost under sensible play (away accrual ~3369/window dwarfs the recipes) |
+| arrivals x1.10-1.20 | identical to baseline | arrivals are ACCEPTANCE-gated (a full gate pauses the road); a quieter road changes nothing |
+| arrivals x0.955 (+ stipend x1.45) — v1's Old Guard | 103 h | faster arrivals multiply the gate-crowd acts (+8 each past tolerance 3): pure heat |
+| training x0.77 — v1's Yard | 85 h | compressed completions ratchet the meter (loud acts above warn freeze decay — the SAME mechanism the 2026-09-17 retune rejection measured at baseline) |
+| **v1 full tree** (arr x0.855, bld x0.726, trn x0.770, gear x0.855, stp x1.454) | **96 h (12 seeds) / 97 h (24), losses 11 -> 18-33, 11/12 won** | **REJECTED** — meta progression that makes every run slower |
+| chosen v2 (the shipped compounds) | 83 h / 87 h | band-neutral within noise |
+
+Why: crossing the commit line is paced by the training pipeline x the
+check-in cadence, with resources over-accumulated. Every accelerator in
+the vocabulary concentrates the FIXED act count (training completions +8
+militia/knight, building levels +4, gate crowds +8) into fewer hours;
+decay (5/h minus presence drift) cannot clear it between batches, the
+meter rides higher, and warns/telegraphs stall the military pipeline.
+Cost cuts only shift building acts slightly earlier; the one strictly-safe
+kind (gear cost — equips are not acts) is inert in this policy. This is
+the L1-side twin of the retune's rejected trainee half.
+
+**What the tree therefore sells** (all real, all felt, none band-breaking):
++31% stipend (a visibly richer opening — 50 -> 65 food, 80 -> 104 timber),
+-20% walls / -15% gear recipes (every check-in's spends go further;
+post-loss re-equips hurt less), -12% drills (the pipeline breathes faster
+without ratcheting the meter). The BASELINE band is untouched (the CI band
+suite runs zero purchases and passes unchanged); the full tree stays
+inside the band's noise with every run still winning.
+
+**If real band compression (the 20-35% hope) is wanted**, it needs an
+L1-A vocabulary EXTENSION — an effect kind that touches the pressure model
+or the odds curve (e.g. a suspicion-decay or garrison modifier), which is
+an engine/registry decision (L1-A owns `LegacyModifiers.EFFECT_KINDS`),
+not a content retune. This section is the measured evidence for that call.

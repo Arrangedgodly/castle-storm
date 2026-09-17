@@ -20,3 +20,13 @@ extends Resource
 ## Every purchasable node (non-empty, unique ids, acyclic prerequisites —
 ## ContentValidator.validate_unlock_tree is the loud gate).
 @export var nodes: Array[UnlockNodeDef] = []
+
+## Branch -> art-manifest crest key (additive-optional, L1-B: the branch
+## plates of the tree UI are content-art, exactly like RegimeDef.crest_id).
+## Empty = the tree ships no branch crests (the example tree's shape; the
+## tree UI falls back to a plain plate) — no format bump either way. When
+## non-empty the validator requires EVERY branch carried by `nodes` to be
+## keyed, every value non-empty, and (when a pack art manifest is in scope)
+## every crest to resolve to an ArtAssetDef — pending art entries are legal
+## (the T-ARCH-04 hatch), staged files are checked for real.
+@export var branch_crests: Dictionary[StringName, StringName] = {}

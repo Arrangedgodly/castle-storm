@@ -97,6 +97,7 @@ func _initialize() -> void:
 	_sweep_opening(seed_count)
 	_sweep_pressure()
 	_sweep_first_win(seed_count)
+	_sweep_legacy_tree(seed_count)
 	_sweep_final_detail()
 	print()
 	print("[balance-sweep] done in %.1fs — record into docs/balance.md" % [float(Time.get_ticks_msec() - clock) / 1000.0])
@@ -175,9 +176,10 @@ func measure_opening(tunables: EconomyTunables, seed: int, policy: Dictionary) -
 ## population cap GROWS WITH THE ESTATE (10 + producer levels): a real
 ## player's conspiracy scales with the camp that feeds it — a fixed cap
 ## would freeze the army the moment the workers fill it (workers cannot
-## rebranch; army growth needs fresh recruits).
-func measure_first_win(tunables: EconomyTunables, seed: int, cadence_hours: int, commit_permille: int) -> Dictionary:
-	var session: Variant = HOST.session(seed, {}, tunables)
+## rebranch; army growth needs fresh recruits). `legacy` (L1 probe) wires
+## the unlock-tree provider into the session exactly the way GameHost does.
+func measure_first_win(tunables: EconomyTunables, seed: int, cadence_hours: int, commit_permille: int, legacy: LegacySystem = null) -> Dictionary:
+	var session: Variant = HOST.session(seed, {}, tunables, legacy)
 	var engine: SimEngine = session.engine
 	var run := engine.get_system(&"run") as RunLifecycleSystem
 	var units := engine.get_system(&"units") as UnitLifecycleSystem
@@ -245,8 +247,8 @@ func measure_first_win(tunables: EconomyTunables, seed: int, cadence_hours: int,
 # --- Pressure: the 1000h sensible-play stability stream ------------------------
 
 
-func measure_stability(tunables: EconomyTunables, seed: int, policy: Dictionary) -> Dictionary:
-	var session: Variant = HOST.session(seed, {}, tunables)
+func measure_stability(tunables: EconomyTunables, seed: int, policy: Dictionary, legacy: LegacySystem = null) -> Dictionary:
+	var session: Variant = HOST.session(seed, {}, tunables, legacy)
 	var engine: SimEngine = session.engine
 	var run := engine.get_system(&"run") as RunLifecycleSystem
 	var suspicion := engine.get_system(&"suspicion") as SuspicionSystem
@@ -510,6 +512,75 @@ func _sweep_first_win(seed_count: int) -> void:
 			garrison, wins, hours_total / maxi(1, wins), slowest, losses_total,
 			23000.0 / (23000.0 + float(garrison) * 1000.0) * 100.0,
 		])
+	print()
+
+
+# --- L1: the legacy-tree probe (docs/balance.md's L1 section) --------------------
+
+
+## A LegacySystem owning EVERY node of the shipped tree (tree order is a
+## valid purchase order — the shipped .tres lists every node after its
+## prerequisites), with a bank big enough to buy it all.
+func _legacy_full_tree() -> LegacySystem:
+	var tree := MVP.load_mvp().unlock_tree
+	if tree == null:
+		return null
+	var meta := RunMeta.new()
+	meta.legacy_points = 1_000_000
+	var legacy := LegacySystem.new(tree, meta)
+	for id in legacy.node_ids():
+		if not legacy.purchase(id):
+			push_error("[balance-sweep] full-tree purchase of '%s' refused — tree order is not a purchase order" % id)
+			return null
+	return legacy
+
+
+func _sweep_legacy_tree(seed_count: int) -> void:
+	var tree := MVP.load_mvp().unlock_tree
+	if tree == null:
+		print("[legacy] the pack ships no unlock tree — probe skipped")
+		return
+	var total := 0
+	for node in tree.nodes:
+		total += node.cost
+	var mods := _legacy_full_tree().modifiers()
+	print("== L1 full-tree probe (the shipped tree: %d nodes, %d lp total; earn rates ~150-260 lp/run) ==" % [
+		tree.nodes.size(), total])
+	print("[legacy] resolved full-tree bundle: arrivals x%.3f · building x%.3f · training x%.3f · gear x%.3f · stipend x%.3f" % [
+		mods.recruit_arrival_interval_milli / 1000.0, mods.building_cost_milli / 1000.0,
+		mods.training_time_milli / 1000.0, mods.gear_cost_milli / 1000.0,
+		mods.stipend_milli / 1000.0])
+	print("| config | won | win mean | slowest | losses | crushed |")
+	print("|---|---|---|---|---|---|")
+	for config in [
+		{"name": "baseline (zero purchases)", "legacy": null},
+		{"name": "full tree (all nodes)", "legacy": _legacy_full_tree()},
+	]:
+		var wins := 0
+		var hours_total := 0
+		var slowest := 0
+		var losses_total := 0
+		var crushed := 0
+		for s in range(seed_count):
+			var story := measure_first_win(_tunables({}), BASE_SEED + s, 6, COMMIT_PERMILLE, config["legacy"])
+			if story["crushed"]:
+				crushed += 1
+			if story["won"]:
+				wins += 1
+				var hours := int(story["win_tick"]) / 60
+				hours_total += hours
+				slowest = maxi(slowest, hours)
+			losses_total += story["losses"]
+		print("| %s | %d/%d | %dh | %dh | %d | %d |" % [
+			config["name"], wins, seed_count, hours_total / maxi(1, wins), slowest, losses_total, crushed])
+	print()
+	# The suspicion-pressure question at full tree: the 1000h sensible-play
+	# stream (the T-QA-02 seed) must stay quiet — meta progression must not
+	# break the pressure model's "existing is not a death sentence" line.
+	var pressure := measure_stability(_tunables({}), 20261001, {}, _legacy_full_tree())
+	print("[legacy pressure] 1000h sensible-play at full tree: crushes %d, strikes %d, telegraphs %d, cancels %d, warns %d, suspicion peak %d, alive %s" % [
+		pressure["crushes"], pressure["strikes"], pressure["telegraphs"], pressure["cancels"],
+		pressure["warns"], pressure["suspicion_peak"], pressure["alive_at_end"]])
 	print()
 
 

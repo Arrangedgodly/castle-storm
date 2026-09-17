@@ -73,14 +73,17 @@ func test_example_pack_with_attached_tree_validates_clean() -> void:
 
 
 func test_mvp_pack_without_tree_is_still_valid() -> void:
-	## The additive-optional contract: the pre-L1-B MVP pack ships no tree
-	## and must keep validating clean (absence is legal).
+	## The additive-optional contract: a pack with NO tree must keep
+	## validating clean (absence is legal). Pinned on a deep duplicate
+	## since L1-B attached the real tree to the shipped pack — the shipped
+	## tree itself is pinned by tests/unit/test_mvp_unlock_tree.gd.
 	var pack := ContentValidator.load_pack("res://content/mvp/pack.tres")
 	assert_bool(pack != null).is_true()
 	if pack == null:
 		return
-	assert_array(ContentValidator.validate_pack(pack)).is_empty()
-	assert_bool(pack.unlock_tree == null).is_true()
+	var stripped: ContentPack = pack.duplicate(true)
+	stripped.unlock_tree = null
+	assert_array(ContentValidator.validate_pack(stripped)).is_empty()
 
 
 func test_validator_registry_matches_the_resolution_engine() -> void:

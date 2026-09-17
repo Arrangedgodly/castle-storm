@@ -294,7 +294,9 @@ func test_no_duplicate_display_names_within_each_pool() -> void:
 
 func test_no_orphan_art_keys() -> void:
 	# Stricter than the validator (which allows unreferenced entries): THIS
-	# pack's manifest is exactly the referenced set — 20 assets, all used.
+	# pack's manifest is exactly the referenced set — 23 assets, all used
+	# (faces + building/gear icons + regime crests + the L1-B tree's branch
+	# crests since 2026-09-17).
 	var pack := _pack()
 	var referenced := {}
 	for unit: UnitDef in pack.units:
@@ -305,6 +307,9 @@ func test_no_orphan_art_keys() -> void:
 		referenced[item.icon_id] = true
 	for regime: RegimeDef in pack.regimes:
 		referenced[regime.crest_id] = true
+	if pack.unlock_tree != null:
+		for branch: StringName in pack.unlock_tree.branch_crests.keys():
+			referenced[pack.unlock_tree.branch_crests[branch]] = true
 	var orphans: Array[StringName] = []
 	for asset: ArtAssetDef in pack.art.assets:
 		if not referenced.has(asset.id):

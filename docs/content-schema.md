@@ -61,7 +61,7 @@ through `ContentValidator.load_pack(path)`.
 | `art` | `ArtManifest` | set, valid; covers every referenced key | Asset keys → vendored sources + licenses (§3) | T-ARCH-04, T-UI-01 |
 | `starting_grants` | `Dictionary[StringName, int]` | keys ⊆ `resources`; values > 0 (additive, T-DATA-02) | Run-start stipend paid by the `grant_resources` command (M1 finding F1); empty = no stipend, the verb is refused | T-DATA-02, T-SIM-04, T-UI-05 |
 | `copy` | `CopyTable` | set, valid (additive-optional, T-COPY-01) | Event-copy template table — keyed variants for every repeating printed line, read through `CopyDeck` with seeded rotation (docs/voice-bible.md); absent = the code-side floor | T-COPY-01, all printing surfaces |
-| `unlock_tree` | `UnlockTreeDef` | valid when attached (additive-optional, L1) | The legacy unlock tree — purchasable meta-progression nodes fed by the banked legacy points of every run (R5: always-on, Rogue Legacy manor pattern). Absent/null = the pack ships no tree and the whole L1 layer runs empty (the pre-L1-B MVP shape) — no format bump | L1 LegacySystem/Modifiers, the tree UI |
+| `unlock_tree` | `UnlockTreeDef` | valid when attached (additive-optional, L1) | The legacy unlock tree — purchasable meta-progression nodes fed by the banked legacy points of every run (R5: always-on, Rogue Legacy manor pattern). Absent/null = the pack ships no tree and the whole L1 layer runs empty (still legal — no format bump); the MVP pack ships the L1-B tree (§5) | L1 LegacySystem/Modifiers, the tree UI |
 
 Cross-refs between defs use **`StringName` ids, never file paths or
 ExtResource chains**: `peasant.promotion_paths = [&"worker", &"militia"]`,
@@ -182,7 +182,9 @@ garrison ×1.2 (archers on the walls) + timber ×0.85 (timber tax).
 The persistent meta-progression layer (post-MVP Layer 1; R5's Rogue
 Legacy manor pattern — always-on, fed by every run win or lose). The tree
 attaches to the pack **additively-optional** (`unlock_tree`); the MVP pack
-ships none until L1-B authors one, and its absence is legal everywhere.
+ships the L1-B tree (`content/mvp/unlock_tree.tres`: 12 nodes, 3 branches
+— The Old Guard / The Workshop / The Yard, CopyDeck-voiced, cost-curved
+against docs/balance.md §6), and absence remains legal everywhere.
 
 | Field | Type | Constraint | Meaning |
 |---|---|---|---|
@@ -196,6 +198,7 @@ ships none until L1-B authors one, and its absence is legal everywhere.
 | `UnlockEffect.value` | `float` | > 0 | Multiplier value |
 | `UnlockTreeDef.version` | `int` | ≥ 1 | Tree-shape version for humans/tools; ADDITIVE nodes never bump it (node ids are the contract — same rule as §6) |
 | `UnlockTreeDef.nodes` | `Array[UnlockNodeDef]` | non-empty when attached | Every purchasable node |
+| `UnlockTreeDef.branch_crests` | `Dictionary[StringName, StringName]` | additive-optional (L1-B): empty = no branch crests; when non-empty — keys exactly the tree's branches, values non-empty art-manifest asset ids (membership checked when a pack manifest is in scope; pending entries legal, the T-ARCH-04 hatch) | Branch → crest art for the tree UI's branch plates (the `RegimeDef.crest_id` rule, per-branch) |
 
 Effect kind registry (`ContentValidator.LEGACY_EFFECT_KINDS`, mirroring
 `LegacyModifiers.EFFECT_KINDS` — the resolution engine owns the
@@ -235,7 +238,7 @@ attached to `pack_example.tres`, validated on the §5 green path).
 
 | Field | Constraint |
 |---|---|
-| `templates: Dictionary[StringName, PackedStringArray]` | every key in `CopyTable.KEY_TOKENS` (87 — content cannot invent keys no surface reads); 1..`MAX_VARIANTS` (4) variants per key; every `{token}` from the key's vocabulary; keys in `ROTATING_KEYS` (repeated beats) need ≥ 2 variants; every variant passes the banned-register word scan (word-boundary, case-insensitive — `BANNED_FRAGMENTS`) |
+| `templates: Dictionary[StringName, PackedStringArray]` | every key in `CopyTable.KEY_TOKENS` (125 — content cannot invent keys no surface reads; the L1-B unlock family adds `unlock_branch_*` / `unlock_flavor_*` literal-line keys); 1..`MAX_VARIANTS` (4) variants per key; every `{token}` from the key's vocabulary; keys in `ROTATING_KEYS` (repeated beats) need ≥ 2 variants; every variant passes the banned-register word scan (word-boundary, case-insensitive — `BANNED_FRAGMENTS`) |
 
 The renderer (`sim/copy_deck.gd`, `CopyDeck`) picks variants by a rotor
 derived from view data (event seq / run number / report ticks / the beat
@@ -428,10 +431,19 @@ truth — no suite carries its own content copy):
   names × 52 epithets (2,392 full-name permutations — thousands), 20
   personality tags, 72 recruit names, 10 leader trait labels — medieval
   farce, no anachronisms (banned-register scanned by test).
-- **Copy table** (T-COPY-01, additive): 87 template keys × 1–4 variants
+- **Copy table** (T-COPY-01, additive + the L1-B unlock family): 125
+  template keys × 1–4 variants
   each — the shipped voice for every repeating printed line, sized to
   the 476px/22px line-budget standard with seeded variant rotation
   (docs/voice-bible.md).
+- **Unlock tree** (L1-B): `unlock_tree.tres` — 12 nodes, 3 branches
+  (The Old Guard pantry ladder: stipend ×1.306 compound; The Workshop:
+  building ×0.803 / gear ×0.855; The Yard: training ×0.884; the arrival
+  lever deliberately absent — measured dead/harmful, docs/balance.md §6),
+  branch crests `crest_old_guard/workshop/yard` (pending Armorial), tier-1
+  costs 60–120 lp against the ~150–260 lp/run earn band, total 2010 lp ≈
+  8–12 runs. Voice through `unlock_branch_*` / `unlock_flavor_*` copy keys;
+  cost curve + full-tree balance probe recorded in docs/balance.md §6.
 - **starting_grants**: `{food 50, timber 80}` — affords building all four
   buildings at identity costs with a thin spare buffer; paid once per run
   by the `grant_resources` command (docs/sim-engine.md §12, F1).

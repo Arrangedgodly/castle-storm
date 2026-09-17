@@ -463,13 +463,18 @@ func test_host_exposes_legacy_reads_and_the_purchase_command() -> void:
 
 
 func test_host_refuses_purchases_when_the_pack_has_no_tree() -> void:
-	## The shipped MVP pack pre-L1-B: the read surface is empty and the
-	## purchase command refuses loudly (unknown node) — never a crash.
-	Inks._pack_cache = null  # the honest pack, never a previous test's injection
+	## The additive-optional contract still holds post-L1-B: a pack WITHOUT
+	## a tree (a stripped duplicate — the shipped pack carries the L1-B
+	## tree now, pinned by test_mvp_unlock_tree) runs an empty legacy
+	## surface, and the purchase command refuses loudly (unknown node) —
+	## never a crash.
+	var stripped: ContentPack = Inks.pack().duplicate(true)
+	stripped.unlock_tree = null
+	Inks._pack_cache = stripped
 	var host := GameHost.new(SEED, "user://cs_legacy_host_tests/b")
 	host.boot(0)
 	assert_array(host.unlock_tree_nodes()).is_empty()
-	assert_bool(host.unlock_purchase(&"stipend_25")).is_false()
+	assert_bool(host.unlock_purchase(&"grandmas_recipes")).is_false()
 	assert_int(host.unlock_bank()).is_zero()
 
 

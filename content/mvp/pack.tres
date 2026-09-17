@@ -29,6 +29,7 @@
 [ext_resource type="Resource" path="res://content/mvp/units/trainee.tres" id="26_mvp"]
 [ext_resource type="Resource" path="res://content/mvp/units/knight.tres" id="27_mvp"]
 [ext_resource type="Resource" path="res://content/mvp/units/archer.tres" id="28_mvp"]
+[ext_resource type="Resource" path="res://content/mvp/unlock_tree.tres" id="30_mvp"]
 
 [resource]
 script = ExtResource("20_mvp")
@@ -44,6 +45,7 @@ identity = ExtResource("14_mvp")
 tunables = ExtResource("21_mvp")
 art = ExtResource("1_mvp")
 copy = ExtResource("29_mvp")
+unlock_tree = ExtResource("30_mvp")
 starting_grants = Dictionary[StringName, int]({
 &"food": 50,
 &"timber": 80

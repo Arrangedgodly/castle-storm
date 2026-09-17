@@ -80,7 +80,7 @@ static func validate_pack(pack: ContentPack) -> Array[String]:
 	# L1 unlock tree: additive-optional on the pack — validated only when
 	# attached (absent = the pack ships no tree, the pre-L1-B MVP shape).
 	if pack.unlock_tree != null:
-		errors.append_array(validate_unlock_tree(pack.unlock_tree))
+		errors.append_array(validate_unlock_tree(pack.unlock_tree, pack.art))
 	return errors
 
 
@@ -479,8 +479,12 @@ static func _check_name_pool(errors: Array[String], label: String, pool: Array, 
 ## names + branch labels, positive costs, prerequisites that resolve
 ## within the tree, an ACYCLIC prerequisite graph (DFS, the promotion-graph
 ## pattern — a cycle would be unpurchasable), and one known-kind positive
-## effect per node.
-static func validate_unlock_tree(tree: UnlockTreeDef) -> Array[String]:
+## effect per node. `p_art` (optional, the pack's manifest) additionally
+## cross-checks `branch_crests`: when declared, every branch carried by
+## the nodes must be keyed and every crest must resolve to a manifest
+## asset (the RegimeDef.crest_id membership rule; null = no manifest in
+## scope, the crest-existence shape checks still run).
+static func validate_unlock_tree(tree: UnlockTreeDef, p_art: ArtManifest = null) -> Array[String]:
 	var errors: Array[String] = []
 	if tree == null:
 		errors.append("unlock-tree: tree resource is null")
@@ -527,7 +531,33 @@ static func validate_unlock_tree(tree: UnlockTreeDef) -> Array[String]:
 			elif not id_set.has(String(prerequisite)):
 				errors.append("unlock '%s': prerequisite '%s' does not match any node in tree" % [node.id, prerequisite])
 	_check_prerequisite_graph(tree.nodes, errors)
+	_check_branch_crests(tree, p_art, errors)
 	return errors
+
+
+## Branch crests (L1-B, additive-optional on the tree): a DECLARED map must
+## be total over the tree's branches (a crestless branch plate is content
+## churn), carry no branches the tree does not (dead entries), and resolve
+## every crest against the manifest when one is in scope (the regime-crest
+## membership rule; pending art entries pass — the T-ARCH-04 hatch).
+static func _check_branch_crests(tree: UnlockTreeDef, manifest: ArtManifest, errors: Array[String]) -> void:
+	if tree.branch_crests.is_empty():
+		return
+	var branches := {}
+	for node: UnlockNodeDef in tree.nodes:
+		if node != null and node.branch != &"":
+			branches[node.branch] = true
+	for branch in branches.keys():
+		if not tree.branch_crests.has(branch):
+			_err(errors, "unlock-tree: branch '%s' has no crest in branch_crests (declare it or clear the dictionary)" % branch)
+	for branch in tree.branch_crests.keys():
+		if not branches.has(branch):
+			_err(errors, "unlock-tree: branch_crests carries branch '%s' with no nodes in tree" % branch)
+		var crest: StringName = tree.branch_crests[branch]
+		if crest == &"":
+			_err(errors, "unlock-tree '%s': crest must not be empty (art manifest key required)" % branch)
+		elif manifest != null:
+			_check_art_key(errors, "unlock-tree", branch, crest, manifest, "crest")
 
 
 static func _check_prerequisite_graph(nodes: Array[UnlockNodeDef], errors: Array[String]) -> void:

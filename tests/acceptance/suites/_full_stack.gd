@@ -52,13 +52,18 @@ const MVP := preload("res://tests/acceptance/suites/_mvp_pack.gd")
 ## `p_tunables` overrides the pack's tunables — used ONLY by the T-SIM-08
 ## balance sweep (`scripts/balance_sweep.gd`) to evaluate candidate values
 ## against exactly this composition; the default `null` runs the pack's
-## tuned content, which is what CI asserts and what ships.
-static func game_stack(run_seed: int, meta: RunMeta, stipend: Dictionary = {}, p_tunables: EconomyTunables = null) -> SimEngine:
+## tuned content, which is what CI asserts and what ships. `p_legacy`
+## (additive, L1) wires the legacy unlock-tree provider exactly the way
+## GameHost does — null/empty-owned resolves identity modifiers and the
+## engine stays byte-identical to the pre-L1 build (pinned by
+## test_legacy_run_effects); the balance sweep's full-tree probe passes a
+## purchase-everything LegacySystem.
+static func game_stack(run_seed: int, meta: RunMeta, stipend: Dictionary = {}, p_tunables: EconomyTunables = null, p_legacy: LegacySystem = null) -> SimEngine:
 	var pack := MVP.load_mvp()
 	var tunables := p_tunables if p_tunables != null else pack.tunables
 	var engine := SimEngine.new(run_seed)
 	engine.register_system(HeartbeatSystem.new())
-	engine.register_system(RunLifecycleSystem.new(pack.regimes, pack.identity, meta, stipend if not stipend.is_empty() else pack.starting_grants))
+	engine.register_system(RunLifecycleSystem.new(pack.regimes, pack.identity, meta, stipend if not stipend.is_empty() else pack.starting_grants, p_legacy))
 	engine.register_system(UnitLifecycleSystem.new(pack.units, pack.gear, tunables))
 	engine.register_system(ProductionSystem.new(pack.buildings, tunables, null))
 	engine.register_system(AssaultResolver.new(tunables))
@@ -69,9 +74,9 @@ static func game_stack(run_seed: int, meta: RunMeta, stipend: Dictionary = {}, p
 ## HostSession factory (the ONLY supported construction path — it injects
 ## the canonical composition, so a session can never be built from a stale
 ## copy of the system order).
-static func session(run_seed: int, stipend: Dictionary = {}, p_tunables: EconomyTunables = null) -> HostSession:
+static func session(run_seed: int, stipend: Dictionary = {}, p_tunables: EconomyTunables = null, p_legacy: LegacySystem = null) -> HostSession:
 	var factory := func(p_seed: int, p_meta: RunMeta, p_stipend: Dictionary) -> SimEngine:
-		return game_stack(p_seed, p_meta, p_stipend, p_tunables)
+		return game_stack(p_seed, p_meta, p_stipend, p_tunables, p_legacy)
 	return HostSession.new(run_seed, stipend, factory, p_tunables)
 
 

@@ -194,7 +194,7 @@ Shape rules, then the numbers (`content/mvp/identity_pools.tres`):
 
 ## 6. The template table (keys, tokens, variants, consumers)
 
-The complete vocabulary is `CopyTable.KEY_TOKENS` (101 keys; content
+The complete vocabulary is `CopyTable.KEY_TOKENS` (125 keys; content
 cannot invent keys the code never reads). The shipped variant counts and
 the surface consuming each key print into the test log as the COPY
 COVERAGE REPORT (`CopyDeck.coverage_report`) — the machine-checked
@@ -222,6 +222,12 @@ answer to "which screens got which templates". Shape of the table:
   `first_build`, `first_trickle`, `first_train`) — once-only teaching
   lines in the strip (T-UI-10), rotor = the beat's own tick (the line
   a player reads is fixed by when the world brought the moment).
+- **The legacy tree's voice** (`unlock_branch_<branch>`,
+  `unlock_flavor_<node_id>` — L1-B): one branch-name key per branch
+  plate and one flavor key per node card, literal lines (no tokens,
+  rotor 0 — the tree is static content), 1 variant each, table == floor
+  (one voice, two origins); consumed by the L1-C tree UI, budget-pinned
+  at the card/quote classes by `tests/unit/test_mvp_unlock_tree.gd`.
 
 Every key that the sim REPEATS (`CopyTable.ROTATING_KEYS` — arrivals,
 trainings, promotions, suspicion beats, headlines, card phrases) ships
@@ -274,7 +280,7 @@ punished — the copy IS the policy's tone).
 | Artifact | Role |
 |---|---|
 | `content/schema/copy_table.gd` | The key/token vocabulary, variant caps, rotating keys, banned list (validated) |
-| `content/mvp/copy_table.tres` | THE shipped voice — 101 keys, 1–4 variants each |
+| `content/mvp/copy_table.tres` | THE shipped voice — 125 keys, 1–4 variants each |
 | `ui/screens/spread/first_session.gd` | The first session's five printed cues (T-UI-10) |
 | `content/schema/identity_pools.gd` + `content/mvp/identity_pools.tres` | The names (firsts, epithets, tags, recruits, traits) |
 | `sim/copy_deck.gd` | The renderer: variant selection, substitution, fallback floor, coverage report |

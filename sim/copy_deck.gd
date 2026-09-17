@@ -372,6 +372,53 @@ const DEFAULTS: Dictionary = {
 	&"title_new_run_caution": [
 		"The hand ends where it stands; the bank keeps its points.",
 	],
+	# --- the legacy tree's voice (L1-B, the shipped tree content; the L1-C
+	# tree UI's pending surface reads these) ---
+	&"unlock_branch_old_guard": [
+		"The Old Guard",
+	],
+	&"unlock_branch_workshop": [
+		"The Workshop",
+	],
+	&"unlock_branch_yard": [
+		"The Yard",
+	],
+	&"unlock_flavor_grandmas_recipes": [
+		"Boots march on pickled eggs, banners or no.",
+	],
+	&"unlock_flavor_the_seed_drawer": [
+		"Grain hidden from three crowns, now lent out.",
+	],
+	&"unlock_flavor_the_emergency_cheese": [
+		"One wheel, shield-sized, older than the crest.",
+	],
+	&"unlock_flavor_unpaid_artisans": [
+		"Dues are waived. Nails, regrettably, are not.",
+	],
+	&"unlock_flavor_cousin_ironmonger": [
+		"The family price is a threat and a discount.",
+	],
+	&"unlock_flavor_the_masons_secret": [
+		"Walls go up crooked, on purpose, for less.",
+	],
+	&"unlock_flavor_the_smiths_signature": [
+		"Half the invoice. Twice the embossing.",
+	],
+	&"unlock_flavor_the_salvage_charter": [
+		"Every burned barn is a discount, in writing.",
+	],
+	&"unlock_flavor_the_sergeants_primer": [
+		"Shouting is free; brevity has to be drilled.",
+	],
+	&"unlock_flavor_the_drill_song_book": [
+		"The verses keep the step; the step keeps men.",
+	],
+	&"unlock_flavor_the_sand_yard": [
+		"Falls in sand teach what falls in mud cost.",
+	],
+	&"unlock_flavor_war_games_on_sundays": [
+		"The crown rests on Sundays. The drills do not.",
+	],
 }
 
 
@@ -490,6 +537,21 @@ const CONSUMERS: Dictionary = {
 	&"title_new_run": "title card secondary chip (live run) — MainShell title card",
 	&"title_new_run_armed": "title card secondary chip armed (the two-step confirm) — MainShell title card",
 	&"title_new_run_caution": "title card caution line (the two-step confirm) — MainShell title card",
+	&"unlock_branch_old_guard": "legacy tree branch plate — the L1-C tree UI (content ships in L1-B)",
+	&"unlock_branch_workshop": "legacy tree branch plate — the L1-C tree UI (content ships in L1-B)",
+	&"unlock_branch_yard": "legacy tree branch plate — the L1-C tree UI (content ships in L1-B)",
+	&"unlock_flavor_grandmas_recipes": "legacy tree node card flavor row — the L1-C tree UI (content ships in L1-B)",
+	&"unlock_flavor_the_seed_drawer": "legacy tree node card flavor row — the L1-C tree UI (content ships in L1-B)",
+	&"unlock_flavor_the_emergency_cheese": "legacy tree node card flavor row — the L1-C tree UI (content ships in L1-B)",
+	&"unlock_flavor_unpaid_artisans": "legacy tree node card flavor row — the L1-C tree UI (content ships in L1-B)",
+	&"unlock_flavor_cousin_ironmonger": "legacy tree node card flavor row — the L1-C tree UI (content ships in L1-B)",
+	&"unlock_flavor_the_masons_secret": "legacy tree node card flavor row — the L1-C tree UI (content ships in L1-B)",
+	&"unlock_flavor_the_smiths_signature": "legacy tree node card flavor row — the L1-C tree UI (content ships in L1-B)",
+	&"unlock_flavor_the_salvage_charter": "legacy tree node card flavor row — the L1-C tree UI (content ships in L1-B)",
+	&"unlock_flavor_the_sergeants_primer": "legacy tree node card flavor row — the L1-C tree UI (content ships in L1-B)",
+	&"unlock_flavor_the_drill_song_book": "legacy tree node card flavor row — the L1-C tree UI (content ships in L1-B)",
+	&"unlock_flavor_the_sand_yard": "legacy tree node card flavor row — the L1-C tree UI (content ships in L1-B)",
+	&"unlock_flavor_war_games_on_sundays": "legacy tree node card flavor row — the L1-C tree UI (content ships in L1-B)",
 }
 
 

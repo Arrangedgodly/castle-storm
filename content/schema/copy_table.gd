@@ -169,6 +169,27 @@ const KEY_TOKENS: Dictionary = {
 	&"title_new_run": [],
 	&"title_new_run_armed": [],
 	&"title_new_run_caution": [],
+	# --- the legacy tree's voice (L1-B, the tree content; the L1-C tree UI
+	# consumes): one branch-name key per tree branch (`unlock_branch_<id>`)
+	# and one flavor key per node (`unlock_flavor_<node_id>` — literal lines,
+	# no tokens: the tree copy is static content, rotor 0 always). The key
+	# set mirrors the shipped tree's ids exactly (pinned by
+	# test_mvp_unlock_tree: every node/branch keyed, no orphan keys). ---
+	&"unlock_branch_old_guard": [],
+	&"unlock_branch_workshop": [],
+	&"unlock_branch_yard": [],
+	&"unlock_flavor_grandmas_recipes": [],
+	&"unlock_flavor_the_seed_drawer": [],
+	&"unlock_flavor_the_emergency_cheese": [],
+	&"unlock_flavor_unpaid_artisans": [],
+	&"unlock_flavor_cousin_ironmonger": [],
+	&"unlock_flavor_the_masons_secret": [],
+	&"unlock_flavor_the_smiths_signature": [],
+	&"unlock_flavor_the_salvage_charter": [],
+	&"unlock_flavor_the_sergeants_primer": [],
+	&"unlock_flavor_the_drill_song_book": [],
+	&"unlock_flavor_the_sand_yard": [],
+	&"unlock_flavor_war_games_on_sundays": [],
 }
 
 ## Automated register floor: whole WORDS that BREAK the voice (modern

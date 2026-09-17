@@ -1,0 +1,179 @@
+[gd_resource type="Resource" script_class="UnlockTreeDef" format=3]
+
+[ext_resource type="Script" path="res://content/schema/unlock_effect.gd" id="1_eff"]
+[ext_resource type="Script" path="res://content/schema/unlock_node_def.gd" id="2_node"]
+[ext_resource type="Script" path="res://content/schema/unlock_tree_def.gd" id="3_tree"]
+
+[sub_resource type="Resource" id="UnlockEffect_grandmas_recipes"]
+script = ExtResource("1_eff")
+kind = &"stipend_bonus"
+value = 1.1
+
+[sub_resource type="Resource" id="UnlockEffect_the_seed_drawer"]
+script = ExtResource("1_eff")
+kind = &"stipend_bonus"
+value = 1.1
+
+[sub_resource type="Resource" id="UnlockEffect_the_emergency_cheese"]
+script = ExtResource("1_eff")
+kind = &"stipend_bonus"
+value = 1.08
+
+[sub_resource type="Resource" id="UnlockEffect_unpaid_artisans"]
+script = ExtResource("1_eff")
+kind = &"building_cost_multiplier"
+value = 0.95
+
+[sub_resource type="Resource" id="UnlockEffect_cousin_ironmonger"]
+script = ExtResource("1_eff")
+kind = &"gear_cost_multiplier"
+value = 0.95
+
+[sub_resource type="Resource" id="UnlockEffect_the_masons_secret"]
+script = ExtResource("1_eff")
+kind = &"building_cost_multiplier"
+value = 0.93
+
+[sub_resource type="Resource" id="UnlockEffect_the_smiths_signature"]
+script = ExtResource("1_eff")
+kind = &"gear_cost_multiplier"
+value = 0.9
+
+[sub_resource type="Resource" id="UnlockEffect_the_salvage_charter"]
+script = ExtResource("1_eff")
+kind = &"building_cost_multiplier"
+value = 0.91
+
+[sub_resource type="Resource" id="UnlockEffect_the_sergeants_primer"]
+script = ExtResource("1_eff")
+kind = &"training_time_multiplier"
+value = 0.98
+
+[sub_resource type="Resource" id="UnlockEffect_the_drill_song_book"]
+script = ExtResource("1_eff")
+kind = &"training_time_multiplier"
+value = 0.97
+
+[sub_resource type="Resource" id="UnlockEffect_the_sand_yard"]
+script = ExtResource("1_eff")
+kind = &"training_time_multiplier"
+value = 0.97
+
+[sub_resource type="Resource" id="UnlockEffect_war_games_on_sundays"]
+script = ExtResource("1_eff")
+kind = &"training_time_multiplier"
+value = 0.96
+
+[sub_resource type="Resource" id="UnlockNode_grandmas_recipes"]
+script = ExtResource("2_node")
+id = &"grandmas_recipes"
+display_name = "Grandma's Recipes"
+branch = &"old_guard"
+cost = 60
+effect = SubResource("UnlockEffect_grandmas_recipes")
+
+[sub_resource type="Resource" id="UnlockNode_the_seed_drawer"]
+script = ExtResource("2_node")
+id = &"the_seed_drawer"
+display_name = "The Seed Drawer"
+branch = &"old_guard"
+cost = 140
+prerequisites = Array[StringName]([&"grandmas_recipes"])
+effect = SubResource("UnlockEffect_the_seed_drawer")
+
+[sub_resource type="Resource" id="UnlockNode_the_emergency_cheese"]
+script = ExtResource("2_node")
+id = &"the_emergency_cheese"
+display_name = "The Emergency Cheese"
+branch = &"old_guard"
+cost = 260
+prerequisites = Array[StringName]([&"the_seed_drawer"])
+effect = SubResource("UnlockEffect_the_emergency_cheese")
+
+[sub_resource type="Resource" id="UnlockNode_unpaid_artisans"]
+script = ExtResource("2_node")
+id = &"unpaid_artisans"
+display_name = "The Union of Unpaid Artisans"
+branch = &"workshop"
+cost = 80
+effect = SubResource("UnlockEffect_unpaid_artisans")
+
+[sub_resource type="Resource" id="UnlockNode_cousin_ironmonger"]
+script = ExtResource("2_node")
+id = &"cousin_ironmonger"
+display_name = "A Cousin in Ironmongery"
+branch = &"workshop"
+cost = 120
+effect = SubResource("UnlockEffect_cousin_ironmonger")
+
+[sub_resource type="Resource" id="UnlockNode_the_masons_secret"]
+script = ExtResource("2_node")
+id = &"the_masons_secret"
+display_name = "The Mason's Secret"
+branch = &"workshop"
+cost = 180
+prerequisites = Array[StringName]([&"unpaid_artisans"])
+effect = SubResource("UnlockEffect_the_masons_secret")
+
+[sub_resource type="Resource" id="UnlockNode_the_smiths_signature"]
+script = ExtResource("2_node")
+id = &"the_smiths_signature"
+display_name = "The Smith's Signature"
+branch = &"workshop"
+cost = 220
+prerequisites = Array[StringName]([&"cousin_ironmonger"])
+effect = SubResource("UnlockEffect_the_smiths_signature")
+
+[sub_resource type="Resource" id="UnlockNode_the_salvage_charter"]
+script = ExtResource("2_node")
+id = &"the_salvage_charter"
+display_name = "The Salvage Charter"
+branch = &"workshop"
+cost = 310
+prerequisites = Array[StringName]([&"the_masons_secret", &"the_smiths_signature"])
+effect = SubResource("UnlockEffect_the_salvage_charter")
+
+[sub_resource type="Resource" id="UnlockNode_the_sergeants_primer"]
+script = ExtResource("2_node")
+id = &"the_sergeants_primer"
+display_name = "The Sergeant's Primer"
+branch = &"yard"
+cost = 100
+effect = SubResource("UnlockEffect_the_sergeants_primer")
+
+[sub_resource type="Resource" id="UnlockNode_the_drill_song_book"]
+script = ExtResource("2_node")
+id = &"the_drill_song_book"
+display_name = "The Drill-Song Book"
+branch = &"yard"
+cost = 140
+prerequisites = Array[StringName]([&"the_sergeants_primer"])
+effect = SubResource("UnlockEffect_the_drill_song_book")
+
+[sub_resource type="Resource" id="UnlockNode_the_sand_yard"]
+script = ExtResource("2_node")
+id = &"the_sand_yard"
+display_name = "The Sand Yard"
+branch = &"yard"
+cost = 170
+prerequisites = Array[StringName]([&"the_sergeants_primer"])
+effect = SubResource("UnlockEffect_the_sand_yard")
+
+[sub_resource type="Resource" id="UnlockNode_war_games_on_sundays"]
+script = ExtResource("2_node")
+id = &"war_games_on_sundays"
+display_name = "War Games on Sundays"
+branch = &"yard"
+cost = 230
+prerequisites = Array[StringName]([&"the_drill_song_book", &"the_sand_yard"])
+effect = SubResource("UnlockEffect_war_games_on_sundays")
+
+[resource]
+script = ExtResource("3_tree")
+version = 1
+nodes = Array[ExtResource("2_node")]([SubResource("UnlockNode_grandmas_recipes"), SubResource("UnlockNode_the_seed_drawer"), SubResource("UnlockNode_the_emergency_cheese"), SubResource("UnlockNode_unpaid_artisans"), SubResource("UnlockNode_cousin_ironmonger"), SubResource("UnlockNode_the_masons_secret"), SubResource("UnlockNode_the_smiths_signature"), SubResource("UnlockNode_the_salvage_charter"), SubResource("UnlockNode_the_sergeants_primer"), SubResource("UnlockNode_the_drill_song_book"), SubResource("UnlockNode_the_sand_yard"), SubResource("UnlockNode_war_games_on_sundays")])
+branch_crests = Dictionary[StringName, StringName]({
+&"old_guard": &"crest_old_guard",
+&"workshop": &"crest_workshop",
+&"yard": &"crest_yard"
+})
