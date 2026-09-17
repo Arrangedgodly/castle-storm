@@ -1775,7 +1775,7 @@ func _print_autosave_line() -> void:
 	presenter.push_row({
 		"class": Inks.LineClass.PLAIN,
 		"text": CopyDeck.line(Inks.pack().copy, &"autosave_filed",
-			host.engine.tick_count, {"hours": host.engine.sim_hours()}),
+			host.engine.tick_count, {"hours": int(host.engine.sim_hours())}),
 	})
 	if not _view.is_empty():
 		_bind_chronicle()
