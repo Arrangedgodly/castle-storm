@@ -92,6 +92,14 @@ const KEY_BUDGETS: Dictionary = {
 	&"assault_denied": STRIP_BUDGET, &"catch_up_clock_rewound": STRIP_BUDGET,
 	&"clerk_denied": STRIP_BUDGET, &"command_rejected": STRIP_BUDGET,
 	&"gate_thinned": STRIP_BUDGET, &"cards_kept_close": STRIP_BUDGET,
+	# the L2 escalation presence (L2-B): the victory beat is a strip row;
+	# the odds castle-card line wraps to two plates at card scale (the
+	# SiegeCard 26-char rule) — pinned at the widest single-line budget so
+	# the WRAP stays a two-plate wrap; the chronicle entry's line prints on
+	# the sheet's card rows (quote budget, the army-line class)
+	&"escalation_captured": STRIP_BUDGET,
+	&"garrison_escalation": STRIP_BUDGET,
+	&"chronicle_escalation": QUOTE_BUDGET,
 	# the first session's printed cues (T-UI-10) — strip rows
 	&"first_gate": STRIP_BUDGET, &"first_assign": STRIP_BUDGET,
 	&"first_build": STRIP_BUDGET, &"first_trickle": STRIP_BUDGET,
@@ -268,6 +276,10 @@ func _worst_case_params() -> Dictionary:
 		# name, and the widest shortfall the abbreviated bank can print.
 		"node": _longest_node_name(pack),
 		"short": 9999,
+		# the L2 escalation tokens (L2-B): the ladder's cycle count (3
+		# digits is the deep-campaign worst case) — {leader} and {power}
+		# reuse the first-name and assault values above.
+		"cycle": 999,
 	}
 
 

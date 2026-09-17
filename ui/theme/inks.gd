@@ -278,6 +278,7 @@ const EVENT_LINE_CLASSES: Dictionary = {
 	&"crackdown_struck": LineClass.STRIKE, &"crackdown_seized": LineClass.STRIKE,
 	&"crackdown_scattered": LineClass.STRIKE, &"run_crushed": LineClass.STRIKE,
 	&"run_won": LineClass.VICTORY, &"assault_won": LineClass.VICTORY,
+	&"escalation_captured": LineClass.VICTORY,
 	&"suspicion_rose": LineClass.PLAIN, &"crackdown_cancelled": LineClass.PLAIN,
 	&"catch_up_applied": LineClass.PLAIN, &"catch_up_clock_rewound": LineClass.PLAIN,
 	&"assault_beat": LineClass.PLAIN, &"assault_denied": LineClass.PLAIN,

@@ -213,10 +213,10 @@ func floor_met(engine: SimEngine) -> bool:
 ##       # ...when an L2 escalation snapshot is ACTIVE, the same four keys
 ##       # carry the DERIVED base/kind/mult/strength plus: "source"
 ##       # (&"escalation"), "escalation_cycle", "snapshot_power",
-##       # "curve_multiplier_milli", "regime_id", "leader",
+##       # "curve_multiplier_milli", "regime_id", "crest_id", "leader",
 ##       # "captured_at_run", "roster" (the snapshot's tier mix) — L2-C's
-##       # "whose army, what tier mix" data. No snapshot -> exactly the
-##       # four static keys, byte-identical to pre-L2.
+##       # "whose army, what crest, what tier mix" data. No snapshot ->
+##       # exactly the four static keys, byte-identical to pre-L2.
 ##     },
 ##   }
 ##
@@ -515,6 +515,7 @@ func _escalation_garrison(engine: SimEngine) -> Dictionary:
 		"snapshot_power": snapshot_power,
 		"curve_multiplier_milli": curve_milli,
 		"regime_id": String(snapshot.get("regime_id", "")),
+		"crest_id": String(snapshot.get("crest_id", "")),
 		"leader": String(snapshot.get("leader", "")),
 		"captured_at_run": int(snapshot.get("captured_at_run", 0)),
 		"roster": roster.duplicate(true),

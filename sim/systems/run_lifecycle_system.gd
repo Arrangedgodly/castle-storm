@@ -509,7 +509,6 @@ func _end_run(engine: SimEngine, p_outcome: int, army_override: int) -> int:
 	end_tick = engine.tick_count
 	meta.legacy_points += score
 	meta.runs_recorded += 1
-	meta.chronicle.append(_chronicle_entry(roster, army_power, duration, score))
 	# L2 escalation capture (docs/sim-engine.md §19, docs/save-schema.md §6):
 	# VICTORY ONLY — the winning army becomes the next cycle's castle
 	# garrison. An empty roster captures nothing (an empty castle garrisons
@@ -517,6 +516,9 @@ func _end_run(engine: SimEngine, p_outcome: int, army_override: int) -> int:
 	# loss/abort/crush never reaches this branch, so the regime that beat
 	# you STAYS until beaten (the snapshot survives every restart form — it
 	# lives in the meta domain, not the run payload the reset clears).
+	# The capture runs BEFORE the chronicle append so the victory entry can
+	# carry the cycle it opened (the chronicle escalation field, L2-B).
+	var escalation_cycle_opened := 0
 	if p_outcome == OUTCOME_VICTORY:
 		var snapshot := Escalation.capture(
 			units, _regime, leader_name(), meta.runs_recorded, meta.escalation_cycle + 1
@@ -524,8 +526,23 @@ func _end_run(engine: SimEngine, p_outcome: int, army_override: int) -> int:
 		if not snapshot.is_empty():
 			meta.escalation_garrison = snapshot
 			meta.escalation_cycle += 1
+			escalation_cycle_opened = meta.escalation_cycle
+	meta.chronicle.append(
+		_chronicle_entry(roster, army_power, duration, score, escalation_cycle_opened)
+	)
 	match p_outcome:
 		OUTCOME_VICTORY:
+			# The capture beat (L2-B): when the victory garrisoned the
+			# castle with the winning army, the event stream says so BEFORE
+			# the outcome event — value = the cycle opened, value2 = the
+			# army power that took the wall (the next hand's garrison). No
+			# capture (empty roster / loss / abort): no event, byte-identical
+			# stream to the pre-L2-B build.
+			if escalation_cycle_opened > 0:
+				engine.events.record(
+					engine.tick_count, &"escalation_captured", regime_id(),
+					escalation_cycle_opened, army_power
+				)
 			engine.events.record(engine.tick_count, &"run_won", regime_id(), score, run_index)
 		OUTCOME_DEFEAT:
 			engine.events.record(engine.tick_count, &"run_lost", regime_id(), score, run_index)
@@ -537,14 +554,21 @@ func _end_run(engine: SimEngine, p_outcome: int, army_override: int) -> int:
 ## JSON-safe append-only record (docs/sim-engine.md §12 schema). The "run"
 ## number is the META-monotonic counter (survives engine re-inits); "army"
 ## is the terminal-roster snapshot for the chronicle screen (T-UI-08).
-func _chronicle_entry(roster: Dictionary, army_power: int, duration: int, score: int) -> Dictionary:
+## `p_escalation_cycle` > 0 marks the VICTORY that garrisoned the castle
+## (L2-B): the entry records the escalation cycle this run's army opened —
+## emit-when-set (a non-capturing entry carries no key, so pre-L2-B saves
+## read back identically).
+func _chronicle_entry(
+		roster: Dictionary, army_power: int, duration: int, score: int,
+		p_escalation_cycle := 0
+) -> Dictionary:
 	var army := {}
 	for def_id in roster.keys():
 		army[String(def_id)] = int(roster[def_id])
 	var tags: Array[String] = []
 	for tag in _leader_tags:
 		tags.append(String(tag))
-	return {
+	var entry := {
 		"run": meta.runs_recorded,
 		"leader": leader_name(),
 		"tags": tags,
@@ -556,6 +580,9 @@ func _chronicle_entry(roster: Dictionary, army_power: int, duration: int, score:
 		"army": army,
 		"score": score,
 	}
+	if p_escalation_cycle > 0:
+		entry["escalation_cycle"] = p_escalation_cycle
+	return entry
 
 
 func _outcome_name(p_outcome: int) -> String:

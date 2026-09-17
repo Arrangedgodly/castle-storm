@@ -60,11 +60,12 @@ const MVP := preload("res://tests/acceptance/suites/_mvp_pack.gd")
 ## purchase-everything LegacySystem. `p_escalation` (additive, L2) wires
 ## the assault resolver's escalation content exactly the way GameHost
 ## does — DEFAULT FALSE: the shared suites' recorded digests and the
-## balance-band pins are measured against the STATIC garrison ladder, so
-## they stay unwired until the L2-B balance pass re-sweeps with escalation
-## on (a fresh meta behaves identically either way — the zero-impact rule,
-## docs/sim-engine.md §19; GameHost itself always wires, so the shipped
-## game escalates).
+## balance-band pins are measured against the STATIC garrison ladder and
+## STAY unwired by design (a fresh meta behaves identically either way —
+## the zero-impact rule, docs/sim-engine.md §19; the L2-B balance pass
+## measures escalation on its own explicitly-wired harness,
+## docs/balance.md §7, pinned by escalation_ladder_band; GameHost itself
+## always wires, so the shipped game escalates).
 static func game_stack(run_seed: int, meta: RunMeta, stipend: Dictionary = {}, p_tunables: EconomyTunables = null, p_legacy: LegacySystem = null, p_escalation := false) -> SimEngine:
 	var pack := MVP.load_mvp()
 	var tunables := p_tunables if p_tunables != null else pack.tunables
@@ -83,11 +84,16 @@ static func game_stack(run_seed: int, meta: RunMeta, stipend: Dictionary = {}, p
 
 ## HostSession factory (the ONLY supported construction path — it injects
 ## the canonical composition, so a session can never be built from a stale
-## copy of the system order).
-static func session(run_seed: int, stipend: Dictionary = {}, p_tunables: EconomyTunables = null, p_legacy: LegacySystem = null, p_escalation := false) -> HostSession:
-	var factory := func(p_seed: int, p_meta: RunMeta, p_stipend: Dictionary) -> SimEngine:
-		return game_stack(p_seed, p_meta, p_stipend, p_tunables, p_legacy, p_escalation)
-	return HostSession.new(run_seed, stipend, factory, p_tunables)
+## copy of the system order). `p_meta` (additive, L2-B): inject an EXISTING
+## meta domain — the host's one-shared-meta-across-engines rule (GameHost
+## hands the same RunMeta to every engine it builds; the escalation ladder
+## is exactly this shape: a chained campaign where each victory's capture
+## stands in the shared meta while the next engine builds fresh). Default
+## null builds a fresh meta — identical to the pre-L2-B behavior.
+static func session(run_seed: int, stipend: Dictionary = {}, p_tunables: EconomyTunables = null, p_legacy: LegacySystem = null, p_escalation := false, p_meta: RunMeta = null) -> HostSession:
+	var factory := func(p_seed: int, p_meta_in: RunMeta, p_stipend: Dictionary) -> SimEngine:
+		return game_stack(p_seed, p_meta_in, p_stipend, p_tunables, p_legacy, p_escalation)
+	return HostSession.new(run_seed, stipend, factory, p_tunables, p_meta)
 
 
 ## One host session: the meta bank + the catch-up service + the current
@@ -116,8 +122,8 @@ class HostSession:
 	var _factory: Callable
 
 
-	func _init(p_run_seed: int, p_stipend: Dictionary, p_factory: Callable, p_tunables: EconomyTunables = null) -> void:
-		meta = RunMeta.new()
+	func _init(p_run_seed: int, p_stipend: Dictionary, p_factory: Callable, p_tunables: EconomyTunables = null, p_meta: RunMeta = null) -> void:
+		meta = p_meta if p_meta != null else RunMeta.new()
 		catch_up = CatchUpService.new(p_tunables if p_tunables != null else MVP.load_mvp().tunables)
 		_run_seed = p_run_seed
 		_stipend = p_stipend

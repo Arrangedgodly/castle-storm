@@ -194,7 +194,7 @@ Shape rules, then the numbers (`content/mvp/identity_pools.tres`):
 
 ## 6. The template table (keys, tokens, variants, consumers)
 
-The complete vocabulary is `CopyTable.KEY_TOKENS` (125 keys; content
+The complete vocabulary is `CopyTable.KEY_TOKENS` (128 keys; content
 cannot invent keys the code never reads). The shipped variant counts and
 the surface consuming each key print into the test log as the COPY
 COVERAGE REPORT (`CopyDeck.coverage_report`) — the machine-checked
@@ -228,6 +228,19 @@ answer to "which screens got which templates". Shape of the table:
   rotor 0 — the tree is static content), 1 variant each, table == floor
   (one voice, two origins); consumed by the L1-C tree UI, budget-pinned
   at the card/quote classes by `tests/unit/test_mvp_unlock_tree.gd`.
+- **The escalation presence** (`garrison_escalation`,
+  `escalation_captured`, `chronicle_escalation` — L2-B): the odds castle
+  card's line when a CAPTURED garrison stands ("garrison 46 · Ottilie's
+  veterans — cycle 2" — rotor 0, a static composition surface; the
+  leader prints by FIRST name, the single-line pool rule), the strip's
+  victory beat when the win garrisons the castle ("Ottilie's veterans
+  take the wall — cycle 2." — seq-rotated, 2 variants, rides the
+  `escalation_captured` event before `run_won`), and the victory
+  chronicle entry's line ("this army holds the castle — cycle 2 opens" —
+  run-number-rotated, reads the entry's `escalation_cycle` field). The
+  clerk's register throughout: the army that won becomes the wall, the
+  record says so flat — the joke is the castle now files YOUR paperwork.
+  A non-capturing victory prints nothing (the pre-L2-B stream).
 
 Every key that the sim REPEATS (`CopyTable.ROTATING_KEYS` — arrivals,
 trainings, promotions, suspicion beats, headlines, card phrases) ships
@@ -280,7 +293,7 @@ punished — the copy IS the policy's tone).
 | Artifact | Role |
 |---|---|
 | `content/schema/copy_table.gd` | The key/token vocabulary, variant caps, rotating keys, banned list (validated) |
-| `content/mvp/copy_table.tres` | THE shipped voice — 125 keys, 1–4 variants each |
+| `content/mvp/copy_table.tres` | THE shipped voice — 128 keys, 1–4 variants each |
 | `ui/screens/spread/first_session.gd` | The first session's five printed cues (T-UI-10) |
 | `content/schema/identity_pools.gd` + `content/mvp/identity_pools.tres` | The names (firsts, epithets, tags, recruits, traits) |
 | `sim/copy_deck.gd` | The renderer: variant selection, substitution, fallback floor, coverage report |

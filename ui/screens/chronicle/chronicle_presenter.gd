@@ -117,7 +117,11 @@ static func view(host: GameHost, page: int, per_page: int) -> Dictionary:
 ## the display dressing (regime name/ink/crest) resolves against the pack
 ## from the entry's OWN regime id, and unknown ids degrade honestly (raw
 ## id as the name, the neutral ink, no crest) — the record never bends to
-## the pack, the pack dresses the record.
+## the pack, the pack dresses the record. The escalation line (L2-B) is
+## the entry's own record of the capture: a victory whose army took the
+## castle carries `escalation_cycle`, and the card prints the clerk's line
+## for it (rotor = the entry's run number — same entry, same line, a
+## growing campaign varies). Non-capturing entries carry an empty line.
 static func entry_view(entry: Dictionary) -> Dictionary:
 	var leader := String(entry.get("leader", ""))
 	var first := leader
@@ -128,6 +132,7 @@ static func entry_view(entry: Dictionary) -> Dictionary:
 		epithet = leader.substr(split + 1)
 	var outcome := String(entry.get("outcome", ""))
 	var regime_id := StringName(String(entry.get("regime", "")))
+	var escalation_cycle := int(entry.get("escalation_cycle", 0))
 	return {
 		"run": int(entry.get("run", 0)),
 		"leader": leader,
@@ -149,6 +154,11 @@ static func entry_view(entry: Dictionary) -> Dictionary:
 		"army_line": army_line(entry),
 		"army_power": int(entry.get("army_power", 0)),
 		"score": int(entry.get("score", 0)),
+		"escalation_cycle": escalation_cycle,
+		"escalation_line": CopyDeck.line(
+			Inks.pack().copy, &"chronicle_escalation",
+			int(entry.get("run", 0)), {"cycle": escalation_cycle}
+		) if escalation_cycle > 0 else "",
 	}
 
 
@@ -314,6 +324,8 @@ static func view_hash(view: Dictionary) -> int:
 		h = _mix(h, String(entry["army_line"]).hash())
 		h = _mix(h, int(entry["army_power"]))
 		h = _mix(h, int(entry["score"]))
+		h = _mix(h, int(entry["escalation_cycle"]))
+		h = _mix(h, String(entry["escalation_line"]).hash())
 		var regime: Dictionary = entry["regime"]
 		h = _mix(h, String(regime["id"]).hash())
 	var current: Dictionary = view["current"]

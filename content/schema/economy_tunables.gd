@@ -214,20 +214,27 @@ extends Resource
 ## edge. Default 20 = just above half a warn threshold.
 @export var assault_failure_suspicion: int = 20
 
-## --- Enemy escalation (L2 — docs/sim-engine.md §19; the curve placeholder
-## shipped by L2-A, TUNED BY THE L2-B BALANCE PASS) ---
+## --- Enemy escalation (L2 — docs/sim-engine.md §19; the curve shipped by
+## L2-A, TUNED BY THE L2-B BALANCE PASS — docs/balance.md §7) ---
 
 ## Per-cycle compounding step of the escalation curve: when a garrison
 ## snapshot stands in the meta, the castle's strength is the SNAPSHOT's
 ## army-power-equivalent x step^(cycle-1) — cycle 1 (the first captured
 ## victory) is x1.000 because the snapshot ITSELF is the first escalation
-## (a typical winning army ~100 power already doubles the static 50 wall,
-## re-establishing R5's "first L2 cycle is a full new campaign" arc);
-## every later captured cycle compounds this step (R5: the ladder the
-## player climbs, compressing ~2-5x per arc as legacy power compounds).
+## (a measured sensible winning army ~43-55 power sits at the static 50
+## wall's own scale, re-establishing R5's "first L2 cycle is a full new
+## campaign" arc); every later captured cycle compounds this step. THE
+## TUNED VALUE x1.10 (L2-B, 12-seed chained campaigns): the snapshot
+## self-damps each cycle (a 450-permille commit captures only ~0.82x the
+## wall's power), so the wall's net growth stays ~x1.0 per cycle early and
+## the step's exponent surfaces from cycle 3 — full tree climbs 12/12
+## through cycle 5 (walls ~44 -> ~71, time-to-win 75 -> 102 h, growth
+## <= 1.4x the previous cycle) while the zero-tree band inflates
+## 82 -> 119 h and starts dropping seeds at cycle 5 (the tree is the
+## ladder's handrail). x1.15 bites one cycle earlier (11/12 at cycle 5);
+## the L2-A placeholder x1.25 stalls 7 of 11 campaigns there — rejected.
 ## Exact integer milli math (SimFixed.milli_from_float ONCE at the
 ## resolver's construction; one floored int division per hop, hops capped
 ## at Escalation.MAX_CURVE_HOPS). Validator band [1.0, 4.0): the ladder
-## never shrinks. Default 1.25 is the L2-A PLACEHOLDER — L2-B owns the
-## tuned value (docs/balance.md §7).
-@export var escalation_garrison_cycle_step: float = 1.25
+## never shrinks.
+@export var escalation_garrison_cycle_step: float = 1.10

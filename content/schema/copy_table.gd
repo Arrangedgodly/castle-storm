@@ -42,6 +42,7 @@ const ROTATING_KEYS: Array[StringName] = [
 	&"catchup_headline", &"catchup_people_arrived",
 	&"card_warn_line", &"card_telegraph_line",
 	&"autosave_filed",
+	&"escalation_captured", &"chronicle_escalation",
 ]
 
 ## The complete key vocabulary + each key's allowed `{tokens}` (empty list =
@@ -194,6 +195,13 @@ const KEY_TOKENS: Dictionary = {
 	&"unlock_flavor_quiet_boots": [],
 	&"unlock_flavor_scarred_banners": [],
 	&"unlock_flavor_the_night_watch": [],
+	# --- the L2 escalation presence (L2-B): the odds castle-card line when a
+	# captured garrison stands (static composition surface, rotor 0), the
+	# victory beat that captures (strip, seq-rotated), and the chronicle
+	# entry's escalation line (run-number-rotated) ---
+	&"garrison_escalation": [&"power", &"leader", &"cycle"],
+	&"escalation_captured": [&"leader", &"cycle"],
+	&"chronicle_escalation": [&"cycle"],
 	# --- the legacy deck screen (L1-C, the tree UI): the empty bank's two
 	# lines, the mid-run mount-discipline note, the one-step purchase
 	# confirmation and its refusal reasons. {node} is the node's display

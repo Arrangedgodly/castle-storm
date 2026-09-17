@@ -349,6 +349,33 @@ func test_duration_and_army_lines() -> void:
 	assert_str(ChroniclePresenter.army_line(entry)).is_equal("2 halberdiers · power 9")
 
 
+func test_escalation_line_reads_the_entries_own_record() -> void:
+	# L2-B: the victory that garrisoned the castle carries its escalation
+	# cycle on the entry; the card prints the clerk's line from the entry's
+	# OWN field (run-number rotor — same entry, same line; run 2 reads
+	# variant 0, run 5 reads variant 1: repeats vary, the record does not).
+	# Non-capturing entries carry an empty line and a zero cycle.
+	var captured := {"run": 2, "leader": "Bran the Unbearable", "outcome": "victory",
+		"regime": "gilded_crown", "escalation_cycle": 2}
+	var view := ChroniclePresenter.entry_view(captured)
+	assert_int(view["escalation_cycle"]).is_equal(2)
+	assert_str(String(view["escalation_line"])).is_equal(
+		"this army holds the castle — cycle 2 opens")
+	# Same entry, same line (the rotor is the entry's own run number).
+	var again := ChroniclePresenter.entry_view(captured.duplicate())
+	assert_str(String(again["escalation_line"])).is_equal(String(view["escalation_line"]))
+	# A different capturing run can read the other variant — still the
+	# entry's own cycle, never another run's.
+	var other := ChroniclePresenter.entry_view({"run": 5, "outcome": "victory",
+		"regime": "velvet_fist", "escalation_cycle": 3})
+	assert_str(String(other["escalation_line"])).contains("cycle 3")
+	# Non-capturing entries: empty line, zero cycle, no invention.
+	var quiet := ChroniclePresenter.entry_view({"run": 5, "outcome": "defeat",
+		"regime": "paper_crown"})
+	assert_int(quiet["escalation_cycle"]).is_equal(0)
+	assert_str(String(quiet["escalation_line"])).is_equal("")
+
+
 func test_view_hash_deterministic_and_meta_sensitive() -> void:
 	var host_a := _test_host()
 	var host_b := _test_host()

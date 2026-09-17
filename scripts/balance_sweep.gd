@@ -94,11 +94,21 @@ func _initialize() -> void:
 	var clock := Time.get_ticks_msec()
 	print("[balance-sweep] canonical host, MVP pack; %d seeds from %d; commit line %d permille" % [seed_count, BASE_SEED, COMMIT_PERMILLE])
 	print()
-	_sweep_opening(seed_count)
-	_sweep_pressure()
-	_sweep_first_win(seed_count)
-	_sweep_legacy_tree(seed_count)
-	_sweep_final_detail()
+	# CS_SWEEP_ONLY=<section> re-runs one section (the balance passes'
+	# iteration lever): opening | pressure | first-win | legacy | escalation
+	var only := OS.get_environment("CS_SWEEP_ONLY")
+	if only == "" or only == "opening":
+		_sweep_opening(seed_count)
+	if only == "" or only == "pressure":
+		_sweep_pressure()
+	if only == "" or only == "first-win":
+		_sweep_first_win(seed_count)
+	if only == "" or only == "legacy":
+		_sweep_legacy_tree(seed_count)
+	if only == "" or only == "escalation":
+		_sweep_escalation(seed_count)
+	if only == "" or only == "checkin":
+		_sweep_final_detail()
 	print()
 	print("[balance-sweep] done in %.1fs — record into docs/balance.md" % [float(Time.get_ticks_msec() - clock) / 1000.0])
 	quit(0)
@@ -178,8 +188,20 @@ func measure_opening(tunables: EconomyTunables, seed: int, policy: Dictionary) -
 ## would freeze the army the moment the workers fill it (workers cannot
 ## rebranch; army growth needs fresh recruits). `legacy` (L1 probe) wires
 ## the unlock-tree provider into the session exactly the way GameHost does.
-func measure_first_win(tunables: EconomyTunables, seed: int, cadence_hours: int, commit_permille: int, legacy: LegacySystem = null) -> Dictionary:
-	var session: Variant = HOST.session(seed, {}, tunables, legacy)
+## L2-B ladder probes: `p_escalation` wires the resolver's escalation
+## content (the shipped game's wiring), `p_meta` chains the run into an
+## EXISTING campaign meta (the host's one-shared-meta rule — a victory's
+## capture stands there, so the next call faces the escalated garrison),
+## `p_cap_hours` widens the ladder's honest ceiling (the band suite's 240h
+## stays the FIRST-win pin; a cycle-5 rebuild legitimately runs longer).
+## The story records the wall the run faced (`wall_strength`, the garrison
+## strength in power units at run start).
+func measure_first_win(
+		tunables: EconomyTunables, seed: int, cadence_hours: int, commit_permille: int,
+		legacy: LegacySystem = null, p_escalation := false, p_meta: RunMeta = null,
+		p_cap_hours := FIRST_WIN_CAP_HOURS
+) -> Dictionary:
+	var session: Variant = HOST.session(seed, {}, tunables, legacy, p_escalation, p_meta)
 	var engine: SimEngine = session.engine
 	var run := engine.get_system(&"run") as RunLifecycleSystem
 	var units := engine.get_system(&"units") as UnitLifecycleSystem
@@ -189,16 +211,19 @@ func measure_first_win(tunables: EconomyTunables, seed: int, cadence_hours: int,
 	engine.submit_command(&"run_start", &"", 0)
 	engine.submit_command(&"grant_resources", &"", 0)
 	engine.fast_forward(1)
+	var wall: Dictionary = resolver.assault_odds(engine)["garrison"]
 	var story := {
 		"won": false, "win_tick": -1, "losses": 0, "first_loss_tick": -1,
 		"suspicion_max": 0, "warns": 0, "telegraphs": 0, "cancels": 0,
 		"crushed": false, "batches": 0, "regime": run.regime_id(),
 		"odds_cross_tick": -1, "power_at_win": 0,
+		"wall_strength": int(wall["strength_milli"]) / SimFixed.MILLI,
+		"wall_cycle": int(wall.get("escalation_cycle", 0)),
 	}
 	var epoch := 1_750_000_000
 	var seq := 0
 	var batches := 0
-	while engine.tick_count < FIRST_WIN_CAP_HOURS * 60:
+	while engine.tick_count < p_cap_hours * 60:
 		var laying_low := suspicion.suspicion_points() >= 70
 		var military := 12 if resolver.floor_met(engine) else 3
 		HOST.manage(engine, military, {&"laying_low": laying_low, &"population_cap": _estate_cap(production)})
@@ -594,6 +619,188 @@ func _sweep_legacy_tree(seed_count: int) -> void:
 		print("[legacy greed] full-tree failure-mode probe (military 24, population 40, never lay low, seed %d): crushed %s at hour %.0f, strikes %d, warns %d" % [
 			greed_seed, "YES" if greed["crushes"] > 0 else "no",
 			greed["crush_tick"] / 60.0, greed["strikes"], greed["warns"]])
+	print()
+
+
+# --- L2: the escalation ladder (docs/balance.md's L2-B section) -----------------
+#
+# One CHAINED CAMPAIGN per seed: run 1 is the static first win (the shared
+# meta starts bare — escalation wired changes nothing, the zero-impact
+# rule); its victory CAPTURES the winning army into the shared meta; every
+# following run is a fresh engine around the SAME meta (the host's
+# one-shared-meta rule), so it faces the escalated garrison, and ITS
+# victory captures the next snapshot. The curve step sweeps here; the
+# chosen value is the tunable default (the ladder table records it).
+
+
+## The ladder's honest ceiling: a cycle-4/5 rebuild legitimately runs
+## longer than the 240h FIRST-win pin, so the probe measures to 360h and
+## reports anything that touches the cap as a stall.
+const ESCALATION_CAP_HOURS := 360
+
+## The modeled partial-tree purchase policy: after the first win banks
+## ~250-300 lp, the bread-first economy purchases (R5's Rogue-Legacy
+## guidance: breadth-first economy nodes first) — the three cheapest
+## tier-1 nodes (60 + 80 + 100 = 240 lp, one win's bank). No veterans
+## branch: Scarred Banners (250 lp + the 110 lp prerequisite) is a two-win
+## purchase, recorded as the full-tree row's head start instead.
+const PARTIAL_TREE_NODES: Array[StringName] = [
+	&"grandmas_recipes", &"unpaid_artisans", &"the_sergeants_primer",
+]
+
+
+## A LegacySystem around the CAMPAIGN's shared meta with the whole tree
+## bought (the climbability probe's wallet — the L1-B probe's 1M-bank
+## pattern: the bank is a purchase gate, nothing in-run reads the balance,
+## so the campaign's honest bank is restored after the bulk buy).
+func _campaign_full_tree(meta: RunMeta) -> LegacySystem:
+	var legacy := LegacySystem.new(MVP.load_mvp().unlock_tree, meta)
+	var bank := meta.legacy_points
+	meta.legacy_points += 1_000_000
+	for id in legacy.node_ids():
+		if not legacy.purchase(id):
+			push_error("[balance-sweep] full-tree purchase of '%s' refused" % id)
+	meta.legacy_points = bank
+	return legacy
+
+
+## The partial-tree provider: buys the three tier-1 economy nodes out of
+## the campaign's REAL bank once (after run 1 banks), skips quietly when
+## the bank is short (a fast first win banks ~180 lp — 2 of 3; the honest
+## wallet, the same refusal the deck screen prints).
+func _campaign_partial_tree(meta: RunMeta, purchased: Dictionary) -> LegacySystem:
+	var legacy := LegacySystem.new(MVP.load_mvp().unlock_tree, meta)
+	if not bool(purchased.get("done", false)):
+		purchased["done"] = true
+		for id in PARTIAL_TREE_NODES:
+			if legacy.purchase_result(id) == LegacySystem.PURCHASE_OK:
+				legacy.purchase(id)
+	return legacy
+
+
+## One chained campaign: cycle 0 = the static first win; cycles 1..N face
+## the captured garrisons. `p_provider` maps (cycle, meta, purchased-flag)
+## -> the LegacySystem for that run (null = no tree). Stops at the first
+## unwon cycle (a stall is a READING, not an error — the row records it).
+func measure_campaign(
+		tunables: EconomyTunables, seed: int, cycles: int,
+		p_provider: Callable, cap_hours: int = ESCALATION_CAP_HOURS
+) -> Array[Dictionary]:
+	var meta := RunMeta.new()
+	var purchased := {}
+	var stories: Array[Dictionary] = []
+	for cycle in range(cycles + 1):
+		var legacy: LegacySystem = p_provider.call(cycle, meta, purchased)
+		var story := measure_first_win(
+			tunables, seed + cycle * 101, 6, COMMIT_PERMILLE, legacy, true, meta, cap_hours
+		)
+		story["cycle"] = cycle
+		stories.append(story)
+		if not story["won"]:
+			break
+	return stories
+
+
+## Mean/slowest/wins/losses/wall for one cycle index across campaigns.
+func _cycle_row(stories_by_seed: Array, cycle: int) -> Dictionary:
+	var wins := 0
+	var hours_total := 0
+	var slowest := 0
+	var losses := 0
+	var walls := 0
+	var wall_n := 0
+	var crushed := 0
+	for stories in stories_by_seed:
+		if cycle >= stories.size():
+			continue  # this seed's campaign ended earlier (stall at a previous cycle)
+		var story: Dictionary = stories[cycle]
+		walls += int(story["wall_strength"])
+		wall_n += 1
+		crushed += int(story["crushed"])
+		if story["won"]:
+			wins += 1
+			var hours := int(story["win_tick"]) / 60
+			hours_total += hours
+			slowest = maxi(slowest, hours)
+		else:
+			losses += int(story["losses"])
+	return {
+		"runs": wall_n, "won": wins, "mean": hours_total / maxi(1, wins),
+		"slowest": slowest, "losses": losses, "wall": walls / maxi(1, wall_n),
+		"crushed": crushed,
+	}
+
+
+func _sweep_escalation(seed_count: int) -> void:
+	print("== L2 escalation ladder (chained campaigns, one shared meta per seed; cadence 6h, commit %d, cap %dh/cycle) ==" % [COMMIT_PERMILLE, ESCALATION_CAP_HOURS])
+	var no_tree := func(_cycle: int, _meta: RunMeta, _p: Dictionary) -> LegacySystem: return null
+	var partial := func(cycle: int, meta: RunMeta, purchased: Dictionary) -> LegacySystem:
+		if cycle == 0:
+			return null  # run 1 is fought barefoot; its bank buys the nodes
+		return _campaign_partial_tree(meta, purchased)
+	var full := func(_cycle: int, meta: RunMeta, purchased: Dictionary) -> LegacySystem:
+		if not bool(purchased.get("full_done", false)):
+			purchased["full_done"] = true
+			return _campaign_full_tree(meta)
+		return LegacySystem.new(MVP.load_mvp().unlock_tree, meta)
+	# Step candidates on the climbability gate (full tree, cycles 1-5): the
+	# chosen step must win 5/5 cycles with per-cycle growth <= ~1.5x and no
+	# cap stalls; the honest stall line is where the ceiling bites.
+	print("| step | full-tree per-cycle: won/mean h (wall) | verdict |")
+	print("|---|---|---|")
+	for step in [1.0, 1.1, 1.15, 1.2, 1.25]:
+		var tunables := _tunables({"escalation_garrison_cycle_step": step})
+		var campaigns: Array = []
+		for s in range(seed_count):
+			campaigns.append(measure_campaign(tunables, BASE_SEED + s * 13, 5, full))
+		var cells: Array[String] = []
+		var verdict := "climbs"
+		var prev_mean := -1
+		for cycle in range(1, 6):
+			var row := _cycle_row(campaigns, cycle)
+			if row["runs"] == 0:
+				cells.append("—")
+				verdict = "stalled earlier"
+				continue
+			cells.append("%d/%d %dh (%d)" % [row["won"], row["runs"], row["mean"], row["wall"]])
+			if row["won"] < row["runs"]:
+				verdict = "ceiling bites"
+			elif prev_mean > 0 and row["mean"] > prev_mean * 1.5:
+				verdict = "growth >1.5x"
+			if row["won"] == row["runs"]:
+				prev_mean = row["mean"]
+			if row["crushed"] > 0:
+				verdict += ", %d crushed" % row["crushed"]
+		print("| x%.2f | %s | %s |" % [step, " · ".join(cells), verdict])
+	print()
+	# The recorded ladder table at the SHIPPED step: the three campaign
+	# shapes (no tree / partial tree / full tree), cycles 1-5.
+	var step_chosen := (MVP.load_mvp().tunables as EconomyTunables).escalation_garrison_cycle_step
+	var tunables := _tunables({"escalation_garrison_cycle_step": step_chosen})
+	print("== the ladder table (shipped step x%.2f): cycle | wall mean | no-tree | partial (3 economy nodes) | full tree ==" % step_chosen)
+	print("| cycle | garrison wall (mean) | no tree | partial tree | full tree |")
+	print("|---|---|---|---|---|")
+	var table := {}
+	for name_and_provider in [["no tree", no_tree], ["partial tree", partial], ["full tree", full]]:
+		var campaigns: Array = []
+		for s in range(seed_count):
+			campaigns.append(measure_campaign(tunables, BASE_SEED + s * 13, 5, name_and_provider[1]))
+		table[name_and_provider[0]] = campaigns
+	for cycle in range(1, 6):
+		var cells: Array[String] = []
+		var wall := 0
+		for name in ["no tree", "partial tree", "full tree"]:
+			var row := _cycle_row(table[name], cycle)
+			wall = row["wall"]
+			if row["runs"] == 0:
+				cells.append("—")
+			elif row["won"] == 0:
+				cells.append("STALLED (losses %d)" % row["losses"])
+			else:
+				cells.append("%d/%d won, %dh mean, %dh slow, %d losses%s" % [
+					row["won"], row["runs"], row["mean"], row["slowest"], row["losses"],
+					", %d crushed" % row["crushed"] if row["crushed"] > 0 else ""])
+		print("| %d | %d | %s | %s | %s |" % [cycle, wall, cells[0], cells[1], cells[2]])
 	print()
 
 

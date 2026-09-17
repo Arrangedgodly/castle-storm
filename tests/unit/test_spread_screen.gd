@@ -270,6 +270,37 @@ func test_chronicle_renders_key_events_and_skips_noise() -> void:
 			{"seq": 2, "tick": 6, "type": kind, "subject": &"", "value": 1, "value2": 0}, host)).is_null()
 
 
+func test_escalation_captured_beat_prints_from_the_standing_snapshot() -> void:
+	# L2-B: the capture beat renders from the event + the run system's own
+	# snapshot window — the leader by FIRST name, the cycle from the event
+	# payload. The beat carries the VICTORY line class (the seal grammar).
+	var host := _test_host()
+	var presenter := SpreadPresenter.new()
+	host.meta.escalation_garrison = {
+		"regime_id": "gilded_crown", "captured_at_run": 1, "cycle": 2,
+		"leader": "Bartholomew the Unbearable", "crest_id": "crest_gilded_crown",
+		"roster": {"knight": {"count": 1, "gear_tiers": {"weapon": {"1": 1}}}},
+	}
+	host.meta.escalation_cycle = 2
+	var beat: Variant = presenter.chronicle_line_for(
+		{"seq": 2, "tick": 90, "type": &"escalation_captured", "subject": &"gilded_crown",
+			"value": 2, "value2": 46}, host)
+	assert_that(beat).is_not_null()
+	assert_str(str(beat["text"])).contains("Bartholomew's veterans")
+	assert_str(str(beat["text"])).contains("cycle 2")
+	assert_int(beat["class"]).is_equal(Inks.LineClass.VICTORY)
+	# The rotation contract: a different seq reads the other variant —
+	# same facts (leader's veterans, the cycle), different tail.
+	var beat2: Variant = presenter.chronicle_line_for(
+		{"seq": 3, "tick": 90, "type": &"escalation_captured", "subject": &"gilded_crown",
+			"value": 2, "value2": 46}, host)
+	assert_str(str(beat2["text"])).contains("cycle 2")
+	assert_str(str(beat2["text"])).is_not_equal(str(beat["text"]))
+	# The beat refreshes the full view (a run-boundary-class event).
+	assert_int(SpreadPresenter.refresh_targets_for(&"escalation_captured").size()).is_greater(0)
+	assert_str(",".join(SpreadPresenter.refresh_targets_for(&"escalation_captured"))).is_equal("full")
+
+
 func test_new_event_kinds_have_line_classes() -> void:
 	## The additive Inks vocabulary: every kind the presenter prints maps
 	## (no loud PLAIN fallbacks on the hot path).

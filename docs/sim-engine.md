@@ -558,7 +558,13 @@ abort, and the crush NEVER touch a standing snapshot (the regime that beat
 you stays until beaten — the fantasy), and a victory over an empty roster
 captures nothing. The snapshot lives in the meta domain precisely so it
 survives the `run_restart` that follows a victory; the derivation that
-consumes it is §15/§19.
+consumes it is §15/§19. **L2-B flavor seams:** a capturing victory also
+emits `escalation_captured` (subject = regime id, value = the cycle
+opened, value2 = the wall-taking army power) in the SAME tick, BEFORE
+`run_won` — the strip's victory beat (CopyDeck key `escalation_captured`);
+and the victory's chronicle entry carries `escalation_cycle` (emit-when-
+set, save-schema §5.1) — the chronicle screen's escalation line. A
+non-capturing victory emits neither: the pre-L2-B stream and record.
 
 ### The reset contract (documented choice)
 
@@ -901,8 +907,10 @@ winning regime's modifier, save-schema §6; the current run's regime still
 scales the ARMY side only). The garrison breakdown then carries the
 static four keys with the derived values PLUS the transparency set —
 `source: &"escalation"`, `escalation_cycle`, `snapshot_power`,
-`curve_multiplier_milli`, `regime_id`, `leader`, `captured_at_run`, and
-the full `roster` tier mix: L2-C's "whose army, what tier mix" data. No
+`curve_multiplier_milli`, `regime_id`, `crest_id`, `leader`,
+`captured_at_run`, and the full `roster` tier mix: L2-C's "whose army,
+what crest, what tier mix" data (the odds castle card's escalation line —
+CopyDeck key `garrison_escalation` — already composes from it). No
 snapshot (or an unwired resolver, or a snapshot whose every id left the
 pack) → the static branch to the digit — the zero-impact rule.
 
@@ -1184,7 +1192,7 @@ Measured: the two L1 suites (~60 cases) add ~0.4s to `make test`; every
 sibling marathon digest unchanged.
 
 
-## 19. The escalation engine (L2-A — post-MVP enemy escalation, sim side)
+## 19. The escalation engine (L2-A engine + the L2-B tuning, enemy escalation, sim side)
 
 The post-MVP Layer 2, part A (town-hall L2: "on victory, a snapshot of
 your winning army becomes the next cycle's castle garrison — your previous
@@ -1206,9 +1214,10 @@ Three pieces, no UI (L2-C owns the surface):
    captured victories (incremented only by a capturing victory).
 2. **Derivation** (the stateless §15 resolver, wired with content at
    construction — `AssaultResolver.new(tunables, units, gear, regimes)`;
-   GameHost wires the pack, the shared fixtures stay unwired until the
-   L2-B balance re-sweep): when a snapshot stands in the shared meta, the
-   castle side of the odds is
+   GameHost wires the pack; the shared marathon fixtures stay unwired so
+   their recorded digests stand — the ladder is measured on the
+   escalation-wired harness, docs/balance.md §7): when a snapshot stands
+   in the shared meta, the castle side of the odds is
    `snapshot_power x curve_milli / 1000 x snapshot_regime_garrison_mult`
    where `snapshot_power` recomputes the units system's `army_power()`
    arithmetic from the compact snapshot (ids resolved against boot
@@ -1217,14 +1226,23 @@ Three pieces, no UI (L2-C owns the surface):
    zero-strength castle), and the curve is
    `EconomyTunables.escalation_garrison_cycle_step` compounded (cycle−1)
    times in exact integer milli (validator band [1.0, 4.0); cycle 1 is
-   identity — the SNAPSHOT ITSELF is the first escalation: a typical
-   winning power ~100 already doubles the static 50 wall, per
-   docs/balance.md). The L2-A default 1.25 is the PLACEHOLDER — L2-B owns
-   the tuned value.
+   identity — the SNAPSHOT ITSELF is the first escalation). **TUNED at
+   L2-B to ×1.10** (was the ×1.25 placeholder): a measured sensible
+   winning army is ~43-55 power — the static 50 wall's own scale, not the
+   double L2-A estimated — and the snapshot self-damps each cycle (a
+   450-permille commit captures ~0.82× the wall's power), so the wall's
+   net growth stays ~×1.0 per cycle until the step's exponent surfaces
+   from cycle 3. The chained-campaign evidence and the ladder table:
+   docs/balance.md §7.
 3. **Transparency** (§15's breakdown): the garrison dict carries the
-   derivation (whose army: regime id + leader + captured-at run; what
-   tier mix: the full roster; the raw vs curved power + the curve
-   multiplier + the cycle), distinct from the regime-static composition.
+   derivation (whose army: regime id + crest id + leader + captured-at
+   run; what tier mix: the full roster; the raw vs curved power + the
+   curve multiplier + the cycle), distinct from the regime-static
+   composition. L2-B ships the CopyDeck presence on top of it: the odds
+   castle card's `garrison_escalation` line, the strip's
+   `escalation_captured` victory beat, and the chronicle entry's
+   `chronicle_escalation` line — all budget-pinned
+   (tests/unit/test_copy_voice.gd), all fed by the sim's own numbers.
 
 **Zero-impact rule (unit-pinned, the L1 discipline):** no snapshot in the
 meta → the odds are the static branch to the digit, `RunMeta.to_dict()`

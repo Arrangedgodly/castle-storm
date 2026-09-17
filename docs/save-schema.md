@@ -373,6 +373,7 @@ duration_ticks
 army_power
 army
 score
+escalation_cycle
 ```
 
 | Field | Type | Meaning |
@@ -387,6 +388,7 @@ score
 | `army_power` | int | terminal army score (assault override or live `army_power()`) |
 | `army` | Dictionary[String, int] | terminal roster snapshot, army-eligible def id → count (the chronicle screen's T-UI-08 data) |
 | `score` | int | banked score (thin stub: `duration_hours + army_power + 100` victory bonus; T-SIM-08 owns the real curve) |
+| `escalation_cycle` | int | EMIT-WHEN-SET (L2-B): present only on the victory that garrisoned the castle — the escalation cycle this run's army opened (the same value the `escalation_captured` event carries; the chronicle screen's escalation line reads it). Non-capturing entries (defeat, abort, an empty-roster victory) carry no key, so pre-L2-B saves read back identically |
 
 Meta corruption policy (single file, save-format.md §8): quarantine the
 bytes, return a FRESH bank, never touch the run slots.

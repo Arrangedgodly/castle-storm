@@ -412,7 +412,7 @@ static func refresh_targets_for(event_type: StringName) -> Array[StringName]:
 			return [&"eye", &"pips"]
 		&"suspicion_telegraph":
 			return [&"eye"]
-		&"run_crushed", &"run_won", &"run_lost", &"run_aborted", &"run_started", &"run_restarted":
+		&"run_crushed", &"run_won", &"run_lost", &"run_aborted", &"run_started", &"run_restarted", &"escalation_captured":
 			return [&"full"]
 		&"catch_up_applied", &"catch_up_clock_rewound":
 			return [&"full"]
@@ -492,6 +492,18 @@ func chronicle_line_for(event: Dictionary, host: GameHost) -> Variant:
 		&"run_won":
 			return _row(kind, CopyDeck.line(table, &"run_won", rotor,
 				{"points": int(event["value"])}))
+		&"escalation_captured":
+			# The L2 victory beat (L2-B): the winning army takes the wall as
+			# the next cycle's garrison — printed right before the outcome's
+			# own row. The snapshot stands in the run system's meta window;
+			# the leader prints by FIRST name (the single-line pool rule).
+			var snapshot: Dictionary = host.run().escalation_garrison()
+			var captured_leader := String(snapshot.get("leader", ""))
+			var leader_split := captured_leader.find(" ")
+			return _row(kind, CopyDeck.line(table, &"escalation_captured", rotor, {
+				"leader": captured_leader if leader_split <= 0 else captured_leader.substr(0, leader_split),
+				"cycle": int(event["value"]),
+			}))
 		&"run_lost":
 			return _row(kind, CopyDeck.line(table, &"run_lost", rotor,
 				{"points": int(event["value"])}))

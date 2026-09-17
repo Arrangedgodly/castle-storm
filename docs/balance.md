@@ -157,6 +157,11 @@ resources of spends (timber 86 / food 28 / iron 35).
   2026-09-17 follow-up retune; measured 7 / 16 / 22), 4 fixed regime seeds
   each winning ≤ 240 h with mean in [48, 96] h and tail ≤ 132 h, recovery
   ≤ 72 h, tension ≥ 1 warn, the greed crush, and check-in value > 0.
+- `tests/acceptance/suites/escalation_ladder_band.gd` (55 checks, L2-B):
+  the chained-campaign ladder on 6 fixed seeds — the reference (static)
+  run in band, cycle 1 beatable barefoot in the similar band, cycle 2
+  barefoot, partial tree (the 3 tier-1 economy nodes) cycles 1-2, full
+  tree cycles 1-5 all won with growth ≤ 1.5× and rising walls (§7).
 - `economy_stability_1000h` now asserts the tuned reality honestly:
   crushes ≤ 1, suspicion peak < warn under sensible play, structural
   telegraph/strike/crush/restart rules unchanged.
@@ -316,21 +321,104 @@ Crown keeps its bite). Baseline digests: byte-identical (every existing
 marathon suite green, unchanged); the zero-impact proof extends to both
 new seams (serialized + hashed only when non-identity).
 
-## 7. L2 — enemy escalation: the L2-A placeholder curve (2026-09-17)
+## 7. L2 — the escalation ladder (L2-B, 2026-09-17: the tuned curve + the climbability pass)
 
-Worker: Iron Man + Mr Fantastic lane (L2-A, the engine). The escalation
-garrison derives the castle from the captured snapshot: `snapshot army
-power x step^(cycle-1)` — cycle 1 is x1.000 by DESIGN (the snapshot itself
-is the first escalation: a typical winning army ~100 power already doubles
-the static 50 wall, re-establishing R5's "first L2 cycle is a full new
-campaign" arc), and every later captured cycle compounds
-`escalation_garrison_cycle_step`. **The shipped default 1.25 is the
-PLACEHOLDER** — the L2-A contract is engine + shape + zero-impact, not
-tuning; **L2-B owns the balance pass** (sweep the step + the snapshot-power
-interaction against the canonical host with escalation wired — the shared
-suites run unwired until then, per the §19 zero-impact rule) and re-records
-this section. Anchor numbers for that pass: static baseline first win
-79 h mean / 127 h slowest (12/12); floor assault 315 permille neutral;
-typical winning power ~100–115 (5 knights + 5 archers, mixed tiers), so
-cycle 1 opens at ~500 permille against a like-for-like rebuild and the
-~23-power floor assault drops to ~190 — the ladder bites immediately.
+Worker: Hawkeye + Prof X lane. Harness: `make balance-sweep`'s "L2
+escalation ladder" section (`CS_SWEEP_ONLY=escalation` re-runs it) —
+CHAINED CAMPAIGNS on the canonical host with escalation wired (the
+shipped game's wiring): run 1 is the static first win (the shared meta
+starts bare — the zero-impact rule, so the campaign's own run 1 doubles
+as the no-snapshot probe), its victory CAPTURES the winning army, and
+every later run is a fresh engine around the SAME meta (`_full_stack`
+gained the additive `p_meta` injection — the host's one-shared-meta
+rule). Cadence 6h, commit 450 permille, cap 360h/cycle, 12 seeds.
+CI pin: `tests/acceptance/suites/escalation_ladder_band.gd`.
+
+**The L2-A anchor was wrong, and the sweep corrects it:** §7's
+placeholder note estimated "a typical winning army ~100-115 power already
+doubles the static 50 wall". Measured: the sensible player's winning army
+is **~43-55 power** (the commit line crosses at `0.818 x wall` — the
+clump of trainings that lands the batch the odds cross 450 permille), so
+**cycle 1's wall (the snapshot itself, ×1.000) opens at the static 50
+wall's own scale** — a like-for-like rebuild opens cycle 1 at ~500
+permille, exactly the "first L2 cycle is a full new campaign" arc (R5):
+the arc is a full estate+army rebuild, not a doubled wall.
+
+**The chosen curve: step ×1.10** (was the ×1.25 placeholder), compounded
+(cycle−1) — the engine's shipped shape, only the number moved. The
+mechanism that makes a SMALL step right: **the snapshot self-damps** —
+a 450-permille commit captures only ~0.82× the wall's power, so in
+steady state the wall grows `~0.82 x step x regime-mult ≈ ×1.0` per
+cycle; the step's exponent only surfaces from cycle 3. The step
+candidates (full tree, cycles 1-5, 12 seeds each):
+
+| step | full-tree per cycle: won / mean h (mean wall) | verdict |
+|---|---|---|
+| ×1.00 | 12/12 75h (44) · 12/12 79h (40) · 12/12 75h (39) · 12/12 72h (39) · 12/12 67h (39) | climbs, but the ladder DECAYS (walls sink under the static 50) — no escalation at all |
+| **×1.10** | **12/12 75h (44) · 12/12 79h (43) · 12/12 82h (46) · 12/12 73h (55) · 12/12 102h (71)** | **climbs — the ladder holds** |
+| ×1.15 | 12/12 75h (44) · 12/12 75h (45) · 12/12 86h (55) · 12/12 90h (68) · 11/12 110h (109) | bites one cycle early |
+| ×1.20 | … 11/12 112h (85) · 8/11 165h (160) | ceiling bites at 4-5 |
+| ×1.25 (placeholder) | … 11/12 123h (109) · **4/11** 151h (212) | rejected — 7 of 11 stall |
+
+**The ladder table** (shipped step ×1.10; the modeled campaign shapes:
+**no tree** = zero purchases; **partial** = the 3 tier-1 economy nodes
+(240 lp ≈ run 1's bank — Grandma's Recipes, The Union of Unpaid
+Artisans, The Sergeant's Primer; NO veterans branch: Scarred Banners +
+prerequisite = 360 lp ≈ two wins); **full tree** = all 15 nodes from run
+1, the climbability ceiling probe):
+
+| cycle | garrison wall (mean) | no tree | partial tree | full tree |
+|---|---|---|---|---|
+| 0 (static) | 50 | 82h mean (the first-win band, unmoved) | — | 75h mean |
+| 1 | 44 | 12/12, 82h mean, 205h slow | 12/12, 82h | 12/12, 75h, 175h slow |
+| 2 | 43 | 12/12, 78h | 12/12, 77h | 12/12, 79h |
+| 3 | 46 | 12/12, 93h | 12/12, 93h | 12/12, 82h |
+| 4 | 55 | 12/12, 106h | 12/12, 106h | 12/12, 73h, 115h slow |
+| 5 | 71 | 11/12, 119h, 278h slow | 11/12, 108h | 12/12, 102h, 175h slow |
+
+**How the contract reads against it:**
+
+- **Cycle 1 is beatable by a partial-tree (and even a zero-tree) player
+  in the similar band** — 82h vs the 79h first win: the wall is your own
+  last army at ~44-54 power, the arc is the full rebuild. The ladder's
+  first rung is a campaign, not a spike.
+- **Cycles 2-3 consume the headroom progressively**: barefoot times
+  inflate 78 → 93h while full tree holds 79 → 82h — the same wall costs
+  the un-tree'd player more each cycle. The hard fork lands at 4-5, where
+  the step's exponent surfaces: no tree 106 → 119h (one seed of twelve
+  stalls at cycle 5), full tree 73 → 102h. The tree is the ladder's
+  handrail — the odds-hop veterans node (Scarred Banners, 360 lp ≈ two
+  wins) is the purchase that holds the band.
+- **Full tree climbs 12/12 through cycle 5** with per-cycle growth ≤1.4×
+  (73 → 102h) and the wall rising 44 → 71: the ladder is real, never a
+  stall. (The full-tree row's honest asterisk: a real campaign reaches
+  the full tree around runs 8-12 at the measured earn rates — the row is
+  the climbability ceiling, the partial row is the early campaign.)
+- **Why not steeper**: ×1.15 already drops one full-tree seed at cycle 5
+  and the placeholder ×1.25 stalls 7 of 11 there — the snapshot
+  self-damping means the felt escalation per cycle is `0.82 × step`, so
+  the intuitive "×1.25 per victory" is really "×1.02 net early, then
+  superexponential" — the ceiling (the sensible policy's ~138-power
+  12-unit army) arrives two cycles later but arrives HARD.
+
+**Zero-impact, re-proven:** the static first-win band, the pressure and
+greed rows, and every §3/§6 table are byte-unmoved (the sweep's own
+no-snapshot sections re-ran unchanged; `economy_balance_band` pins the
+static ladder on the unwired fixtures and passes untouched). The CI
+ladder suite pins the chained campaigns on 6 fixed seeds (55 checks:
+reference run in band, barefoot cycles 1-2, partial cycles 1-2, full
+tree cycles 1-5 all won, growth ≤1.5×, walls rising).
+
+**The flavor (L2-B's CopyDeck presence, budget-pinned per voice-bible
+§4):** `garrison_escalation` (the odds castle card when a captured
+garrison stands: "garrison 46 · Ottilie's veterans — cycle 2" — the
+leader prints by first name, the single-line pool rule), 
+`escalation_captured` (the strip's victory beat: "Ottilie's veterans take
+the wall — cycle 2." — seq-rotated, 2 variants), and
+`chronicle_escalation` (the victory chronicle entry's line: "this army
+holds the castle — cycle 2 opens" — the entry's `escalation_cycle` field
+rendered, run-number-rotated). The capture beat rides a NEW engine event
+(`escalation_captured`, same tick, before `run_won`, value = the cycle,
+value2 = the wall-taking power) and the chronicle field is
+emit-when-set (save-schema §5.1) — a non-capturing victory prints and
+records nothing, byte-identical to pre-L2-B.

@@ -431,6 +431,20 @@ const DEFAULTS: Dictionary = {
 	&"unlock_flavor_the_night_watch": [
 		"They watch the roads till the roads forget.",
 	],
+	# --- the L2 escalation presence (L2-B): the odds castle-card line when a
+	# captured garrison stands, the victory beat that captures, and the
+	# chronicle entry's escalation line ---
+	&"garrison_escalation": [
+		"garrison {power} · {leader}'s veterans — cycle {cycle}",
+	],
+	&"escalation_captured": [
+		"{leader}'s veterans take the wall — cycle {cycle}.",
+		"The victors file in as the garrison — cycle {cycle}.",
+	],
+	&"chronicle_escalation": [
+		"this army holds the castle — cycle {cycle} opens",
+		"the castle garrisons this army — cycle {cycle}",
+	],
 	# --- the legacy deck screen (L1-C, the tree UI) ---
 	&"legacy_empty_1": [
 		"the deck is still wrapped — no legacy earned yet",
@@ -571,6 +585,9 @@ const CONSUMERS: Dictionary = {
 	&"title_new_run": "title card secondary chip (live run) — MainShell title card",
 	&"title_new_run_armed": "title card secondary chip armed (the two-step confirm) — MainShell title card",
 	&"title_new_run_caution": "title card caution line (the two-step confirm) — MainShell title card",
+	&"garrison_escalation": "assault odds castle card (a captured garrison stands) — AssaultPresenter.garrison_line",
+	&"escalation_captured": "strip victory beat (the capture) — SpreadPresenter.chronicle_line_for",
+	&"chronicle_escalation": "chronicle entry's escalation line — ChroniclePresenter.entry_view",
 	&"unlock_branch_old_guard": "legacy tree branch plate — the L1-C tree UI (content ships in L1-B)",
 	&"unlock_branch_workshop": "legacy tree branch plate — the L1-C tree UI (content ships in L1-B)",
 	&"unlock_branch_yard": "legacy tree branch plate — the L1-C tree UI (content ships in L1-B)",

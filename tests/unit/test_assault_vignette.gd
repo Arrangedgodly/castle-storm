@@ -268,6 +268,40 @@ func test_garrison_and_floor_lines() -> void:
 	assert_str(AssaultPresenter.floor_line(thin_view)).contains("23")
 
 
+## L2-B: when a CAPTURED garrison stands, the castle card's composition
+## line names WHOSE veterans hold the wall and which cycle — through the
+## CopyDeck escalation key, the leader's FIRST name (the single-line pool
+## rule), the numbers the resolver derived. A static wall keeps the
+## regime arithmetic line, and the view carries the transparency set only
+## when escalation is active.
+func test_escalation_garrison_line_names_the_veterans() -> void:
+	var host := _test_host(20261201)  # gilded_crown: snapshot garrison x1.2
+	host.meta.escalation_garrison = {
+		"regime_id": "gilded_crown", "captured_at_run": 3, "cycle": 2,
+		"leader": "Bartholomew the Unbearable", "crest_id": "crest_gilded_crown",
+		"roster": {"knight": {"count": 1, "gear_tiers": {"weapon": {"1": 1}}}},
+	}
+	host.meta.escalation_cycle = 2
+	var odds := host.assault().assault_odds(host.engine)
+	var view := AssaultPresenter.odds_view(odds)
+	# The transparency set rides the view (L2-C's data), additive-only.
+	assert_str(String(view["garrison_source"])).is_equal("escalation")
+	assert_int(view["garrison_cycle"]).is_equal(2)
+	assert_int(view["garrison_snapshot_power"]).is_equal(12)  # knight 10 + t1 weapon 2
+	assert_int(view["garrison_base"]).is_equal(13)  # 12 x 1.10 (one hop), floored
+	assert_str(String(view["garrison_leader"])).is_equal("Bartholomew the Unbearable")
+	assert_str(String(view["garrison_crest_id"])).is_equal("crest_gilded_crown")
+	assert_int(view["garrison_captured_at_run"]).is_equal(3)
+	# The line: whose veterans, which cycle — first name only.
+	assert_str(AssaultPresenter.garrison_line(view, "The Gilded Crown")) \
+		.is_equal("garrison 13 · Bartholomew's veterans — cycle 2")
+	# The static wall keeps the regime arithmetic line (no escalation keys).
+	var plain := _test_host(20261200)
+	var plain_view := AssaultPresenter.odds_view(plain.assault().assault_odds(plain.engine))
+	assert_bool(not plain_view.has("garrison_source")).is_true()
+	assert_str(AssaultPresenter.garrison_line(plain_view, "The Gilded Crown")).contains("walls")
+
+
 ## THE COMPOSITION LINE NEVER DOUBLES THE ARTICLE (the closing critique's
 ## P2, "Against the The Paper Crown"): regime display names carry their own
 ## "The", so the odds screen's opening print composes through the article

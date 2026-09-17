@@ -49,7 +49,7 @@ static func odds_view(odds: Dictionary) -> Dictionary:
 			"gear_power": int(entry["gear_power"]),
 			"total": int(entry["total"]),
 		})
-	return {
+	var view := {
 		"win_permille": int(odds["win_permille"]),
 		"floor_power": int(odds["floor_power"]),
 		"floor_met": bool(odds["floor_met"]),
@@ -63,6 +63,19 @@ static func odds_view(odds: Dictionary) -> Dictionary:
 		"garrison_strength_milli": int(garrison["strength_milli"]),
 		"roster": roster,
 	}
+	# L2 transparency (additive, present only when a captured garrison
+	# stands): whose army, which crest, what cycle — the escalation
+	# presence the castle card prints (L2-B's seam; L2-C paints the rest).
+	if garrison.has("source"):
+		view["garrison_source"] = garrison["source"]
+		view["garrison_cycle"] = int(garrison["escalation_cycle"])
+		view["garrison_snapshot_power"] = int(garrison["snapshot_power"])
+		view["garrison_curve_milli"] = int(garrison["curve_multiplier_milli"])
+		view["garrison_leader"] = String(garrison["leader"])
+		view["garrison_regime_id"] = String(garrison["regime_id"])
+		view["garrison_crest_id"] = String(garrison["crest_id"])
+		view["garrison_captured_at_run"] = int(garrison["captured_at_run"])
+	return view
 
 
 ## "276 in 1000 — poor odds": the permille printed AS confidence. The raw
@@ -84,8 +97,19 @@ static func meter_blocks(permille: int, total_blocks: int = METER_BLOCKS) -> int
 
 
 ## The garrison's composition line for the castle card: the regime's ONE
-## combat modifier, printed in the world's arithmetic voice.
+## combat modifier, printed in the world's arithmetic voice — EXCEPT when
+## a captured garrison stands (L2): then the line says WHOSE veterans hold
+## the wall and which cycle, through the CopyDeck escalation key (the
+## clerk's voice, budget-pinned; the leader prints by FIRST name, the
+## single-line pool rule — the full name stays on the snapshot for the
+## surfaces that wrap).
 static func garrison_line(view: Dictionary, regime_name: String) -> String:
+	if String(view.get("garrison_source", "")) == "escalation":
+		return CopyDeck.line(Inks.pack().copy, &"garrison_escalation", 0, {
+			"power": int(view["garrison_base"]),
+			"leader": _leader_first_name(String(view.get("garrison_leader", ""))),
+			"cycle": int(view.get("garrison_cycle", 1)),
+		})
 	var mult := _multiplier_text(int(view["garrison_multiplier_milli"]))
 	if String(view["garrison_modifier_kind"]) == "garrison_multiplier":
 		return "garrison %d · walls ×%s" % [int(view["garrison_base"]), mult]
@@ -213,3 +237,10 @@ static func _multiplier_text(multiplier_milli: int) -> String:
 	## "1.2" from 1200 milli (trimming trailing zeros: 900 -> "0.9", 1000 -> "1").
 	var text := "%.3f" % (float(multiplier_milli) / 1000.0)
 	return text.trim_suffix("0").trim_suffix(".")
+
+
+## The snapshot leader's FIRST name (the single-line pool rule; a bare
+## name degrades honestly — an empty leader never reaches the card).
+static func _leader_first_name(leader: String) -> String:
+	var split := leader.find(" ")
+	return leader if split <= 0 else leader.substr(0, split)

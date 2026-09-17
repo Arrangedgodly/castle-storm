@@ -302,6 +302,53 @@ func test_empty_roster_victory_captures_nothing_and_keeps_the_prior_garrison() -
 	assert_int(meta.escalation_cycle).is_equal(1)
 
 
+func test_capture_beat_and_chronicle_field_ride_the_victory() -> void:
+	# L2-B flavor seams: a CAPTURING victory emits `escalation_captured`
+	# (value = the cycle opened, value2 = the army power that took the
+	# wall) in the SAME tick, BEFORE run_won — and the victory's chronicle
+	# entry carries the escalation cycle it opened. A non-capturing victory
+	# (empty roster) emits NO beat and NO field: the pre-L2-B stream and
+	# record, byte-identical.
+	var meta := RunMeta.new()
+	var engine := _engine(meta, _tunables())
+	_start(engine)
+	_field_floor(engine)  # army power 23
+	var events: Array[Dictionary] = []
+	var run := _run(engine)
+	run.resolve_victory(engine, true)
+	engine.fast_forward(1)  # the command drains at THIS tick (the _win shape)
+	var victory_tick := engine.tick_count
+	for seq in range(engine.events.next_seq()):
+		var event := engine.events.get_event(seq)
+		if event != null and event.tick == victory_tick:
+			events.append({"type": event.type, "value": event.value, "value2": event.value2})
+	var beat_idx := -1
+	var won_idx := -1
+	for i in events.size():
+		if events[i]["type"] == &"escalation_captured":
+			beat_idx = i
+		if events[i]["type"] == &"run_won":
+			won_idx = i
+	assert_int(beat_idx).is_greater_equal(0)
+	assert_int(won_idx).is_greater(beat_idx)
+	assert_int(int(events[beat_idx]["value"])).is_equal(1)  # the cycle opened
+	assert_int(int(events[beat_idx]["value2"])).is_equal(23)  # the wall-taking power
+	# The chronicle entry records the capture; the meta banked one run.
+	assert_int(run.meta.chronicle.size()).is_equal(1)
+	assert_int(int(run.meta.chronicle[0]["escalation_cycle"])).is_equal(1)
+	# Non-capturing victory: no beat, no field (the empty-roster rule).
+	var quiet := _engine(RunMeta.new(), _tunables())
+	_start(quiet)
+	_win(quiet)
+	for seq in range(quiet.events.next_seq()):
+		var event := quiet.events.get_event(seq)
+		if event != null:
+			assert_str(String(event.type)).is_not_equal("escalation_captured")
+	var quiet_run := _run(quiet)
+	assert_int(quiet_run.meta.chronicle.size()).is_equal(1)
+	assert_bool(not quiet_run.meta.chronicle[0].has("escalation_cycle")).is_true()
+
+
 func test_cycle_increments_per_capturing_victory_and_latest_victor_wins() -> void:
 	var meta := RunMeta.new()
 	var engine := _engine(meta, _tunables(1.25))
@@ -376,7 +423,7 @@ func test_garrison_derivation_math_is_exact() -> void:
 	var odds := _resolver(engine).assault_odds(engine)
 	var garrison: Dictionary = odds["garrison"]
 	assert_str(_sorted_keys_text(garrison)).is_equal(
-		"base_power,captured_at_run,curve_multiplier_milli,escalation_cycle,leader,modifier_kind,regime_id,regime_multiplier_milli,roster,snapshot_power,source,strength_milli"
+		"base_power,captured_at_run,crest_id,curve_multiplier_milli,escalation_cycle,leader,modifier_kind,regime_id,regime_multiplier_milli,roster,snapshot_power,source,strength_milli"
 	)
 	assert_str(String(garrison["source"])).is_equal("escalation")
 	assert_int(int(garrison["snapshot_power"])).is_equal(55)
@@ -387,6 +434,7 @@ func test_garrison_derivation_math_is_exact() -> void:
 	assert_int(int(garrison["strength_milli"])).is_equal(66000)
 	assert_int(int(garrison["escalation_cycle"])).is_equal(1)
 	assert_str(String(garrison["regime_id"])).is_equal("gilded_crown")
+	assert_str(String(garrison["crest_id"])).is_equal("crest_gilded_crown")
 	assert_str(String(garrison["leader"])).is_equal("Bran the Unbearable")
 	assert_int(int(garrison["captured_at_run"])).is_equal(7)
 	assert_that(garrison["roster"]).is_equal(_snapshot()["roster"])
