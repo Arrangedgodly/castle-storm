@@ -27,6 +27,20 @@
 ## The hint strip at the fan's foot is the intercepted hint (the
 ## controller's face-button hint slot, printed rather than overlaid):
 ## "choose — act — back" in the soft ink.
+##
+## THE FAN'S OWN SHEET (readability r3 — the choice-card/veil pattern):
+## the whole fan (chips + hint) prints on ONE localized paper sheet laid
+## over the table, because covering text is legitimate ONLY when the
+## covering paper is a designed surface. Before the sheet the fan's
+## separate strips sliced FOREIGN titles into fragments (the verifier's
+## co-mount find, invisible to the r2 audit's standalone fan walk: the
+## "Send them home" chip crossed "Hob"'s title glyph tops and the hint
+## strip printed straight across "Hob"/"Nell", the Eye's numeral plate
+## under it too). With the sheet, a fan opened over a neighbor's title
+## hides it cleanly UNDER one designed paper edge — the same move as any
+## card laid over this table — and no glyph fragments peek between the
+## strips. The audit's co-mount rule reads sheet_rect(): a fan print may
+## overlap foreign text ONLY inside the sheet.
 class_name ActionFan
 extends VBoxContainer
 
@@ -34,6 +48,11 @@ extends VBoxContainer
 signal action_chosen(action: Dictionary)
 ## A DISABLED chip was activated: print the refusal (chronicle hint).
 signal action_refused(action: Dictionary)
+
+## The sheet's air around the chips + hint (design units). The fan is
+## placed >= 8px inside the screen bounds, so the sheet always stays on
+## the table.
+const SHEET_PAD := 8.0
 
 ## The view-model card id this fan is fanned out from ("" while closed).
 var card_id := ""
@@ -92,6 +111,25 @@ func open(for_card_id: String, actions: Array[Dictionary]) -> void:
 func close() -> void:
 	visible = false
 	card_id = ""
+
+
+## The fan's paper sheet in the fan's LOCAL space (the audit's co-mount
+## occlusion rule reads it: a fan print may overlap foreign text ONLY
+## inside this designed surface). The fan is never rotated or scaled on
+## the screen, so local == global axes.
+func sheet_rect() -> Rect2:
+	return Rect2(Vector2(-SHEET_PAD, -SHEET_PAD),
+		size + Vector2(SHEET_PAD, SHEET_PAD) * 2.0)
+
+
+func _draw() -> void:
+	# THE SHEET (see the header): one paper quad under the whole fan —
+	# the chips' stock, ink-edged like the hint strip's foot rule. Drawn
+	# behind the children (a CanvasItem's own draw runs under them), and
+	# the fan is invisible while closed, so nothing prints while folded.
+	var sheet := sheet_rect()
+	draw_rect(sheet, Inks.PAPER)
+	draw_rect(sheet, Inks.INK, false, 1.0)
 
 
 ## The fan's chips in print order (tests + the screen's grip audit).

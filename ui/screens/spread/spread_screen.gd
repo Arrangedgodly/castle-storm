@@ -314,11 +314,25 @@ func _ready() -> void:
 
 
 ## The deferred first bind (see _ready), THEN the boot intro check — the
-## reveal papers over an already-bound table, never a blank one.
+## reveal papers over an already-bound table, never a blank one. The
+## finalization pass rides the mount too (readability r3): a dense
+## initial bind's plates land their honest heights through the fit
+## cascade, and the bounded finalization loop is what finishes it —
+## the r2 pass ran only on layout CHANGED events, and a first bind that
+## never resized anything stalled short of stable (the dense-estate
+## find: plates rendering no print at all).
 func _refresh_from_state_deferred() -> void:
 	refresh_from_state.call_deferred()
 	_maybe_open_boot_intro.call_deferred()
 	_maybe_open_resumed_intro.call_deferred()
+	_finalize_mount.call_deferred()
+
+
+func _finalize_mount() -> void:
+	if _view.is_empty():
+		return  # the bind never landed — nothing to finalize
+	_finalize_passes = 0
+	_finalize_topology()
 
 
 ## The seeded demo session: a real save-backed host. CS_DEMO_RESET=1 (the
@@ -1872,6 +1886,7 @@ func _on_layout_changed() -> void:
 		return
 	_apply_columns.call_deferred()
 	_bind_eye.call_deferred()
+	_finalize_passes = 0  # a fresh layout event gets a fresh bounded budget
 	# THE FINALIZATION PASS, AT RUNTIME (readability r2 — the r1 seam was
 	# test-only): a slot's last topology pass can have run at a TRANSIENT
 	# header budget (mid-bind plates, an async name wrap) and the steady
@@ -1888,9 +1903,36 @@ func _on_layout_changed() -> void:
 		_suspicion.replace_quote.call_deferred(bounds, _quote_floor())
 
 
+## The finalization loop's bounded re-queue (see _finalize_topology).
+const FINALIZE_MAX_PASSES := 8
+var _finalize_passes := 0
+
+
 func _finalize_topology() -> void:
+	# BOUNDED CONVERGENCE (readability r3): one pass can still change a
+	# slot's honest minimum — the plates' held heights (the r3
+	# plate-minimum rule) land through the fit cascade AFTER the sort that
+	# granted their widths — and a changed minimum must be laid AGAIN
+	# before the table is stable. The pass re-queues (deferred) while
+	# either spread's combined minimum moved, bounded: a settled tree
+	# reproduces its own minimum and the loop stops; the bound exists so
+	# a pathological never-converging plate cannot spin the mount.
+	var spreads: Array[Control] = [
+		get_portrait_slot().get_spread(), get_landscape_slot().get_spread()]
+	var before: Array[Vector2] = []
+	for spread in spreads:
+		before.append(spread.get_combined_minimum_size())
 	get_portrait_slot().layout_topology()
 	get_landscape_slot().layout_topology()
+	var moved := false
+	for i in spreads.size():
+		if before[i] != spreads[i].get_combined_minimum_size():
+			moved = true
+	if moved and _finalize_passes < FINALIZE_MAX_PASSES:
+		_finalize_passes += 1
+		_finalize_topology.call_deferred()
+	else:
+		_finalize_passes = 0
 
 
 ## The adaptive column ladder, re-derived from the CURRENT spread height

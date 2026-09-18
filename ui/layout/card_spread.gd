@@ -250,9 +250,19 @@ func _get_minimum_size() -> Vector2:
 	if mode == Mode.STACKED:
 		var cols := maxi(1, columns)
 		var rows := maxi(1, int(ceil(float(controls.size()) / float(cols))))
+		# THE GRID'S MINIMUM IS THE GRIP, NOT THE PLATES (readability r3):
+		# a grown plate's honest minimum is honored by the GRID'S OWN
+		# LAYOUT — the row gap absorbs a few px of growth — never by the
+		# minimum chain, where it would inflate the slot's granted band,
+		# re-pitch the column ladder (5 columns -> 4 -> more rows -> more
+		# growth) and shear the last row off the design (the dense
+		# estate's windowed runaway). Capped at the touch grip — the r2
+		# floor of record — so parents never squeeze cards under the grip
+		# and never grant the runaway either.
+		var grip := float(Inks.TOUCH_GRIP_MIN * 2.0)
 		return Vector2(
-			float(cols) * cell.x + float(cols - 1) * space.x + right_reserve,
-			float(rows) * cell.y + float(rows - 1) * space.y)
+			float(cols) * minf(cell.x, grip) + float(cols - 1) * space.x + right_reserve,
+			float(rows) * minf(cell.y, grip) + float(rows - 1) * space.y)
 	return Vector2(cell.x + right_reserve,
 		cell.y + arc_depth + ROTATION_SLACK)
 

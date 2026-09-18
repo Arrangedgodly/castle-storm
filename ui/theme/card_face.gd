@@ -177,32 +177,77 @@ var _role_fit_key := ""
 
 func _refit_plates() -> void:
 	if _name_label != null:
-		var wrap := _plates_may_wrap()
-		var key := "%s@%.1f@%d@%s" % [_name_label.text, _name_label.size.x, title_base, wrap]
+		# The TITLE's wrap is not height-gated (the display face's own
+		# move — the letterhead's epithet drops a line); it fits first so
+		# the role's budget below reads the title's settled outcome.
+		var key := "%s@%.1f@%d" % [_name_label.text, _name_label.size.x, title_base]
 		if key != _name_fit_key:
 			_name_fit_key = key
 			# Titles: the display face keeps its plate down to TITLE_FLOOR
 			# and wraps (paper flow) before any grow.
-			fit_label_to_width(_name_label, 0.0, FIT_STEP, title_base, TITLE_FLOOR, wrap)
+			fit_label_to_width(_name_label, 0.0, FIT_STEP, title_base, TITLE_FLOOR, true)
 	if _role_label != null:
 		var wrap := _plates_may_wrap()
-		var key := "%s@%.1f@%s" % [_role_label.text, _role_label.size.x, wrap]
+		var room := _role_height_room() if wrap else 0.0
+		var key := "%s@%.1f@%s@%.0f" % [_role_label.text, _role_label.size.x, wrap, room]
 		if key != _role_fit_key:
 			_role_fit_key = key
-			# Roles wrap under the small-print line too (the plate's
-			# height permitting — see the fit's wrap contract).
-			fit_label_to_width(_role_label, 0.0, FIT_STEP, -1, MIN_FIT_SIZE, wrap)
+			# Roles wrap under the small-print line too — but only INTO the
+			# face's honest room (r3): a wrapped print is stepped down
+			# through the budget, and one that cannot fit it even at the
+			# floor keeps the one-line floor (the density answer).
+			fit_label_to_width(_role_label, 0.0, FIT_STEP, -1, MIN_FIT_SIZE, wrap, room)
 
 
-## Whether the plates may take a second line: the face must hold the art
-## slot's grip PLUS a two-line plate — a roomy card wraps (paper flow);
-## a sliver cell (the density answer) keeps one-line prints at the floor
-## so the card's honest minimum stays within its row. Read off the FACE's
-## own granted height — one level above the labels — so the fit's outcome
-## can never feed its own input (the label-height version re-entered
+## Whether the ROLE plate may take a second line: THE HONEST WRAP BUDGET
+## (readability r3 — wrap is paper flow the face must AFFORD). The face's
+## granted height minus the fixed rows (the art slot's grip floor, the
+## rule, the separations) minus the TITLE's honest print (it has already
+## been fitted when this runs — the fit order is title, then role) is the
+## room the ROLE may wrap into; with none, the small print keeps the
+## one-line floor (the documented density answer). Read off the FACE's
+## own geometry — one level above the labels — so the fit's outcome can
+## never feed its own input (the label-height version re-entered
 ## `resized` mid-sort and recursed; the suite's stack-overflow find).
+## The TITLE's wrap is the display face's own move and is not gated by
+## this: a wrapped title HOLDS its height (the plate-minimum rule) and
+## the CARD grows the difference through the honest-minimum relay.
 func _plates_may_wrap() -> bool:
-	return size.y >= float(Inks.TOUCH_GRIP_MIN) + 2.0 * float(TypeScale.scaled(24))
+	if _name_label == null or _role_label == null:
+		return false
+	if not vertical:
+		return true  # landscape plates share the row — no vertical contest
+	return _role_height_room() > 0.0
+
+
+## The face's vertical room left for the ROLE plate: granted height minus
+## the fixed rows and the title's honest print height. The role may wrap
+## only into this room; its wrapped print is stepped down through it and
+## refused (one-line floor) when even the floor cannot fit.
+func _role_height_room() -> float:
+	var fixed := float(Inks.TOUCH_GRIP_MIN)  # the art slot's grip floor
+	if _rule != null:
+		fixed += _rule.get_combined_minimum_size().y
+	fixed += float(get_theme_constant("separation")) * 3.0  # four rows, three gaps
+	var title_h := _title_print_height()
+	return size.y - fixed - title_h
+
+
+## The TITLE plate's honest height: its held wrapped minimum when the fit
+## wrapped it, else its one-line height at the applied size.
+func _title_print_height() -> float:
+	if _name_label == null or _name_label.text.is_empty():
+		return 0.0
+	if _name_label.custom_minimum_size.y > 0.0:
+		return _name_label.custom_minimum_size.y
+	var font: Font = _name_label.get_theme_font(&"font")
+	if font == null:
+		return 0.0
+	var fsize := _name_label.get_theme_font_size(&"font_size")
+	if fsize <= 0:
+		return 0.0
+	return font.get_string_size(_name_label.text,
+		HORIZONTAL_ALIGNMENT_LEFT, -1.0, fsize).y
 
 
 ## THE PLATE FIT, shared by every card grammar surface (the spread's card
@@ -221,8 +266,20 @@ func _plates_may_wrap() -> bool:
 ## grow. Pure given text + theme + width: same state -> same size, so
 ## view hashes stay deterministic. Returns the applied size (0 when the
 ## label is not measurable yet).
+##
+## THE HEIGHT CONTRACT (readability r3 — plates hold their height):
+## a WRAPPED plate's honest height is its shaped multi-line print, and
+## the plate now HOLDS it — `custom_minimum_size.y` rises to the shaped
+## height (one-line fits clear it; a wrapped+clipped Label's own minimum
+## is a 1x1 lie, and a tight box legally crushed such plates to a 1px
+## stub — the dense-estate stall: 18 of 40 plates rendering no print at
+## all, the r2 audit's size<=1 skip blind to it). `p_max_height` (when
+## > 0) caps the wrap: the wrapped print is stepped down through the
+## budget, and a print that cannot fit it even at the floor refuses the
+## wrap and keeps the one-line floor (the small print yields to the
+## display face; the density answer). 0 = no cap (the r2 callers).
 static func fit_label_to_width(label: Label, _floor_ratio := 0.0, step := 2,
-		p_base := -1, p_floor := -1, allow_wrap := false) -> int:
+		p_base := -1, p_floor := -1, allow_wrap := false, p_max_height := 0.0) -> int:
 	if label == null or not is_instance_valid(label):
 		return 0
 	var width := label.size.x
@@ -247,6 +304,14 @@ static func fit_label_to_width(label: Label, _floor_ratio := 0.0, step := 2,
 		size = maxi(size - step, floor_size)  # the last step lands ON the floor
 	var one_line_fits := _line_width(font, label.text, size) <= target
 	if one_line_fits and size >= TypeScale.scaled(WRAP_BELOW):
+		# THE ONE-LINE STATE IS EXACT (r3): a one-line print renders with
+		# wrapping OFF and no held height — a stale wrap from an earlier
+		# fit (a previous layout granted less room) would leave the label
+		# autowrapping with minimum (1,1) — the wrapped+clipped Label's
+		# own minimum lie — and a tight box legally crushed it to a 1px
+		# stub (the dense-estate stall's last holdout).
+		label.autowrap_mode = TextServer.AUTOWRAP_OFF
+		_hold_wrapped_height(label, 0.0)
 		_apply_size(label, size, base, p_base > 0)
 		return size
 	# The one-line print is unwritable at a readable size (it cannot fit
@@ -259,11 +324,29 @@ static func fit_label_to_width(label: Label, _floor_ratio := 0.0, step := 2,
 	var word_size := base
 	while word_size > floor_size and _word_width(font, label.text, word_size) > target:
 		word_size = maxi(word_size - step, floor_size)
-	if allow_wrap and _word_width(font, label.text, word_size) <= target:
+	# THE HEIGHT BUDGET (r3): the wrap must also fit VERTICALLY — step the
+	# wrapped print down through the caller's budget before granting it.
+	if allow_wrap and p_max_height > 0.0:
+		while word_size > floor_size \
+				and _wrapped_height(font, label.text, width, word_size) > p_max_height:
+			word_size = maxi(word_size - step, floor_size)
+	# A budget-forced wrap that lands BELOW the small-print line is
+	# refused (r3): the wrap's whole point was avoiding sub-WRAP_BELOW
+	# one-line prints; a wrap shrunken to 12-16 by the height budget is
+	# strictly worse than the one-line print at the same or larger size —
+	# and its held height would feed the plate-minimum relay, growing the
+	# card past its row pitch (the dense estate's overlap find). One line,
+	# whole, at the stepped size — the density answer.
+	if allow_wrap and word_size >= TypeScale.scaled(WRAP_BELOW) \
+			and _word_width(font, label.text, word_size) <= target \
+			and (p_max_height <= 0.0
+				or _wrapped_height(font, label.text, width, word_size) <= p_max_height):
 		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		_hold_wrapped_height(label, _wrapped_height(font, label.text, width, word_size))
 		_apply_size(label, word_size, base, p_base > 0)
 		return word_size
 	label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	_hold_wrapped_height(label, 0.0)
 	# GROW, NOT CLIP (readability r2): the plate's minimum rises to the
 	# floor-size print + air; the print renders whole at the floor. A
 	# one-line print that FITS at its floor stays whole (never grown for
@@ -275,6 +358,23 @@ static func fit_label_to_width(label: Label, _floor_ratio := 0.0, step := 2,
 	label.custom_minimum_size.x = maxf(label.custom_minimum_size.x, need)
 	_apply_size(label, floor_size, base, p_base > 0)
 	return floor_size
+
+
+## The plate's held height (see THE HEIGHT CONTRACT): the shaped wrapped
+## print while wrapped, zero on a one-line fit. The wrap decision itself
+## reads the CALLER's stable geometry, so this never feeds back into the
+## fit — the label's `resized` re-entry is guarded by the text+width key.
+static func _hold_wrapped_height(label: Label, height: float) -> void:
+	if height > 0.0:
+		label.custom_minimum_size.y = height
+	elif label.custom_minimum_size.y > 0.0:
+		label.custom_minimum_size.y = 0.0
+
+
+## The shaped height of this text wrapped at `width`, at one size.
+static func _wrapped_height(font: Font, text: String, width: float, size: int) -> float:
+	return font.get_multiline_string_size(text,
+		HORIZONTAL_ALIGNMENT_LEFT, maxf(width, 1.0), size).y
 
 
 static func _apply_size(label: Label, size: int, base: int, pinned: bool) -> void:

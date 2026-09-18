@@ -278,12 +278,18 @@ func test_face_plates_step_down_to_fit_before_clipping() -> void:
 		var shaped: Vector2 = font.get_multiline_string_size(title.text,
 			HORIZONTAL_ALIGNMENT_LEFT, title.size.x, title_applied)
 		assert_float(shaped.y).is_less_equal(title.size.y + 0.5)
-	# The role plate: a one-line fit under the small-print line WRAPS
-	# (the face has the height), so the applied size stays at the authored
-	# base with every line whole.
+	# The role plate: the r3 wrap is HEIGHT-BUDGETED — the wrap steps
+	# down through the face's honest room (the title's held print first)
+	# and lands whole at or above the READABILITY FLOOR, and the plate
+	# HOLDS its wrapped height (the dense-estate find's fix — a wrapped
+	# plate's own minimum is a 1x1 lie a tight box could crush). The r2
+	# pin (whole at the authored base) held only while the face had the
+	# height to afford it; at this 108x150 face the honest budget steps
+	# the wrap below the 17px small-print line — whole lines at 14, the
+	# floor's guarantee never loosened.
 	var role: Label = face.role_plate()
 	var role_applied: int = role.get_theme_font_size(&"font_size")
-	assert_int(role_applied).is_greater_equal(TypeScale.scaled(CardFace.WRAP_BELOW))
+	assert_int(role_applied).is_greater_equal(TypeScale.scaled(CardFace.MIN_FIT_SIZE))
 	var role_font: Font = role.get_theme_font(&"font")
 	if role.autowrap_mode != TextServer.AUTOWRAP_OFF:
 		var widest_word := 0.0
@@ -291,10 +297,17 @@ func test_face_plates_step_down_to_fit_before_clipping() -> void:
 			widest_word = maxf(widest_word, role_font.get_string_size(String(word),
 				HORIZONTAL_ALIGNMENT_LEFT, -1.0, role_applied).x)
 		assert_float(widest_word).is_less_equal(role.size.x + 0.5)
+		# THE HEIGHT HOLD: the plate's minimum reserves its whole wrapped
+		# print, and the print fits inside it.
+		var shaped_role: Vector2 = role_font.get_multiline_string_size(role.text,
+			HORIZONTAL_ALIGNMENT_LEFT, role.size.x, role_applied)
+		assert_float(role.custom_minimum_size.y).is_greater_equal(shaped_role.y - 0.5)
+		assert_float(shaped_role.y).is_less_equal(role.size.y + 0.5)
 	else:
 		var role_width: float = role_font.get_string_size(role.text,
 			HORIZONTAL_ALIGNMENT_LEFT, -1.0, role_applied).x
 		assert_float(role_width).is_less_equal(role.size.x + 0.5)
+		assert_float(role.custom_minimum_size.y).is_less_equal(0.5)
 	remove_child(face)
 	# THE HOSTILE 60px STUB: too narrow for even the floor-size title, so
 	# THE PLATE GROWS (the r2 contract) — the print renders WHOLE at the

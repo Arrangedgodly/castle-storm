@@ -42,6 +42,38 @@ static func conspirator_card(card: Dictionary) -> Control:
 	face.set("face_key", card["face_key"])
 	inset.add_child(face)
 	frame.add_child(inset)
+	# THE PAPER HOLDS ITS PRINT (readability r3 — cards grow, the missing
+	# height half): the frame is a plain Control whose own minimum is the
+	# touch grip only, so when the face's honest minimum rose past the
+	# granted cell (a wrapped title holding its r3 height at roster
+	# density), the anchored inset simply OVERFLOWED the card paper — the
+	# role caption printing past the bottom edge onto the dark ground
+	# (the dense-estate find). The face's minimum now relays onto the
+	# frame's custom minimum, inset margins included — THE CARD GROWS to
+	# hold its print, and the grid's minimums relay the growth up through
+	# the slot. Live, not one-way: a rebind that shrinks the honest
+	# minimum lets the card settle back.
+	#
+	# THE HIDDEN PAPER IS PURE (r3, the layout-hash determinism pin): the
+	# engine suppresses minimum updates inside HIDDEN subtrees, so a
+	# hidden slot's relayed growth would latch whatever phase it was last
+	# visible in — two mounts of one state then hash differently. When
+	# the card leaves the rendered tree its paper RELAXES to the assigned
+	# geometry; when it returns, the visibility-resumed minimum cascade
+	# re-fires the relay and the card grows again. Same state -> same
+	# rendered table, whichever path mounted it.
+	var relay := func() -> void:
+		frame.custom_minimum_size = face.get_combined_minimum_size() + Vector2(28.0, 30.0)
+	face.minimum_size_changed.connect(relay)
+	relay.call()
+	frame.visibility_changed.connect(func() -> void:
+		if not is_instance_valid(frame):
+			return
+		if frame.is_visible_in_tree():
+			relay.call()
+		elif is_instance_valid(frame.get_parent()):
+			frame.custom_minimum_size = Vector2.ZERO
+			(frame.get_parent() as Container).queue_sort())
 	return frame
 
 
