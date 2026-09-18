@@ -146,7 +146,7 @@ The honest one, in order:
 
 ## License
 
-No license file ships with this repository yet, so the game code is all-rights-reserved by default. Third-party assets remain under their own licenses (see ATTRIBUTIONS.md). Do not reuse game code without asking first.
+The project's own code and content are MIT-licensed — see [LICENSE](LICENSE). Third-party assets under `assets/vendor/` (Kenney CC0 packs, game-icons.net CC-BY icons, OFL fonts) remain under their respective licenses; see [assets/vendor/ATTRIBUTIONS.md](assets/vendor/ATTRIBUTIONS.md) for the shipped per-file attribution.
 
 ## Further reading
 
