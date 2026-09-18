@@ -128,7 +128,11 @@ static func current_objective(host: GameHost) -> Dictionary:
 		var moment := _moment(host, id)
 		if moment.is_empty():
 			continue  # the moment is gone or has not come — the note is quiet
-		var text := CopyDeck.line(Inks.pack().copy, step["key"],
+		# THE FIRST-DEAL COVERAGE FIX: a step's moment may key its own line
+		# (the build step names the gate first while offers stand — the
+		# concrete intermediate action, never a covered-plot reading).
+		var key: StringName = moment.get("key", step["key"])
+		var text := CopyDeck.line(Inks.pack().copy, key,
 			host.engine.tick_count, moment["params"])
 		if text.is_empty():
 			return {}
@@ -325,8 +329,15 @@ static func _moment(host: GameHost, id: StringName) -> Dictionary:
 			var plot := _affordable_plot(host)
 			if plot.is_empty():
 				return {}
-			return {"params": {"building": String(plot["name"])},
+			var out := {"params": {"building": String(plot["name"])},
 				"focus": "bld_%s" % String(plot["id"])}
+			# THE FIRST-DEAL COVERAGE FIX: while the gate holds offers, the
+			# note names the intermediate action (answer the gate) instead
+			# of pointing at a plot the offers crowd — plain words, the
+			# player's next move, never a covered-plot reading.
+			if not units.offer_ids().is_empty():
+				out["key"] = &"first_build_wait"
+			return out
 		&"train":
 			if units.idle_units(&"militia").is_empty():
 				return {}

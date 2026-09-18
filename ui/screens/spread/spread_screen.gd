@@ -270,6 +270,15 @@ var _catchup_boot_msec := -1
 ## is the packet unfold's business (T-UI-05); cards JOINING a live table
 ## (recruits arriving, offers becoming estate cards) slide-and-settle.
 var _entrances_armed := false
+## THE STAGED FIRST MOMENTS (the first-deal coverage fix): true while the
+## once-only how-to offer paper owns the table on the fresh first deal —
+## recruit deals that arrive behind it WAIT (the table shows the plots it
+## was dealt before the reveal), and slide-and-settle the moment the
+## paper is answered. The paper blocks the table's input anyway; without
+## the hold its veil hid newly dealt offers, so dismissing it revealed a
+## fan already fanned OVER the staked plots. Never set for returning
+## players (no offer — deals land immediately, exactly as today).
+var _deals_held := false
 
 
 func _ready() -> void:
@@ -785,9 +794,15 @@ func open_howto() -> void:
 
 
 ## The pamphlet folded away: focus returns to the chip that opened it,
-## else the table's first card (a screen must never strand focus).
+## else the table's first card (a screen must never strand focus). THE
+## STAGED FIRST MOMENTS: on the fresh first deal this dismissal is what
+## releases the held deals — the gate's paper slides in NOW (the offer
+## paper is gone; nothing buries it), settling on the open table.
 func _on_howto_closed() -> void:
 	stats[&"howtos_closed"] += 1
+	if _deals_held:
+		_deals_held = false
+		_bind_cards_list.call_deferred(false)
 	if _howto_from_chip:
 		_howto_from_chip = false
 		var active := get_active_slot() as OrientationSlot
@@ -814,6 +829,11 @@ func _maybe_offer_howto() -> void:
 	if _chronicle != null and _chronicle.is_open():
 		_chronicle.close()
 	_howto.offer(host)
+	# THE STAGED FIRST MOMENTS: the paper owns the table until it is
+	# answered — deals arriving behind it wait for its dismissal (the
+	# player reads one paper at a time; the table deals onto an open
+	# table, never under a closed veil).
+	_deals_held = true
 
 
 ## Either offer verb (and every chip-open) marks the receipt: the offer
@@ -1697,20 +1717,35 @@ func _card_node_in(slot: OrientationSlot, card_id: String) -> Control:
 
 
 ## At the card's edge: to its right where the table has room, mirrored to
-## its left where it does not, always fully inside the screen (the fan is
-## paper ON the table — it never clips off it).
+## its left where it does not, always fully inside THE TABLE BAND (the
+## fan is paper ON the table — it never clips off it, and it never rides
+## up onto the header, the chronicle strip or the pips rail: the first-
+## deal coverage fix — a fan paper that reached past the band crossed
+## foreign chrome, the audit's straddle finds).
 func _place_fan(card: Control) -> void:
 	var fan_size: Vector2 = _fan.get_combined_minimum_size()
 	_fan.size = fan_size
 	var bounds := get_global_rect()
+	var band := _table_band_rect()
 	var card_rect := card.get_global_rect()
 	var x := card_rect.end.x + 10.0
-	if x + fan_size.x > bounds.end.x - 8.0:
+	if x + fan_size.x > band.end.x - 8.0:
 		x = card_rect.position.x - fan_size.x - 10.0
-	x = clampf(x, 8.0, bounds.end.x - fan_size.x - 8.0)
+	x = clampf(x, band.position.x + 8.0,
+		maxf(band.position.x + 8.0, band.end.x - fan_size.x - 8.0))
 	var y := clampf(card_rect.get_center().y - fan_size.y * 0.5,
-		8.0, bounds.end.y - fan_size.y - 8.0)
+		band.position.y + 8.0,
+		maxf(band.position.y + 8.0, band.end.y - fan_size.y - 8.0))
 	_fan.global_position = Vector2(x, y)
+
+
+## The active slot's table band in global coords (the fan's placement
+## bounds; falls back to the whole screen before the slots exist).
+func _table_band_rect() -> Rect2:
+	var active := get_active_slot() as OrientationSlot
+	if active != null and active.get_spread() != null:
+		return (active.get_spread() as Control).get_global_rect()
+	return get_global_rect()
 
 
 ## Every mounted card's GLOBAL footprint on the ACTIVE table — the r4
@@ -1803,11 +1838,23 @@ func _bind_cards_list(count_render := true) -> void:
 		return  # the crush beat owns the table (T-UI-06): the cleared paper
 			# stays cleared until the beat resolves; the intro's restart
 			# re-deals beneath its own full refresh
+	if _deals_held:
+		return  # THE STAGED FIRST MOMENTS (the first-deal coverage fix):
+			# the how-to offer paper owns the table — the deals it would
+			# bury wait for its dismissal, then slide-and-settle (see
+			# _on_howto_closed). The plots bound before the reveal stay
+			# dealt; nothing else joins the table under the paper.
 	if count_render:
 		stats[&"card_list_renders"] += 1
 	var cards: Array = _view["cards"]
+	var gate_on := _gate_lane_on(cards)
+	# The column ladder counts the ESTATE's cards only when the gate lane
+	# stands (the offers have left the grid); with the lane off the ladder
+	# reads the whole table — every offer-free bind is laid exactly as
+	# always (the byte-identical rule).
 	var columns := SpreadCards.adaptive_columns(
-		cards.size(), _portrait_spread_height(), 20.0, _spread_budget().x)
+		_estate_count(cards) if gate_on else cards.size(),
+		_portrait_spread_height(), 20.0, _spread_budget().x)
 	for slot: OrientationSlot in [get_portrait_slot(), get_landscape_slot()]:
 		var spread := slot.get_spread() as Container
 		# The table is about to re-deal: any entrance slides still in flight
@@ -1844,10 +1891,44 @@ func _bind_cards_list(count_render := true) -> void:
 					spread.move_child(node, index)
 			index += 1
 		spread.set("columns", columns)
+		_apply_gate_lane(spread, gate_on)
 		spread.queue_sort()
 		_sync_focus_ids(slot)
 	_maybe_print_edge_primer()
 	_validate_open_fan()
+
+
+## True when the gate lane stands: offers at the gate AND a table small
+## enough for the split to keep both bands honest (the FIRST DEAL's
+## grammar — past CardSpread.GATE_SPLIT_MAX_CARDS the designed held-fan
+## overlap resumes, the r4-audited dense state).
+func _gate_lane_on(cards: Array) -> bool:
+	if cards.size() > CardSpread.GATE_SPLIT_MAX_CARDS:
+		return false
+	for card: Dictionary in cards:
+		if card["kind"] == &"offer":
+			return true
+	return false
+
+
+## The estate's card count (everything but the gate offers) — the column
+## ladder's input once the gate lane takes the offers out of the grid.
+func _estate_count(cards: Array) -> int:
+	var n := 0
+	for card: Dictionary in cards:
+		if card["kind"] != &"offer":
+			n += 1
+	return n
+
+
+## The gate lane's honest application (the reserves' pattern): setting it
+## only on change, and snapping settling cards first — a re-sort must
+## never strand a card short of its seat.
+func _apply_gate_lane(spread: Container, gate_on: bool) -> void:
+	var lane := 1.0 if gate_on else 0.0
+	if absf(float(spread.get("gate_lane")) - lane) > 0.01:
+		CardMotion.snap_all(spread)
+		spread.set("gate_lane", lane)
 
 
 # --- the line-form primer (finishing refinement #2, P2) ----------------------------------
@@ -2204,12 +2285,14 @@ func _finalize_topology() -> void:
 
 ## The adaptive column ladder, re-derived from the CURRENT spread height
 ## and applied to both slots' spreads (a re-sort costs one sort pass).
-## A column change re-lays the table — entrance slides land first.
+## A column change re-lays the table — entrance slides land first. The
+## ladder counts the ESTATE's cards only: the gate lane has taken the
+## offers out of the grid (the gate row lays its own single row).
 func _apply_columns() -> void:
 	if _view.is_empty():
 		return
 	var columns := SpreadCards.adaptive_columns(
-		(_view["cards"] as Array).size(), _portrait_spread_height(), 20.0, _spread_budget().x)
+		_estate_count(_view["cards"]), _portrait_spread_height(), 20.0, _spread_budget().x)
 	for slot: OrientationSlot in [get_portrait_slot(), get_landscape_slot()]:
 		var spread := slot.get_spread() as Container
 		if spread != null:

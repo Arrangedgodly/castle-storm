@@ -115,7 +115,8 @@ const KEY_BUDGETS: Dictionary = {
 	# wrap pin lives beside the arc's tests); the trickle payoff stays a
 	# strip row
 	&"first_gate": STRIP_BUDGET, &"first_assign": STRIP_BUDGET,
-	&"first_build": STRIP_BUDGET, &"first_trickle": STRIP_BUDGET,
+	&"first_build": STRIP_BUDGET, &"first_build_wait": STRIP_BUDGET,
+	&"first_trickle": STRIP_BUDGET,
 	# the contextual first-time hints — strip rows, budget-pinned
 	&"hint_promote": STRIP_BUDGET, &"hint_warn": STRIP_BUDGET,
 	&"hint_odds": STRIP_BUDGET, &"hint_bank": STRIP_BUDGET,

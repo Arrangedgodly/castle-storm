@@ -27,6 +27,11 @@ static func conspirator_card(card: Dictionary) -> Control:
 	frame.set("misprint_seed", int(card["misprint_seed"]))
 	frame.focus_mode = Control.FOCUS_ALL
 	frame.set_meta(&"spread_card_id", String(card["id"]))
+	# THE GATE PAPER MARK (the first-deal coverage fix): offers carry the
+	# gate meta so CardSpread's gate_lane split lays them in the gate row,
+	# never over the estate. Kind is immutable per card id (an offer_ uid
+	# never rebinds into an estate card), so the meta is set once here.
+	frame.set_meta(&"card_gate", StringName(card["kind"]) == &"offer")
 	var inset := MarginContainer.new()
 	inset.set_anchors_preset(Control.PRESET_FULL_RECT)
 	inset.offset_left = 14.0

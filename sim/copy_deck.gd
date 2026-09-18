@@ -308,6 +308,14 @@ const DEFAULTS: Dictionary = {
 	&"first_build": [
 		"The stipend buys foundations — raise the {building}.",
 	],
+	# THE FIRST-DEAL COVERAGE FIX: the build note's variant for the moment
+	# the gate still holds offers — the concrete intermediate action in
+	# plain words (answer the gate first), never a line that reads as the
+	# plots being covered.
+	&"first_build_wait": [
+		"Answer the gate first — then raise the {building}.",
+		"Paper waits at the gate — answer it, then the {building}.",
+	],
 	&"first_trickle": [
 		"The stores tally the first {resource}: +{amount}.",
 	],
@@ -650,6 +658,7 @@ const CONSUMERS: Dictionary = {
 	&"first_gate": "guided objective note line (the gate) — FirstSession",
 	&"first_assign": "guided objective note line (the role choice) — FirstSession",
 	&"first_build": "guided objective note line (the build order) — FirstSession",
+	&"first_build_wait": "guided objective note line (the build order, offers at the gate) — FirstSession",
 	&"first_trickle": "first-session strip line (the first produce) — FirstSession",
 	&"objective_train": "guided objective note line (the yard) — FirstSession",
 	&"objective_gear": "guided objective note line (the gear) — FirstSession",

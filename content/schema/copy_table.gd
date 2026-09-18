@@ -152,6 +152,11 @@ const KEY_TOKENS: Dictionary = {
 	&"first_gate": [&"name"],
 	&"first_assign": [&"name"],
 	&"first_build": [&"building"],
+	# THE FIRST-DEAL COVERAGE FIX: the build objective's note, variant
+	# keyed by the gate's own state — while offers stand at the gate the
+	# note names the concrete intermediate action (answer the gate
+	# first), never a line that reads as the plots being covered.
+	&"first_build_wait": [&"building"],
 	&"first_trickle": [&"amount", &"resource"],
 	&"objective_train": [],
 	&"objective_gear": [],
