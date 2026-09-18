@@ -27,36 +27,36 @@ colors:
 typography:
   display:
     fontFamily: "IM Fell English SC, Georgia, serif"
-    fontSize: "42px"
+    fontSize: "44px"
     fontWeight: 400
   card-title:
     fontFamily: "IM Fell English SC, Georgia, serif"
-    fontSize: "34px"
+    fontSize: "36px"
     fontWeight: 400
   body:
     fontFamily: "Alegreya Sans, Verdana, sans-serif"
-    fontSize: "22px"
+    fontSize: "24px"
     fontWeight: 400
   button:
     fontFamily: "Alegreya Sans, Verdana, sans-serif"
-    fontSize: "22px"
+    fontSize: "24px"
     fontWeight: 400
   chronicle-line:
     fontFamily: "Alegreya Sans, Verdana, sans-serif"
-    fontSize: "22px"
+    fontSize: "24px"
     fontWeight: 400
     fontStyle: italic
   numerals:
     fontFamily: "Alegreya Sans, Verdana, sans-serif"
-    fontSize: "26px"
+    fontSize: "28px"
     fontWeight: 700
   role-line:
     fontFamily: "Alegreya Sans, Verdana, sans-serif"
-    fontSize: "19px"
+    fontSize: "22px"
     fontWeight: 500
   pip-label:
     fontFamily: "Alegreya Sans, Verdana, sans-serif"
-    fontSize: "15px"
+    fontSize: "18px"
     fontWeight: 500
 rounded:
   chip: "4px"
@@ -264,20 +264,29 @@ AI-default sans; both are OFL-licensed and vendored through the asset pipeline
 
 ### Hierarchy (authored sizes at scale 1.0; `ui/theme/spread_theme.tres`)
 
-- **Display / Heading** (IM Fell English SC, 42px): screen titles — the letterhead's
-  leader name plate is tuned to 28px for table width.
-- **Card Title** (IM Fell English SC, 34px): card name plates and the intro packet's
-  title; regime Major-Arcana titles print one size down (the castle-title rule).
-- **Body** (Alegreya Sans Regular, 22px): default reading size (theme default size 24
-  covers untyped labels).
-- **Chronicle Line** (Alegreya Sans Italic, 22px): every printed event row — the
-  clerk's hand. On dark grounds prints Cheap Paper; on aftermath, Press Ink.
-- **Numerals** (Alegreya Sans Bold, 26px): pip amounts and counted values, abbreviated
-  idle-scale (`Inks.abbreviate_amount`: 1234 → "1.2K", 15400 → "15K", 1250000 → "1.3M").
-- **Role Line** (Alegreya Sans Medium, 19px): card role captions, countdowns, fan hints.
-- **Pip Label** (Alegreya Sans Medium, 15px): the textual resource channel ("FOOD",
-  "TIMBER", "IRON") and the run clock plate.
-- **Button** (Alegreya Sans Regular, 22px): chip labels.
+The readability pass raised the WHOLE ladder one coherent step (the same
+ratios, larger rungs — the 22px chronicle line and the 15px pip labels
+read as fine print on a phone; every rung now sits at comfortable
+arm's-length scale):
+
+- **Display / Heading** (IM Fell English SC, 44px): screen titles — the
+  letterhead's leader name plate is tuned to 28px for table width.
+- **Card Title** (IM Fell English SC, 36px): card name plates and the
+  intro packet's title; regime Major-Arcana titles print one size down
+  (the castle-title rule).
+- **Body** (Alegreya Sans Regular, 24px): default reading size (theme
+  default size 26 covers untyped labels).
+- **Chronicle Line** (Alegreya Sans Italic, 24px): every printed event
+  row — the clerk's hand. On dark grounds prints Cheap Paper; on
+  aftermath, Press Ink.
+- **Numerals** (Alegreya Sans Bold, 28px): pip amounts and counted
+  values, abbreviated idle-scale (`Inks.abbreviate_amount`: 1234 →
+  "1.2K", 15400 → "15K", 1250000 → "1.3M").
+- **Role Line** (Alegreya Sans Medium, 22px): card role captions,
+  countdowns, fan hints.
+- **Pip Label** (Alegreya Sans Medium, 18px): the textual resource
+  channel ("FOOD", "TIMBER", "IRON") and the run clock plate.
+- **Button** (Alegreya Sans Regular, 24px): chip labels.
 
 ### The font-scale seam
 
@@ -424,10 +433,13 @@ button chips, 5px on paper panels (theme styleboxes).
 - **CardFace** (`ui/theme/card_face.gd/.tscn`): the face plate — art slot + name plate
   (display face) + solid under-title rule (portrait cue) + role line (soft
   ink). Reflows portrait-stacked vs landscape-side-by-side on its own aspect
-  hysteresis (flip above 1.15, back below 1.0). The plate fit (backlog sweep):
-  a plate's print steps its font down to the plate's width before it ever
-  clips — the T-UI-03 clip stays as the floored last resort (the label still
-  fails safe at the plate edge, never past the card).
+  hysteresis (flip above 1.15, back below 1.0). The plate fit (the
+  readability pass — the 55%/70% clip floors are GONE): a plate's print
+  steps its font down until the WHOLE text fits (shrink-to-full-fit,
+  absolute 8px floor); a clipped print is a bug, a small whole print is
+  density. clip_text stays only as the never-engaged-by-real-copy last
+  resort (the label still fails safe at the plate edge, never past the
+  card).
 - **FaceSlot + FaceArt + the print shader** (`ui/theme/face_slot.gd`, `face_art.gd`,
   `face_print.gdshader`): face art resolves through the content art manifest — one
   `atlas_region` cell of the vendored Kenney Toon Character pose sheets (uniform 9×5

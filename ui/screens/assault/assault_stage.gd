@@ -93,6 +93,8 @@ var wash := 0.0:
 var _title_label: Label
 var _meter: VBoxContainer
 var _odds_label: Label
+## The odds line's fit key (text@width — see _refit_odds_line).
+var _odds_fit_key := ""
 var _army_blocks: BlocksRow
 var _garrison_blocks: BlocksRow
 var _castle: SiegeCard
@@ -147,6 +149,19 @@ func _relaid() -> void:
 	_sync_prints()
 
 
+## The confidence line's plate fit (the card grammar's shared pass, at
+## the meter's granted width — see _compose's note). Guarded by
+## text+width so the fit cannot ping-pong the relayout.
+func _refit_odds_line() -> void:
+	if _odds_label == null:
+		return
+	var key := "%s@%.1f" % [_odds_label.text, _odds_label.size.x]
+	if key == _odds_fit_key:
+		return
+	_odds_fit_key = key
+	CardFace.fit_label_to_width(_odds_label, 0.0, 1, TypeScale.scaled(22))
+
+
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_RESIZED:
 		_relaid()
@@ -169,8 +184,18 @@ func _compose() -> void:
 	_odds_label = Label.new()
 	_odds_label.theme_type_variation = &"RoleLine"
 	_odds_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	# THE CONFIDENCE LINE FITS (the readability pass): the composed
+	# confidence + floor line is the longest single print on the table
+	# (613px at 1.0x, 808px at 1.3x — the audit's worst clip) and the
+	# meter's width is the lane's, not growable. The shared plate-fit
+	# grammar (CardFace.fit_label_to_width — the ranks' own seam) steps
+	# the print to the meter's width: whole at one line, never clipped.
+	# (Autowrap was tried first: an autowrap label's minimum HEIGHT is
+	# computed at its minimum width, which blew the meter's honest
+	# minimum past the lane — the responsive sweep caught it.)
 	_odds_label.clip_text = true
 	_odds_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_odds_label.resized.connect(_refit_odds_line)
 	_meter.add_child(_odds_label)
 	_army_blocks = BlocksRow.new()
 	_army_blocks.side = &"army"
@@ -233,6 +258,7 @@ func bind_odds(view: Dictionary) -> void:
 	_odds_label.text = AssaultPresenter.confidence_line(int(view["win_permille"]))
 	if not bool(view["floor_met"]):
 		_odds_label.text += "  ·  " + AssaultPresenter.floor_line(view)
+	_refit_odds_line()
 	_army_blocks.regime_ink = Inks.regime_secondary(regime_id)
 	_garrison_blocks.regime_ink = Inks.regime_secondary(regime_id)
 	_army_blocks.bind_odds(int(view["win_permille"]))
@@ -249,6 +275,7 @@ func refresh_odds(view: Dictionary) -> void:
 	_odds_label.text = AssaultPresenter.confidence_line(int(view["win_permille"]))
 	if not bool(view["floor_met"]):
 		_odds_label.text += "  ·  " + AssaultPresenter.floor_line(view)
+	_refit_odds_line()
 	_army_blocks.bind_odds(int(view["win_permille"]))
 	_garrison_blocks.bind_odds(1000 - int(view["win_permille"]))
 
@@ -900,7 +927,12 @@ class RankCard:
 		inset.add_child(column)
 		var name_label := Label.new()
 		name_label.theme_type_variation = &"RoleLine"
-		name_label.add_theme_font_size_override("font_size", TypeScale.scaled(14))
+		# THE RANK PLATES (the readability pass): the old baked 14/11 left
+		# names and contributions at the bottom of the audit's TINY list
+		# (the odds capture's "10 sword · 5 gear" printed ~8px physical).
+		# Raised bases + the shared full-fit: whole at the largest size
+		# the rank card's width grants.
+		name_label.add_theme_font_size_override("font_size", TypeScale.scaled(17))
 		name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		name_label.clip_text = true
 		name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -909,7 +941,7 @@ class RankCard:
 		column.add_child(name_label)
 		var role_label := Label.new()
 		role_label.theme_type_variation = &"PipLabel"
-		role_label.add_theme_font_size_override("font_size", TypeScale.scaled(11))
+		role_label.add_theme_font_size_override("font_size", TypeScale.scaled(14))
 		role_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		role_label.clip_text = true
 		role_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -959,8 +991,10 @@ class RankCard:
 		if key == _fit_key:
 			return
 		_fit_key = key
-		CardFace.fit_label_to_width(name_plate, 0.7, 2, TypeScale.scaled(14))
-		CardFace.fit_label_to_width(role_plate, 0.75, 1, TypeScale.scaled(11))
+		# Full-fit at the raised local bases (the readability pass — the
+		# old 0.7/0.75 floors clipped; shrink-to-whole replaced them).
+		CardFace.fit_label_to_width(name_plate, 0.0, 2, TypeScale.scaled(17))
+		CardFace.fit_label_to_width(role_plate, 0.0, 1, TypeScale.scaled(14))
 
 
 	## Land on the authored target right now (the CardMotion rule: a
@@ -1081,12 +1115,16 @@ class SiegeCard:
 		_cycle_plate = CyclePlate.new()
 		add_child(_cycle_plate)
 		_place_cycle_plate()
-		# The castle's title plate prints one size down: full display
-		# scale clips regime names at card width ("he Paper Crow" — the
-		# capture find), and a clipped name on the castle reads broken.
+		# The castle's title plate prints one size down (full display
+		# scale clips regime names at card width — the capture find), and
+		# the READABILITY PASS pins that base INTO the face's own fit
+		# (title_base): the old _ready override was silently wiped by the
+		# fit's base re-read, so the castle title actually fitted from the
+		# full CardTitle base down to the old clip floor. Pinned base +
+		# full-fit = whole at one size down, never a floored clip.
 		for plate in _face.get_children():
 			if plate is Label and (plate as Label).theme_type_variation == &"CardTitle":
-				(plate as Label).add_theme_font_size_override("font_size", TypeScale.scaled(22))
+				_face.set("title_base", TypeScale.scaled(22))
 
 
 	func _notification(what: int) -> void:
@@ -1182,7 +1220,7 @@ class CyclePlate:
 	func _ready() -> void:
 		_label = Label.new()
 		_label.theme_type_variation = &"Numerals"
-		_label.add_theme_font_size_override("font_size", TypeScale.scaled(15))
+		_label.add_theme_font_size_override("font_size", TypeScale.scaled(17))
 		_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1195,7 +1233,7 @@ class CyclePlate:
 			# The baked size re-applies on every value change — the
 			# press-room's live type-scale step re-flows a card composed at
 			# another factor the next time the numeral reprints.
-			_label.add_theme_font_size_override("font_size", TypeScale.scaled(15))
+			_label.add_theme_font_size_override("font_size", TypeScale.scaled(17))
 			_label.text = str(value)
 
 	func _draw() -> void:

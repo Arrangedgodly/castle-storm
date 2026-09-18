@@ -15,20 +15,35 @@ extends BoxContainer
 
 const RULE_SCENE := preload("res://ui/theme/rule_mark.tscn")
 
-## THE PLATE FIT (the backlog sweep's phone-scale clip pass, same family as
-## the T-UI-03 fail-safe): a plate's print steps its font DOWN to fit the
-## plate's width before it ever clips — the fail-safe becomes the LAST
-## resort, not the default. The base is re-read from the live theme on
-## every fit (override cleared first), so the TypeScale factor and any
-## whole-view rebind stay authoritative; below the floor the label still
-## clips at the plate edge (fail-SAFE, never past the card) — that residue
-## is structural at the narrowest roster columns, documented in
-## docs/acceptance-sweep.md.
-## Floors as a share of the themed size: the title may shrink further than
-## the role line (a title's job is identity, a role line carries state).
-const TITLE_FIT_FLOOR := 0.55
-const ROLE_FIT_FLOOR := 0.7
+## THE PLATE FIT (the readability pass — the 55%/70% clip floors are GONE):
+## a plate's print steps its font DOWN to the plate's width until the
+## WHOLE text fits — shrink-to-full-fit, never a floored clip. The base
+## is re-read from the live theme on every fit (override cleared first),
+## so the TypeScale factor and any whole-view rebind stay authoritative;
+## `p_base` > 0 pins the base instead (plates that bake a LOCAL size —
+## the castle's one-size-down title, the odds roster's rank plates).
+## The only remaining floor is ABSOLUTE (MIN_FIT_SIZE) so a degenerate
+## string cannot step a plate into unreadable nothing: below it the
+## label's clip_text stays as the documented LAST resort (fail-SAFE —
+## the print stops at the plate edge, never past the card). Real content
+## never reaches it: at every roster density the layout grants, pool
+## names and role lines fit whole above the floor (the readability
+## audit, scripts/readability_audit.gd, runs this inventory headless).
+## At extreme roster density the table's arithmetic bounds how wide any
+## card can print; the honest answer there is whole-but-small — a clipped
+## print is a bug, a small whole print is density.
+const MIN_FIT_SIZE := 8
 const FIT_STEP := 2
+
+## The castle title's one-size-down base is a PROPERTY of the face now
+## (the old _ready override was silently WIPED by the fit's base re-read
+## — the audit found the castle title fitting from the full themed base).
+## 0 = the themed base (every normal card).
+@export var title_base := 0:
+	set(value):
+		title_base = maxi(0, value)
+		if _name_label != null:
+			_refit_plates()
 
 ## Face art key in the pack's art manifest (e.g. &"face_peasant"). Empty
 ## or pending keys print FaceSlot's authored placeholder mark. Data-driven
@@ -154,29 +169,30 @@ var _role_fit_key := ""
 
 func _refit_plates() -> void:
 	if _name_label != null:
-		var key := "%s@%.1f" % [_name_label.text, _name_label.size.x]
+		var key := "%s@%.1f@%d" % [_name_label.text, _name_label.size.x, title_base]
 		if key != _name_fit_key:
 			_name_fit_key = key
-			fit_label_to_width(_name_label, TITLE_FIT_FLOOR, FIT_STEP)
+			fit_label_to_width(_name_label, 0.0, FIT_STEP, title_base)
 	if _role_label != null:
 		var key := "%s@%.1f" % [_role_label.text, _role_label.size.x]
 		if key != _role_fit_key:
 			_role_fit_key = key
-			fit_label_to_width(_role_label, ROLE_FIT_FLOOR, FIT_STEP)
+			fit_label_to_width(_role_label, 0.0, FIT_STEP)
 
 
 ## THE PLATE FIT, shared by every card grammar surface (the spread's card
-## faces, the assault roster's rank plates): step the label's font down
-## from its THEMED size (override cleared, so the TypeScale factor stays
-## authoritative) until the whole text fits the label's width, floored at
-## `floor_ratio` of the base — below the floor the label's own clip
-## fail-safe takes over (never past the card). `p_base` > 0 pins the base
-## instead (for plates that bake a LOCAL size through TypeScale.scaled —
-## the rank plates; the override is then always re-asserted). Returns the
-## applied size (0 when the label is not measurable yet). Pure given text
-## + theme + width: same state -> same size, so view hashes stay
-## deterministic.
-static func fit_label_to_width(label: Label, floor_ratio: float, step := 2,
+## faces, the castle card, the assault roster's rank plates): step the
+## label's font down from its base (THEMED — override cleared, so the
+## TypeScale factor stays authoritative — or `p_base` when pinned) until
+## the WHOLE text fits the label's width. `floor_ratio` is retained in
+## the signature for call-site compatibility and is IGNORED (the old
+## 55%/70% floors clipped; the readability pass replaced them with
+## shrink-to-full-fit). The absolute MIN_FIT_SIZE bounds the step-down;
+## below it the label's clip_text is the last-resort fail-safe (never
+## past the card). Returns the applied size (0 when the label is not
+## measurable yet). Pure given text + theme + width: same state -> same
+## size, so view hashes stay deterministic.
+static func fit_label_to_width(label: Label, _floor_ratio := 0.0, step := 2,
 		p_base := -1) -> int:
 	if label == null or not is_instance_valid(label):
 		return 0
@@ -192,12 +208,11 @@ static func fit_label_to_width(label: Label, floor_ratio: float, step := 2,
 		base = label.get_theme_font_size(&"font_size")
 	if base <= 0:
 		return 0
-	var floor_size := maxi(1, int(round(float(base) * floor_ratio)))
 	var size := base
-	while size > floor_size:
+	while size > MIN_FIT_SIZE:
 		if font.get_string_size(label.text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, size).x <= width:
-			break  # fits at this size — done
-		size = maxi(size - step, floor_size)  # the last step lands ON the floor
+			break  # the WHOLE text fits at this size — done
+		size = maxi(size - step, MIN_FIT_SIZE)  # the last step lands ON the floor
 	if size != base or p_base > 0:
 		label.add_theme_font_size_override(&"font_size", size)
 	return size

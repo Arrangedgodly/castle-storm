@@ -24,11 +24,13 @@ const THEME_PATH := "res://ui/theme/spread_theme.tres"
 const SpreadScreen := preload("res://ui/screens/spread/spread_screen.tscn")
 ## The AUTHORED ladder (spread_theme.tres) — drift here is a product
 ## decision and must update this table and docs/acceptance-sweep.md.
+## (The readability pass raised every rung one coherent step: see
+## DESIGN.md's Typography and the production log's readability entry.)
 const AUTHORED := {
-	&"Heading": 42, &"CardTitle": 34, &"Body": 22, &"RoleLine": 19,
-	&"Numerals": 26, &"ChronicleLine": 22, &"PipLabel": 15, &"Button": 22,
+	&"Heading": 44, &"CardTitle": 36, &"Body": 24, &"RoleLine": 22,
+	&"Numerals": 28, &"ChronicleLine": 24, &"PipLabel": 18, &"Button": 24,
 }
-const AUTHORED_DEFAULT := 24
+const AUTHORED_DEFAULT := 26
 
 
 func before_test() -> void:
@@ -87,7 +89,7 @@ func test_repeated_applies_never_compound_and_reset_restores_authored() -> void:
 	TypeScale.apply_factor(1.3, theme)
 	TypeScale.apply_factor(1.3, theme)  # idempotent
 	TypeScale.apply_factor(1.1, theme)  # re-scale from base, not compounded
-	assert_int(theme.get_font_size(&"font_size", &"ChronicleLine")).is_equal(24)  # 22*1.1
+	assert_int(theme.get_font_size(&"font_size", &"ChronicleLine")).is_equal(26)  # 24*1.1 (raised ladder)
 	TypeScale.reset(theme)
 	for type_name: StringName in AUTHORED:
 		assert_int(theme.get_font_size(&"font_size", type_name)).is_equal(AUTHORED[type_name])
@@ -169,8 +171,12 @@ func test_the_widest_catch_up_rows_fit_the_quote_label_at_max_scale() -> void:
 		if label == null or String(label.text).is_empty():
 			continue
 		assert_float(label.size.x).is_equal_approx(want_label, 0.5)
-		var size := label.get_theme_font_size("font")  # >= the declared render (measured conservative)
-		assert_int(size).is_greater_equal(28)  # 22 * 1.3
+		# The resolved render size (the declared ChronicleLine at this
+		# factor) — the honest seam since the readability pass; the
+		# "font"-item fallback would measure at the theme DEFAULT (33.8
+		# at 1.3) and over-measure honest rows.
+		var size := label.get_theme_font_size(&"font_size")
+		assert_int(size).is_greater_equal(28)  # 24 * 1.3
 		var width := label.get_theme_font("font").get_string_size(
 			String(label.text), HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
 		assert_float(width).is_less_equal(label.size.x - 30.0) \

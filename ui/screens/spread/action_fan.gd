@@ -49,7 +49,9 @@ func _ready() -> void:
 	_hint.theme_type_variation = &"RoleLine"
 	_hint.text = "choose — act — back"
 	_hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_hint.add_theme_font_size_override("font_size", TypeScale.scaled(16))
+	# The hint's baked size (the readability pass raised it 16 -> 18; it is
+	# a caption, kept one rung under its RoleLine variation).
+	_hint.add_theme_font_size_override("font_size", TypeScale.scaled(18))
 	_hint.add_theme_color_override("font_color", Inks.INK_SOFT)
 	add_child(_hint)
 
@@ -62,7 +64,7 @@ func open(for_card_id: String, actions: Array[Dictionary]) -> void:
 	# The hint's baked size re-applies on every open — the press-room's
 	# live type-scale change (finishing refinement #5) re-flows a fan
 	# composed at another factor the next time it opens.
-	_hint.add_theme_font_size_override("font_size", TypeScale.scaled(16))
+	_hint.add_theme_font_size_override("font_size", TypeScale.scaled(18))
 	for chip in _chips:
 		chip.queue_free()
 	_chips.clear()
@@ -149,6 +151,9 @@ class ActionChip:
 	var _reason: Label
 
 
+	const CHROME := 30.0  # the leading rule + the label's side offsets
+	const MAX_CHIP_W := 320.0  # past this the clip fail-safe stays (never reached by real copy)
+
 	func _init() -> void:
 		custom_minimum_size = Vector2(152.0, float(Inks.TOUCH_GRIP_MIN))
 		focus_mode = Control.FOCUS_ALL
@@ -162,7 +167,7 @@ class ActionChip:
 		_label = Label.new()
 		_label.theme_type_variation = &"RoleLine"
 		_label.text = String(action.get("label", ""))
-		_label.clip_text = true
+		_label.clip_text = true  # last resort only — the plate grows first (below)
 		_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 		add_child(_label)
@@ -174,10 +179,10 @@ class ActionChip:
 			_label.offset_bottom = 24.0
 			_reason = Label.new()
 			_reason.theme_type_variation = &"RoleLine"
-			_reason.add_theme_font_size_override("font_size", TypeScale.scaled(15))
+			_reason.add_theme_font_size_override("font_size", TypeScale.scaled(16))
 			_reason.add_theme_color_override("font_color", Inks.INK_SOFT)
 			_reason.text = String(action.get("reason", ""))
-			_reason.clip_text = true
+			_reason.clip_text = true  # last resort only — the plate grows first
 			_reason.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			add_child(_reason)
 			_reason.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
@@ -193,6 +198,30 @@ class ActionChip:
 			_label.offset_bottom = -2.0
 		if bool(action.get("signature", false)):
 			_label.add_theme_color_override("font_color", Inks.RED)
+		_grow_to_text()
+
+
+	## THE PLATE GROWS, NOT THE CLIP (the readability pass): the chip's
+	## minimum width is its own measured print — the wider of the label
+	## and the refusal reason at their applied sizes, plus the rule/side
+	## chrome — so a long verb ("Send them home", +6px at 1.0x, +24px at
+	## 1.3x on the old 152px plate) never clips. Pure function of the
+	## action model + the type factor (the same determinism contract as
+	## the header's measured plates). MAX_CHIP_W is the honest ceiling
+	## where growth would crowd the table; real copy stays far below it.
+	func _grow_to_text() -> void:
+		var need := 0.0
+		for plate: Label in [_label, _reason]:
+			if plate == null or plate.text.is_empty():
+				continue
+			var font: Font = plate.get_theme_font(&"font")
+			if font == null:
+				continue
+			var text_w := font.get_string_size(plate.text,
+				HORIZONTAL_ALIGNMENT_LEFT, -1.0, plate.get_theme_font_size(&"font_size")).x
+			need = maxf(need, text_w + CHROME)
+		if need > 0.0:
+			custom_minimum_size.x = clampf(need, 152.0, MAX_CHIP_W)
 
 
 	func _draw() -> void:

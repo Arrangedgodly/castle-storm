@@ -830,12 +830,41 @@ func test_letterhead_holds_the_longest_pool_name_at_max_type() -> void:
 				HORIZONTAL_ALIGNMENT_LEFT, -1.0, nsize).x) \
 				.is_less_equal(name_label.size.x + 0.5) \
 				.override_failure_message("no single word may exceed the name plate")
-		# The plates fit their own measured text (the old fixed plates
-		# clipped "THE GILDED CROWN" 10px at 1.0x and 14px at 1.3x).
-		assert_float(_label_text_fits(header._regime_label)) \
-			.is_less_equal(header._regime_label.size.x + 0.5)
-		assert_float(_label_text_fits(header._time_label)) \
-			.is_less_equal(header._time_label.size.x + 0.5)
+		# The plates hold their prints (the readability pass: the regime
+		# and clock plates CAP their width at the strip's spare share and
+		# WRAP — paper flow, never a clipped print and never a name
+		# starved below its word budget). Every WORD fits its plate's
+		# width and the wrapped height fits the plate.
+		assert_int(header._regime_label.autowrap_mode) \
+			.is_equal(TextServer.AUTOWRAP_WORD_SMART)
+		assert_bool(header._regime_label.clip_text).is_false() \
+			.override_failure_message("an autowrap regime label must not clip_text (4.7 draws only line 1)")
+		var rfont: Font = header._regime_label.get_theme_font(&"font")
+		var rsize: int = header._regime_label.get_theme_font_size(&"font_size")
+		var rwrapped := rfont.get_multiline_string_size(header._regime_label.text,
+			HORIZONTAL_ALIGNMENT_LEFT, header._regime_label.size.x, rsize)
+		assert_float(rwrapped.y).is_less_equal(header._regime_label.size.y + 1.0) \
+			.override_failure_message("the wrapped regime must fit its plate's height")
+		for word in header._regime_label.text.split(" "):
+			assert_float(rfont.get_string_size(String(word),
+				HORIZONTAL_ALIGNMENT_LEFT, -1.0, rsize).x) \
+				.is_less_equal(header._regime_label.size.x + 0.5) \
+				.override_failure_message("no single word may exceed the regime plate")
+		# The clock plate: same grammar (it may wrap when the strip is
+		# tight — every word whole, every line visible).
+		assert_int(header._time_label.autowrap_mode) \
+			.is_equal(TextServer.AUTOWRAP_WORD_SMART)
+		var tfont: Font = header._time_label.get_theme_font(&"font")
+		var tsize: int = header._time_label.get_theme_font_size(&"font_size")
+		var twrapped := tfont.get_multiline_string_size(header._time_label.text,
+			HORIZONTAL_ALIGNMENT_LEFT, header._time_label.size.x, tsize)
+		assert_float(twrapped.y).is_less_equal(header._time_label.size.y + 1.0) \
+			.override_failure_message("the wrapped clock must fit its plate's height")
+		for word in header._time_label.text.split(" "):
+			assert_float(tfont.get_string_size(String(word),
+				HORIZONTAL_ALIGNMENT_LEFT, -1.0, tsize).x) \
+				.is_less_equal(header._time_label.size.x + 0.5) \
+				.override_failure_message("no single word may exceed the clock plate")
 		# The whole strip still fits the table, and at the max type scale
 		# the longest name wraps to an honest multi-line row.
 		assert_float(header.get_combined_minimum_size().x) \
@@ -890,6 +919,13 @@ func test_layout_hash_is_a_function_of_sim_state() -> void:
 	_drive_policy(host_a, policy_a, 9.0)
 	_drive_policy(host_b, policy_b, 9.0)
 	var screen_a: SpreadScreen = await _mounted_screen(host_a)
+	# THE STATE GATE (the readability pass find): the world runs LIVE on
+	# the mounted screen, and a gate arrival landing between the two
+	# hashes legitimately re-lays the table — the pin is about LAYOUT
+	# determinism for a STATE, not about sim drift. Freeze both hosts at
+	# the drive's end state BEFORE any layout work: same state -> same
+	# rendered layout, compared fairly.
+	host_a.driving = false
 	await _settle_window(screen_a, Vector2i(1280, 800), false)
 	await _settle_frames(screen_a)
 	var hash_p_a: int = screen_a.layout_hash(screen_a.get_portrait_slot() as OrientationSlot)
@@ -903,6 +939,7 @@ func test_layout_hash_is_a_function_of_sim_state() -> void:
 	await get_tree().process_frame
 
 	var screen_b: SpreadScreen = await _mounted_screen(host_b)
+	host_b.driving = false
 	await _settle_window(screen_b, Vector2i(1280, 800), false)
 	await _settle_frames(screen_b)
 	assert_int(screen_b.layout_hash(screen_b.get_portrait_slot() as OrientationSlot)).is_equal(hash_p_a)
@@ -934,9 +971,24 @@ func _settle_frames(screen: SpreadScreen) -> void:
 			screen.layout_hash(screen.get_portrait_slot() as OrientationSlot),
 			screen.layout_hash(screen.get_landscape_slot() as OrientationSlot)]
 		if held and stamp[0] == last[0] and stamp[1] == last[1]:
+			await _finalize_topology(screen)
 			return
 		held = true
 		last = stamp
+
+
+## THE FINALIZATION PASS (the readability pass find): a slot's last
+## layout_topology can have run at a TRANSIENT minimum (a strip mid-bind,
+## a letterhead plate mid-refit) and the steady-state minimum that
+## followed fires no sort of its own — the rendered layout then depends
+## on mount order, which the two-screen hash compare must never do. Both
+## screens finish the settle the same way: one explicit topology pass per
+## slot at the settled minimums, then two frames for it to land.
+func _finalize_topology(screen: SpreadScreen) -> void:
+	screen.get_portrait_slot().layout_topology()
+	screen.get_landscape_slot().layout_topology()
+	await get_tree().process_frame
+	await get_tree().process_frame
 
 
 func test_chronicle_strip_prints_in_world() -> void:

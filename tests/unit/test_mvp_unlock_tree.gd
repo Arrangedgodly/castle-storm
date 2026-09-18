@@ -285,8 +285,9 @@ func test_every_branch_and_node_is_voiced_through_the_full_seam() -> void:
 func test_copy_lines_fit_their_surface_budgets_in_real_font_metrics() -> void:
 	## The T-UI-06/09 pin pattern applied to the tree's voice: branch
 	## plates and node flavor rows, measured in the theme's real
-	## ChronicleLine face at the conservative 24 over-measure, clear their
-	## budget classes by CLIP_MARGIN. The L1-C tree UI inherits the
+	## ChronicleLine face at its RESOLVED render size (the declared 24
+	## since the readability pass), clear their budget classes by
+	## CLIP_MARGIN. The L1-C tree UI inherits the
 	## guarantee whatever plate widths it lands on inside these classes.
 	var line: Control = preload("res://ui/theme/chronicle_line.tscn").instantiate()
 	get_tree().root.add_child(line)
@@ -295,9 +296,9 @@ func test_copy_lines_fit_their_surface_budgets_in_real_font_metrics() -> void:
 	assert_that(label).is_not_null()
 	var declared: int = (load("res://ui/theme/spread_theme.tres") as Theme) \
 		.get_font_size(&"font_size", &"ChronicleLine")
-	assert_int(declared).is_equal(22)
+	assert_int(declared).is_equal(24)
 	var face := label.get_theme_font("font")
-	var size := label.get_theme_font_size("font")
+	var size := label.get_theme_font_size(&"font_size")
 	assert_int(size).is_greater_equal(declared)
 	var table := _table()
 	var worst := -1000000.0

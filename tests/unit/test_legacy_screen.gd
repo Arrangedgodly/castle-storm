@@ -735,6 +735,8 @@ func test_new_copy_lines_fit_the_print_row_budget() -> void:
 		CopyDeck.line(Inks.pack().copy, &"legacy_refusal_owned", 0),
 	]
 	for line in lines:
-		var px: float = font.get_string_size(line, HORIZONTAL_ALIGNMENT_LEFT, -1.0, size + 2).x
+		# At the DECLARED render size (the readability pass re-seam: the
+		# old +2 over-measure measured at 26 what renders at 24).
+		var px: float = font.get_string_size(line, HORIZONTAL_ALIGNMENT_LEFT, -1.0, size).x
 		assert_float(px).is_less_equal(PRINT_ROW_BUDGET - CLIP_MARGIN) \
 			.override_failure_message("'%s' -> %.0fpx over budget" % [line, px])

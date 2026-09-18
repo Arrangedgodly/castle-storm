@@ -661,7 +661,7 @@ class EntryCard:
 		head_column.add_child(_name_label)
 		_role_label = Label.new()
 		_role_label.theme_type_variation = &"RoleLine"
-		_role_label.add_theme_font_size_override("font_size", TypeScale.scaled(15))
+		_role_label.add_theme_font_size_override("font_size", TypeScale.scaled(17))
 		_role_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		_role_label.custom_minimum_size = Vector2(160.0, 0.0)
 		_role_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -725,7 +725,7 @@ class EntryCard:
 		# never hue — the same grammar as every clerk row on the card.
 		_escalation_label = Label.new()
 		_escalation_label.theme_type_variation = &"ChronicleLine"
-		_escalation_label.add_theme_font_size_override("font_size", TypeScale.scaled(15))
+		_escalation_label.add_theme_font_size_override("font_size", TypeScale.scaled(17))
 		_escalation_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		_escalation_label.custom_minimum_size = Vector2(200.0, 0.0)
 		_escalation_label.add_theme_color_override("font_color", Inks.INK)

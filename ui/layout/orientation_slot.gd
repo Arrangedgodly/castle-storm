@@ -124,6 +124,11 @@ func layout_topology() -> void:
 		var before: Vector2 = _header.get_combined_minimum_size()
 		if _header.get_child_count() > 0 and _header.get_child(0).has_method(&"refit"):
 			_header.get_child(0).refit(maxf(0.0, size.x - 2.0 * edge_margin))
+		# THE LEDGER VERBS ROW (the readability pass): same seam as the
+		# letterhead — the flow's wrap height is a pure function of the
+		# strip width, derived HERE before the header's minimum is read.
+		if _header.get_child_count() > 1 and _header.get_child(1).has_method(&"refit"):
+			_header.get_child(1).refit(maxf(0.0, size.x - 2.0 * edge_margin))
 		header_size = _header.get_combined_minimum_size()
 		# A refit that CHANGED the row's minimum must reach the host: the
 		# sort that resized this slot read the stale minimum, and a HIDDEN

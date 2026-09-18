@@ -10,8 +10,10 @@
 ##   - THE FONT-METRIC LINE BUDGET (the T-UI-06/09 standard): EVERY
 ##     variant of EVERY single-line template, substituted at WORST-CASE
 ##     parameters drawn from the LIVE pools, measured in the theme's real
-##     ChronicleLine face (conservative 24 over-measure) against its
-##     surface's budget with >= 30px margin;
+##     ChronicleLine face at its RESOLVED render size (the readability
+##     pass: declared 24; the old default-size over-measure is gone —
+##     the declared size is the truth now) against its surface's budget
+##     with >= 30px margin;
 ##   - SEEDED ROTATION: same rotor -> same line, a rotor sweep covers
 ##     every variant, the suspicion system's seq-rotated render is
 ##     deterministic and varies across seqs, table absent -> the floor;
@@ -219,11 +221,17 @@ func test_every_template_variant_fits_its_surface_in_real_font_metrics() -> void
 	assert_that(label).is_not_null()
 	var declared := (load("res://ui/theme/spread_theme.tres") as Theme) \
 		.get_font_size(&"font_size", &"ChronicleLine")
-	assert_int(declared).is_equal(22)
+	# The readability pass raised the ladder: the clerk's hand prints at 24.
+	assert_int(declared).is_equal(24)
 	var face := label.get_theme_font("font")
-	var size := label.get_theme_font_size("font")
-	# The conservative over-measure: the resolved "font" item is the theme
-	# default (24) — never SMALLER than the declared render size.
+	# THE RENDER SIZE, resolved through the label's own variation (the
+	# readability pass made the declared size the truth: the old seam
+	# asked for the nonexistent "font" size item and measured at the theme
+	# DEFAULT as a conservative over-measure — with the raised ladder that
+	# fallback (26) over-measures the real render (24) and would fail
+	# honest rows). The guard stays: the resolved render is never UNDER
+	# the declared size.
+	var size := label.get_theme_font_size(&"font_size")
 	assert_int(size).is_greater_equal(declared)
 	var params := _worst_case_params()
 	var worst_over := 0.0

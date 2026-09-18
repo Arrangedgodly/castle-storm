@@ -416,7 +416,7 @@ func test_entry_card_renders_the_escalation_line() -> void:
 	await get_tree().process_frame
 	var font: Font = card._escalation_label.get_theme_font(&"font")
 	var font_size := card._escalation_label.get_theme_font_size(&"font_size")
-	assert_int(font_size).is_equal(15)
+	assert_int(font_size).is_equal(17)  # the readability pass raised the escalation caption 15 -> 17
 	for variant in CopyDeck.variants(Inks.pack().copy, &"chronicle_escalation"):
 		var text := String(variant).replace("{cycle}", "999")
 		var measured := font.get_string_size(text,

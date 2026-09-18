@@ -96,6 +96,7 @@
 extends ResponsiveScreen
 
 const RUN_HEADER_SCRIPT := preload("res://ui/screens/spread/run_header.gd")
+const LEDGER_VERBS_ROW_SCRIPT := preload("res://ui/screens/spread/ledger_verbs_row.gd")
 const WATCHFUL_EYE_SCRIPT := preload("res://ui/screens/spread/watchful_eye.gd")
 const ACTION_FAN_SCRIPT := preload("res://ui/screens/spread/action_fan.gd")
 const SUSPICION_EVENTS_SCRIPT := preload("res://ui/screens/spread/suspicion_events.gd")
@@ -1649,10 +1650,19 @@ func _bind_pips() -> void:
 	var view_resources: Array = _view["resources"]
 	for i in view_resources.size():
 		view_resources[i]["amount"] = host.engine.get_resource(view_resources[i]["id"])
+	var ground := Inks.ground_for(_view["leader"]["regime_id"], _view["phase"])
+	# THE PIP LABEL'S INK (the readability pass): the rail prints on the
+	# TABLE GROUND, so its labels follow the print rule — the theme's
+	# INK_SOFT default is the paper-plate value and washed out on the
+	# dark ground (the triple encoding's textual channel was the game's
+	# least-readable text). Paper-bright on dark grounds, ink on
+	# aftermath.
+	var text_ink := Inks.ground_text_ink(ground)
 	for slot: OrientationSlot in [get_portrait_slot(), get_landscape_slot()]:
 		for i in mini(3, view_resources.size()):
 			var pip := slot.get_pip(i)
 			if pip != null:
+				pip.set("label_ink", text_ink)
 				pip.set("amount", int(view_resources[i]["amount"]))
 
 
@@ -1778,32 +1788,34 @@ func _bind_header() -> void:
 			slot.layout_topology()
 
 
-## The header's verbs row: a right-aligned HBox (spacer + the four
-## table-paper chips). Built once per slot by _bind_header.
+## The header's verbs row: a right-aligned FLOW of the four table-paper
+## chips (the readability pass — the row was a fixed HBox whose chips
+## clipped their labels: "The Press-Room" +38px at 1.3x portrait). Each
+## chip grows to its own measured print (ActionChip._grow_to_text); when
+## the grown row exceeds the strip the flow WRAPS to a second line — the
+## row's height is its own refit(strip_w) (LedgerVerbsRow), called by the
+## slot's topology exactly like the letterhead's, so the header's height
+## stays a pure function of text + factor + width. Built once per slot by
+## _bind_header.
 func _build_ledger_verbs() -> Control:
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 12)
-	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var spacer := Control.new()
-	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	row.add_child(spacer)
-	row.add_child(_ledger_chip("chronicle_chip", "The Chronicle", 172.0, open_chronicle))
-	row.add_child(_ledger_chip("day_sheet_chip", "The Day-Sheet", 160.0, open_day_sheet))
-	row.add_child(_ledger_chip("press_room_chip", "The Press-Room", 150.0, open_press_room))
-	row.add_child(_ledger_chip("legacy_chip", "The Legacy", 140.0, open_legacy))
+	var row := LEDGER_VERBS_ROW_SCRIPT.new()
+	row.add_child(_ledger_chip("chronicle_chip", "The Chronicle", open_chronicle))
+	row.add_child(_ledger_chip("day_sheet_chip", "The Day-Sheet", open_day_sheet))
+	row.add_child(_ledger_chip("press_room_chip", "The Press-Room", open_press_room))
+	row.add_child(_ledger_chip("legacy_chip", "The Legacy", open_legacy))
 	return row
 
 
-## One header ledger chip (the world's own verb grammar, full grip).
-func _ledger_chip(focus_id: String, label: String, width: float, handler: Callable) -> Control:
+## One header ledger chip (the world's own verb grammar, full grip). The
+## width is the ActionChip's measured-print floor (152) — the chip grows
+## with its label in _ready.
+func _ledger_chip(focus_id: String, label: String, handler: Callable) -> Control:
 	var chip := ActionFan.ActionChip.new()
 	chip.action = {
 		"id": focus_id, "label": label, "command": &"",
 		"subject": &"", "value": 0, "enabled": true, "reason": "",
 		"signature": false,
 	}
-	chip.custom_minimum_size = Vector2(width, float(Inks.TOUCH_GRIP_MIN))
 	chip.set_meta(&"focus_id", focus_id)
 	chip.pressed.connect(handler)
 	return chip

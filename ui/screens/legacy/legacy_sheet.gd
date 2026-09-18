@@ -632,7 +632,7 @@ class LegacyCard:
 
 		_flavor_label = Label.new()
 		_flavor_label.theme_type_variation = &"ChronicleLine"
-		_flavor_label.add_theme_font_size_override("font_size", TypeScale.scaled(13))
+		_flavor_label.add_theme_font_size_override("font_size", TypeScale.scaled(15))
 		_flavor_label.add_theme_color_override("font_color", Inks.INK_SOFT)
 		_flavor_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		# Wrap-width floor (the autowrap minimum-poison find): the wrap
@@ -643,7 +643,7 @@ class LegacyCard:
 
 		_effect_label = Label.new()
 		_effect_label.theme_type_variation = &"RoleLine"
-		_effect_label.add_theme_font_size_override("font_size", TypeScale.scaled(15))
+		_effect_label.add_theme_font_size_override("font_size", TypeScale.scaled(16))
 		_effect_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		column.add_child(_effect_label)
 
@@ -653,7 +653,7 @@ class LegacyCard:
 		column.add_child(footer)
 		_cost_label = Label.new()
 		_cost_label.theme_type_variation = &"RoleLine"
-		_cost_label.add_theme_font_size_override("font_size", TypeScale.scaled(15))
+		_cost_label.add_theme_font_size_override("font_size", TypeScale.scaled(16))
 		_cost_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		footer.add_child(_cost_label)
 		var spacer := Control.new()
@@ -662,7 +662,7 @@ class LegacyCard:
 		footer.add_child(spacer)
 		_note_label = Label.new()
 		_note_label.theme_type_variation = &"RoleLine"
-		_note_label.add_theme_font_size_override("font_size", TypeScale.scaled(13))
+		_note_label.add_theme_font_size_override("font_size", TypeScale.scaled(15))
 		_note_label.clip_text = true
 		_note_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		footer.add_child(_note_label)

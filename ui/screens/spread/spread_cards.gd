@@ -77,7 +77,14 @@ static func rebind_card(frame: Control, card: Dictionary) -> bool:
 static func adaptive_columns(card_count: int, bounds_height: float, space: float = 20.0) -> int:
 	if card_count <= 6:
 		return 2
-	var min_card := float(Inks.TOUCH_GRIP_MIN * 2)
+	# THE GRIP IS A WIDTH (the readability pass): the card's aspect ties
+	# width to height, so a row budget built on the bare 96 height can
+	# grant 90-wide cards whose plates step to 8px — the audit's densest
+	# find. The rows budget uses the height the grip WIDTH implies
+	# (96 / CARD_ASPECT), keeping every card at or above the grip on BOTH
+	# axes; when even the cap cannot honor it, the cap stands and the
+	# plates' full-fit is the density answer.
+	var min_card := float(Inks.TOUCH_GRIP_MIN * 2) / CardSpread.CARD_ASPECT
 	var max_rows := maxi(1, int(bounds_height / (min_card + space)))
 	for cols in range(2, MAX_STACKED_COLUMNS + 1):
 		var rows: int = ceil(float(card_count) / float(cols))

@@ -241,7 +241,7 @@ static func offer_card_view(pack: ContentPack, base_id: StringName, uid: int) ->
 		"uid": uid,
 		"kind": &"offer",
 		"name": recruit_name(pack, uid),
-		"role": "waits at the gate",
+		"role": "at the gate",
 		"face_key": def.face_id if def != null else &"",
 		"edge_state": &"held",
 		"misprint_seed": uid,
@@ -301,7 +301,7 @@ static func _building_card(production: ProductionSystem, building: BuildingDef, 
 		level, production.assigned_workers(building.id), production.worker_slots(building.id)]
 	var edge := &"ready"
 	if level < 1:
-		role = "staked plot — unbuilt"
+		role = "staked plot"
 		edge = &"queued"
 	return {
 		"id": "bld_%s" % String(building.id),

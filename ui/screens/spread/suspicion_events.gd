@@ -675,7 +675,7 @@ class ChoiceCard:
 
 		_countdown = Label.new()
 		_countdown.theme_type_variation = &"RoleLine"
-		_countdown.add_theme_font_size_override("font_size", TypeScale.scaled(17))
+		_countdown.add_theme_font_size_override("font_size", TypeScale.scaled(18))
 		_countdown.add_theme_color_override("font_color", Inks.RED)
 		_countdown.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_content.add_child(_countdown)
@@ -707,7 +707,7 @@ class ChoiceCard:
 		# live type-scale change (finishing refinement #5) re-flows a card
 		# composed at another factor the next time the moment arrives.
 		_title.add_theme_font_size_override("font_size", TypeScale.scaled(22))
-		_countdown.add_theme_font_size_override("font_size", TypeScale.scaled(17))
+		_countdown.add_theme_font_size_override("font_size", TypeScale.scaled(18))
 		_rule.set("form", 3 if urgent else 0)  # RuleForm.DOUBLE / SOLID
 		_rule.set("rule_ink", Inks.RED if urgent else Inks.INK)
 		_title.text = String(model.get("title", ""))

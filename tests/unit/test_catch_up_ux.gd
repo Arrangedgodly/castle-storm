@@ -229,15 +229,15 @@ func test_every_print_row_fits_the_label_in_real_font_metrics() -> void:
 	## min(560, bounds.x - 12), less 2*14 panel margins, 2*8 row insets,
 	## the 30 rule and its 10 separation (the verifier's 476px at 720).
 	var want_label := minf(560.0, bounds.x - 12.0) - 84.0
-	## THE FONT-SIZE ITEM-NAME TRAP (found measuring this pin): a Label's
-	## size item is "font_size"; asking get_theme_font_size("font") finds
-	## NO item and falls back to the theme default (24) — while the RENDER
-	## resolves the declared ChronicleLine 22. Measuring at the "font"
-	## fallback is CONSERVATIVE (24 >= 22, same face, monotone in size),
-	## and this pins that it stays >= the declared render size.
+	## THE RENDER SIZE (the readability pass re-seam): the label's own
+	## resolved "font_size" item — the declared ChronicleLine 24 since the
+	## ladder raise — is the truth, and the pin asserts the render never
+	## resolves UNDER it. (The old seam asked for the nonexistent "font"
+	## item and measured at the theme default as an over-measure; with the
+	## raised ladder that fallback would over-measure honest rows.)
 	var declared := (load("res://ui/theme/spread_theme.tres") as Theme) \
 		.get_font_size(&"font_size", &"ChronicleLine")
-	assert_int(declared).is_equal(22)
+	assert_int(declared).is_equal(24)
 	var texts: Array[String] = []
 	for rows: Array in variants:
 		var typed_rows: Array[Dictionary] = []
@@ -255,11 +255,11 @@ func test_every_print_row_fits_the_label_in_real_font_metrics() -> void:
 				continue
 			# The budget the rows are shaped against is the LIVE label.
 			assert_float(label.size.x).is_equal_approx(want_label, 0.5)
-			assert_int(label.get_theme_font_size("font")) \
-				.is_greater_equal(declared)  # conservative, never under-render
+			assert_int(label.get_theme_font_size(&"font_size")) \
+				.is_greater_equal(declared)  # never under-render
 			var width := label.get_theme_font("font").get_string_size(
 				String(label.text), HORIZONTAL_ALIGNMENT_LEFT, -1,
-				label.get_theme_font_size("font")).x
+				label.get_theme_font_size(&"font_size")).x
 			assert_float(width).is_less_equal(label.size.x - CLIP_MARGIN)
 			if not texts.has(String(label.text)):
 				texts.append(String(label.text))
@@ -293,7 +293,7 @@ func test_every_away_line_fits_the_reveal_packet_in_real_font_metrics() -> void:
 				continue
 			var width := label.get_theme_font("font").get_string_size(
 				String(label.text), HORIZONTAL_ALIGNMENT_LEFT, -1,
-				label.get_theme_font_size("font")).x
+				label.get_theme_font_size(&"font_size")).x
 			assert_float(width).is_less_equal(label.size.x - CLIP_MARGIN)
 	packet.queue_free()
 

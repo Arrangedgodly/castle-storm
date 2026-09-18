@@ -158,7 +158,11 @@ func _composition_line() -> String:
 	if regime_name.is_empty():
 		regime_name = "Crown"
 	var garrison := AssaultPresenter.garrison_line(_view, regime_name)
-	return "Against %s — %s; our sworn number %d." % [
+	# THE TAIL, SHORTENED AT THE ROOT (the readability pass): the raised
+	# clerk's hand (ChronicleLine 24) pushed the worst composition past
+	# the portrait strip's label width; the facts already live on the
+	# castle card's own plate, so the strip's tail prints as "ours N."
+	return "Against %s — %s; ours %d." % [
 		Inks.regime_with_article(regime_name), garrison.to_lower(), int(_view["army_power"])]
 
 

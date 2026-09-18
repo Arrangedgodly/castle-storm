@@ -36,6 +36,19 @@ extends HBoxContainer
 		glyph_ink = value
 		_sync_glyph()
 
+## THE LABEL INK (the readability pass): the pip rail prints ON THE TABLE
+## GROUND (dark at every phase but aftermath), so its labels follow the
+## print rule — paper-bright on dark grounds, ink on the pale aftermath
+## — chosen by the binder from Inks.ground_text_ink(ground). The theme's
+## INK_SOFT default is the paper-plate value; on the ground it washed out
+## (the audit's least-readable text: the triple encoding's TEXTUAL
+## channel!). Binders that print on paper keep the theme default by not
+## setting this.
+@export var label_ink: Color = Inks.INK_SOFT:
+	set(value):
+		label_ink = value
+		_sync_label_ink()
+
 const GLYPH_SCENE := preload("res://ui/theme/pip_glyph.tscn")
 
 var _glyph: Control
@@ -76,6 +89,7 @@ func _rebuild() -> void:
 	_name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	column.add_child(_name_label)
 	add_child(column)
+	_sync_label_ink()
 	_refresh()
 
 
@@ -89,3 +103,10 @@ func _refresh() -> void:
 func _sync_glyph() -> void:
 	if _glyph != null:
 		_glyph.set("glyph_ink", glyph_ink)
+
+
+func _sync_label_ink() -> void:
+	if _amount_label != null:
+		_amount_label.add_theme_color_override("font_color", label_ink)
+	if _name_label != null:
+		_name_label.add_theme_color_override("font_color", label_ink)

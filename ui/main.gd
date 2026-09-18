@@ -214,7 +214,7 @@ func _compose_title() -> void:
 
 	var name_label := Label.new()
 	name_label.theme_type_variation = &"CardTitle"
-	name_label.add_theme_font_size_override("font_size", TypeScale.scaled(42))
+	name_label.add_theme_font_size_override("font_size", TypeScale.scaled(44))
 	name_label.text = GAME_NAME
 	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE

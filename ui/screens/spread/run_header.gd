@@ -47,7 +47,9 @@ const PLATE_SEPARATION := 14.0
 var _name_plate: Control
 var _name_label: Label
 var _rule: Control
+var _regime_plate: Control
 var _regime_label: Label
+var _time_plate: Control
 var _time_label: Label
 var _cycle_mark: Control
 
@@ -90,18 +92,36 @@ func _ready() -> void:
 	_rule.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	_rule.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_rule)
+	_regime_plate = Control.new()
+	_regime_plate.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_regime_plate)
 	_regime_label = Label.new()
 	_regime_label.theme_type_variation = &"RoleLine"
-	_regime_label.clip_text = true
+	# THE REGIME PLATE WRAPS (the readability pass): at 1.3x on the 720
+	# portrait strip the measured regime print ("THE PAPER CROWN" 214px)
+	# plus the raised clock plate starve the name below its word budget
+	# (a single "Bartholomew" needs 242px — the letterhead pin caught the
+	# word overflowing the shrunk plate). The plate takes a refit-capped
+	# width and the print wraps to a second line — paper flow, never a
+	# clipped regime and never a starved name. The label does NOT clip
+	# (the 4.7 autowrap+clip defect draws only line 1); its wrapper is a
+	# plain Control, so the row's height stays the refit's pure function
+	# (the same determinism seam as the name plate above).
+	_regime_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_regime_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	_regime_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(_regime_label)
+	_regime_plate.add_child(_regime_label)
+	_regime_label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_time_plate = Control.new()
+	_time_plate.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_time_plate)
 	_time_label = Label.new()
 	_time_label.theme_type_variation = &"PipLabel"
-	_time_label.clip_text = true
+	_time_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_time_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	_time_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(_time_label)
+	_time_plate.add_child(_time_label)
+	_time_label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_cycle_mark = CycleMark.new()
 	_cycle_mark.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	_cycle_mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -127,23 +147,46 @@ func _text_width(label: Label) -> float:
 		-1.0, label.get_theme_font_size(&"font_size")).x
 
 
-## The plates' minimums fit their own text: the authored base grown by the
-## type factor, or the measured text plus a pad — whichever is wider. A
-## plate never clips its print ("THE GILDED CROWN" measured 209px at 1.3x;
-## the old fixed plate was 195px). Measured on every bind so a longer
-## regime name or clock simply widens its plate and the name cedes the
-## difference (wrapping another line if it must). The escalation mark's
-## width counts only while it is VISIBLE (the deterministic wrap is a
-## function of text + factor + strip width + the mark's state).
+## The measured width of the WIDEST WORD (the wrap-atomic unit — a plate
+## narrower than its widest word clips mid-word, the letterhead pin's
+## 1.3x find).
+func _widest_word_width(label: Label) -> float:
+	var font: Font = label.get_theme_font(&"font")
+	var size := label.get_theme_font_size(&"font_size")
+	var widest := 0.0
+	for word in label.text.split(" "):
+		widest = maxf(widest, font.get_string_size(String(word),
+			HORIZONTAL_ALIGNMENT_LEFT, -1.0, size).x)
+	return widest
+
+
+## The plates' UNCAPPED minimums (their measured text plus a pad; the
+## authored bases grown by the type factor floor them). Measured on every
+## bind; the STRIP-AWARE caps are refit's business (below) — bind cannot
+## know the strip width. Heights stay 0 here: the wrap heights are the
+## REFIT's pure function of the strip width (a bind-time height guess
+## spikes the row's minimum and the topology lays the table at the
+## spike — the -48px spread the layout-hash pin caught).
 func _fit_plates() -> void:
 	if _regime_label == null:
 		return
-	_regime_label.custom_minimum_size = Vector2(maxf(
+	var regime_w := maxf(
 		REGIME_PLATE_BASE * TypeScale.factor(),
-		_text_width(_regime_label) + PLATE_PAD), 0.0)
-	_time_label.custom_minimum_size = Vector2(maxf(
+		_text_width(_regime_label) + PLATE_PAD)
+	var time_w := maxf(
 		TIME_PLATE_BASE * TypeScale.factor(),
-		_text_width(_time_label) + PLATE_PAD), 0.0)
+		_text_width(_time_label) + PLATE_PAD)
+	_set_plate_mins(regime_w, 0.0, time_w, 0.0)
+
+
+## The wrappers are plain Controls (the refit's one authority — see the
+## _ready note), so their mins are set HERE only.
+func _set_plate_mins(regime_w: float, regime_h: float,
+		time_w: float, time_h: float) -> void:
+	if _regime_plate == null or _time_plate == null:
+		return
+	_regime_plate.custom_minimum_size = Vector2(regime_w, regime_h)
+	_time_plate.custom_minimum_size = Vector2(time_w, time_h)
 
 
 ## Re-fit the letterhead's budgets for one strip width (called by the
@@ -151,19 +194,50 @@ func _fit_plates() -> void:
 ## the row's height is a PURE function of text + type factor + strip
 ## width — never of which width a previous layout pass happened to leave
 ## behind; the layout-hash determinism pin caught exactly that drift).
+##
+## THE WORD-BUDGET SHARE (the readability pass): the name's plate keeps
+## at least its widest word (a word cannot wrap). The regime and clock
+## plates CAP at their share of what remains and their prints WRAP (the
+## plates' heights are the measured wraps at the capped widths — pure).
+## A plate whose measured print fits under its cap keeps it whole.
 func refit(strip_w: float) -> void:
 	if _name_plate == null or _rule == null:
 		return
-	_fit_plates()
-	var others := _rule.get_combined_minimum_size().x \
-		+ _regime_label.custom_minimum_size.x \
-		+ _time_label.custom_minimum_size.x \
-		+ 3.0 * PLATE_SEPARATION
+	var fixed := _rule.get_combined_minimum_size().x + 3.0 * PLATE_SEPARATION
 	if _cycle_mark != null and _cycle_mark.visible:
-		others += _cycle_mark.get_combined_minimum_size().x + PLATE_SEPARATION
-	var avail := maxf(160.0, strip_w - others)
+		fixed += _cycle_mark.get_combined_minimum_size().x + PLATE_SEPARATION
 	var font: Font = _name_label.get_theme_font(&"font")
 	var size_now: int = _name_label.get_theme_font_size(&"font_size")
+	var name_need := _widest_word_width(_name_label) + 4.0
+	var name_need_w := maxf(160.0, name_need)
+	# The regime (62%) and clock (the rest) split what the strip can spare
+	# beyond the name's word budget and the fixed chrome. A plate never
+	# goes below its own widest word (words cannot wrap) — the word floor
+	# beats the cap; the print wraps when the cap binds.
+	var regime_measured := _text_width(_regime_label) + PLATE_PAD
+	var regime_word := _widest_word_width(_regime_label) + PLATE_PAD
+	var time_measured := _text_width(_time_label) + PLATE_PAD
+	var time_word := _widest_word_width(_time_label) + PLATE_PAD
+	var spare := maxf(160.0, strip_w - fixed - name_need_w)
+	var regime_w := clampf(regime_measured,
+		minf(REGIME_PLATE_BASE * TypeScale.factor(), 90.0), spare * 0.62)
+	regime_w = clampf(maxf(regime_w, regime_word), 60.0, regime_measured)
+	var time_w := clampf(time_measured,
+		minf(TIME_PLATE_BASE * TypeScale.factor(), 80.0), maxf(60.0, spare - regime_w))
+	time_w = clampf(maxf(time_w, time_word), 60.0, time_measured)
+	# The wraps at the capped widths (the labels autowrap; the wrappers
+	# carry the measured heights so the row never lies about its size).
+	var rfont: Font = _regime_label.get_theme_font(&"font")
+	var rsize := _regime_label.get_theme_font_size(&"font_size")
+	var regime_h := rfont.get_multiline_string_size(_regime_label.text,
+		HORIZONTAL_ALIGNMENT_LEFT, regime_w - PLATE_PAD, rsize).y
+	var tfont: Font = _time_label.get_theme_font(&"font")
+	var tsize := _time_label.get_theme_font_size(&"font_size")
+	var time_h := tfont.get_multiline_string_size(_time_label.text,
+		HORIZONTAL_ALIGNMENT_LEFT, time_w - PLATE_PAD, tsize).y
+	_set_plate_mins(regime_w, regime_h, time_w, time_h)
+	var others := fixed + regime_w + time_w
+	var avail := maxf(name_need_w, strip_w - others)
 	var wrapped := font.get_multiline_string_size(_name_label.text,
 		HORIZONTAL_ALIGNMENT_LEFT, avail, size_now)
 	# The plate's minimum is the row's one authority (the wrapper ignores
@@ -237,7 +311,7 @@ class CycleMark:
 	func _ready() -> void:
 		_label = Label.new()
 		_label.theme_type_variation = &"Numerals"
-		_label.add_theme_font_size_override("font_size", TypeScale.scaled(15))
+		_label.add_theme_font_size_override("font_size", TypeScale.scaled(17))
 		_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		_label.clip_text = true
@@ -253,7 +327,7 @@ class CycleMark:
 			# Re-apply the baked size each reprint — the press-room's live
 			# type-scale step re-flows a letterhead composed at another
 			# factor the next time a hand binds.
-			_label.add_theme_font_size_override("font_size", TypeScale.scaled(15))
+			_label.add_theme_font_size_override("font_size", TypeScale.scaled(17))
 			_label.text = str(value)
 
 	func _draw() -> void:
