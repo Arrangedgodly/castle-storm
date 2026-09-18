@@ -11,3 +11,4 @@ reports/
 tools/
 .impeccable/decision-payload.json
 .impeccable/questions/
+.impeccable/critique/
