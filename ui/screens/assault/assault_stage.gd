@@ -58,9 +58,13 @@ const STANDOFF_GAP := 10.0
 const MARGIN := 14.0
 const GAP := 10.0
 ## Portrait rank cards stack taller than the shared print-scale cap (the
-## vertical reserve, finishing #4): a small host ranks at 168-unit cards
+## vertical reserve, finishing #4): a small host ranks at 184-unit cards
 ## instead of 132, so the foot of the portrait lane carries its weight.
-const RANK_MAX_H_PORTRAIT := 168.0
+## READABILITY r2: 168 -> 184 and BOTH orientations rank at it now — the
+## contribution plates need 143-wide cards to print their line at 18px
+## with air ("10 sword · 5 gear" measures 114 at 18); at the round-1 cap
+## the fit landed at 16 (the audit's TINY).
+const RANK_MAX_H := 184.0
 
 ## The regime under assault (tints ground + hairlines + garrison ink).
 var regime_id: StringName = &"":
@@ -648,10 +652,14 @@ func _beat_targets(fraction: float) -> void:
 func _place_ranks() -> void:
 	if _layout.is_empty() or _ranks.is_empty():
 		return
-	# Portrait ranks stack taller (the vertical reserve, finishing #4); the
-	# landscape band keeps the shared print-scale cap — same value as the
-	# statics' default, so landscape rects stay bit-identical.
-	var rank_max := RANK_MAX_H_PORTRAIT if portrait else 132.0
+	# THE HOME BAND PRINTS BIG (readability r2): both orientations rank at
+	# the tall cap now — the round-1 landscape cap (132) starved the
+	# contribution plates to ~85px and the fit shaved glyphs edge-to-edge
+	# (the verifier's capture find). 184-tall ranks are 143 wide: the
+	# contribution line prints at its authored base with air. The LINE
+	# formation keeps the shared smaller cap (the depth cue of cards
+	# pressing at the wall).
+	var rank_max := RANK_MAX_H
 	var seats := army_seats(_layout["army"], _ranks.size(), rank_max)
 	var card_size := army_card_size(_layout["army"], _ranks.size(), rank_max)
 	for i in _ranks.size():
@@ -707,7 +715,12 @@ static func lane_layout(p_portrait: bool, bounds: Vector2) -> Dictionary:
 	var m := MARGIN
 	var gap := GAP
 	var wide := maxf(0.0, bounds.x - 2.0 * m)
-	var title := Rect2(Vector2(m, m + 2.0), Vector2(wide, 46.0))
+	# The title band honors the type factor (r2): the display face's line
+	# height passes the bare 46 band at 1.3x and its text overdrew the
+	# meter's confidence line below (the audit's occlusion find). At the
+	# default factor this is exactly the round-1 46.
+	var title := Rect2(Vector2(m, m + 2.0),
+		Vector2(wide, maxf(46.0, float(TypeScale.scaled(44)) + 2.0)))
 	var actions := Rect2(Vector2(m, bounds.y - m - float(Inks.TOUCH_GRIP_MIN) - 12.0),
 		Vector2(wide, float(Inks.TOUCH_GRIP_MIN) + 12.0))
 	var chronicle := Rect2(
@@ -720,8 +733,16 @@ static func lane_layout(p_portrait: bool, bounds: Vector2) -> Dictionary:
 	if p_portrait:
 		var lane_top := title.end.y + gap
 		var lane_height := maxf(120.0, lane_bottom - lane_top)
-		var castle_w := clampf(wide * 0.34, 120.0, 208.0)
-		var castle_h := clampf(lane_height * 0.5, 120.0, castle_w * 1.3)
+		# THE CASTLE GROWS (readability r2): the round-1 seat (120-208 wide)
+		# starved the garrison plates into 14-16px steps and the wrapped
+		# share line's second plate clipped at the card's bottom edge. The
+		# card now grants its face the width the garrison line needs at the
+		# authored size ("garrison 50 · our ranks" measures 188px at 22 —
+		# a 244-wide card prints it whole with air) and the height its
+		# face's honest minimum implies (crest + title + rule + the
+		# two-plate share line).
+		var castle_w := clampf(wide * 0.36, 170.0, 244.0)
+		var castle_h := clampf(lane_height * 0.5, 190.0, castle_w * 1.3)
 		var castle := Rect2(
 			Vector2(m + (wide - castle_w) * 0.5, lane_top),
 			Vector2(castle_w, castle_h))
@@ -749,7 +770,9 @@ static func lane_layout(p_portrait: bool, bounds: Vector2) -> Dictionary:
 	var meter := Rect2(title.position + Vector2(0, title.size.y + gap), Vector2(wide, 86.0))
 	var lane_top := meter.end.y + gap
 	var lane_height := maxf(120.0, lane_bottom - lane_top)
-	var castle_size := Vector2(clampf(wide * 0.22, 150.0, 210.0), clampf(lane_height, 140.0, 272.0))
+	# The castle grows in landscape too (readability r2 — see the portrait
+	# note): the garrison plates print at the authored size with air.
+	var castle_size := Vector2(clampf(wide * 0.22, 170.0, 244.0), clampf(lane_height, 190.0, 272.0))
 	var castle_l := Rect2(
 		Vector2(bounds.x - m - castle_size.x, lane_top + (lane_height - castle_size.y) * 0.5),
 		castle_size)
@@ -769,8 +792,9 @@ static func lane_layout(p_portrait: bool, bounds: Vector2) -> Dictionary:
 ## actually FITS the band on both axes. Area heuristics quantize badly
 ## (a width-derived column count can overflow height); the scan
 ## guarantees no settled formation ever overlaps or spills. Deterministic
-## in (band, count) alone.
-static func _fit_grid(band: Rect2, count: int, min_h := 56.0, max_h := 132.0) -> Dictionary:
+## in (band, count) alone. The floor is 84 (readability r2 — a rank card
+## below it cannot print its plates whole even wrapped).
+static func _fit_grid(band: Rect2, count: int, min_h := 84.0, max_h := 132.0) -> Dictionary:
 	const ASPECT := 0.78
 	if count <= 0:
 		return {"size": Vector2(96.0, 120.0), "cols": 1}
@@ -788,10 +812,10 @@ static func _fit_grid(band: Rect2, count: int, min_h := 56.0, max_h := 132.0) ->
 
 
 ## Uniform card size for a ranked band (the fitted grid's card). `max_h`
-## raises the cap for the portrait home band (the vertical reserve); the
+## raises the cap for the home band (the vertical reserve); the
 ## default is the shared print-scale cap, so existing calls are unchanged.
 static func army_card_size(band: Rect2, count: int, max_h := 132.0) -> Vector2:
-	return _fit_grid(band, count, 56.0, max_h)["size"]
+	return _fit_grid(band, count, 84.0, max_h)["size"]
 
 
 ## Grid seats for the ranked band (row-major, centered) — deterministic
@@ -800,7 +824,7 @@ static func army_seats(band: Rect2, count: int, max_h := 132.0) -> Array[Vector2
 	var seats: Array[Vector2] = []
 	if count <= 0:
 		return seats
-	var fit: Dictionary = _fit_grid(band, count, 56.0, max_h)
+	var fit: Dictionary = _fit_grid(band, count, 84.0, max_h)
 	var card: Vector2 = fit["size"]
 	var cols := int(fit["cols"])
 	var rows := ceili(float(count) / float(cols))
@@ -927,12 +951,15 @@ class RankCard:
 		inset.add_child(column)
 		var name_label := Label.new()
 		name_label.theme_type_variation = &"RoleLine"
-		# THE RANK PLATES (the readability pass): the old baked 14/11 left
-		# names and contributions at the bottom of the audit's TINY list
-		# (the odds capture's "10 sword · 5 gear" printed ~8px physical).
-		# Raised bases + the shared full-fit: whole at the largest size
-		# the rank card's width grants.
-		name_label.add_theme_font_size_override("font_size", TypeScale.scaled(17))
+		# THE RANK PLATES (readability r2): the plates run the shared
+		# card-grammar fit — authored base, the 12px READABILITY FLOOR
+		# (never below), air kept inside the plate (no edge-to-edge
+		# glyphs — the round-1 full-fit shaved them), and the contribution
+		# line WRAPS to a second plate before any grow. The refit keys on
+		# the LABELS' own widths (the rank card's width can be stale at
+		# bind — the snap lands after) and re-runs deferred (one pass
+		# after the container's sort grants the final widths).
+		name_label.add_theme_font_size_override("font_size", TypeScale.scaled(18))
 		name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		name_label.clip_text = true
 		name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -941,7 +968,7 @@ class RankCard:
 		column.add_child(name_label)
 		var role_label := Label.new()
 		role_label.theme_type_variation = &"PipLabel"
-		role_label.add_theme_font_size_override("font_size", TypeScale.scaled(14))
+		role_label.add_theme_font_size_override("font_size", TypeScale.scaled(18))
 		role_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		role_label.clip_text = true
 		role_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -972,14 +999,19 @@ class RankCard:
 		# T-UI-03 clip fail-safe ever engages. Text changes refit directly;
 		# width changes arrive through the plates' `resized`.
 		_refit_plates()
+		_refit_plates.call_deferred()  # the post-sort widths (see _ready)
 		var pips := _plate(&"Pips") as ContributionPips
 		if pips != null:
 			pips.bind(int(entry["def_power"]), int(entry["gear_power"]))
 
 
-	## The rank plates' fit (see CardFace.fit_label_to_width — same grammar,
-	## locally baked sizes). Guarded by text+width so the fit's own min-size
-	## ripple cannot ping-pong the relayout.
+	## The rank plates' fit (see CardFace.fit_label_to_width — the shared
+	## grammar at locally baked bases): the name at 18→12, the
+	## contribution line at 18→12 with WRAP when the CARD has the vertical
+	## room (a sliver cell keeps the one-line floor — and the wrap flag is
+	## read off the card's own height, never the label's, so the fit's
+	## outcome cannot feed its own input). Guarded by the LABELS' own
+	## widths so the fit's min-size ripple cannot ping-pong the relayout.
 	var _fit_key := ""
 
 	func _refit_plates() -> void:
@@ -987,14 +1019,16 @@ class RankCard:
 		var role_plate := _plate(&"RolePlate") as Label
 		if name_plate == null or role_plate == null:
 			return
-		var key := "%s|%s@%.1f" % [name_plate.text, role_plate.text, size.x]
+		var wrap := size.y >= float(Inks.TOUCH_GRIP_MIN * 2)
+		var key := "%s|%s@%.1f@%.1f@%s" % [
+			name_plate.text, role_plate.text, name_plate.size.x, role_plate.size.x, wrap]
 		if key == _fit_key:
 			return
 		_fit_key = key
-		# Full-fit at the raised local bases (the readability pass — the
-		# old 0.7/0.75 floors clipped; shrink-to-whole replaced them).
-		CardFace.fit_label_to_width(name_plate, 0.0, 2, TypeScale.scaled(17))
-		CardFace.fit_label_to_width(role_plate, 0.0, 1, TypeScale.scaled(14))
+		CardFace.fit_label_to_width(name_plate, 0.0, 2, TypeScale.scaled(18),
+			CardFace.MIN_FIT_SIZE)
+		CardFace.fit_label_to_width(role_plate, 0.0, 1, TypeScale.scaled(18),
+			CardFace.MIN_FIT_SIZE, wrap)
 
 
 	## Land on the authored target right now (the CardMotion rule: a

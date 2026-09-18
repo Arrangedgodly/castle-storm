@@ -288,6 +288,14 @@ arm's-length scale):
   channel ("FOOD", "TIMBER", "IRON") and the run clock plate.
 - **Button** (Alegreya Sans Regular, 24px): chip labels.
 
+THE READABILITY FLOOR (r2): no rendered text below 12 design units at 1.0x
+(18 for card titles) — a plate's print steps down to the floor and never past
+it; below the small-print line (17) a multi-word print wraps (the card's
+height permitting) or the plate grows. The audit of record is
+`scripts/readability_audit.gd`: 0 CLIP / 0 OVERFLOW / 0 WRAP-CLIP /
+0 OCCLUSION / 0 SUB-FLOOR at 1.0x both orientations, TINY within the
+count baseline; 1.3x is floor-check only.
+
 ### The font-scale seam
 
 `ui/theme/type_scale.gd` multiplies the whole ladder by `castle_storm/type/scale`,
@@ -346,12 +354,17 @@ never lose their place; the incoming slot always ends focus-enabled.
 
 **The spread itself** is `CardSpread` (`ui/layout/card_spread.gd`), a custom Container
 with pure, test-pinned math: STACKED mode is a centered grid (2 columns default,
-adaptive ladder to 5 — `SpreadCards.adaptive_columns` keeps every row at or above a
-96-unit card grip); PANORAMIC mode is an arc along the table's width — cards
-bottom-align with a parabolic lift (center highest, `arc_depth` 24), rotation swinging
-±10° end-to-center, overlapping like a held fan (min advance 55% of a card width) when
-the table is narrow. Cards keep aspect 0.68 (w/h), capped at 330 units tall; 36 units
-of rotation slack reserve height for the rotated bounding boxes.
+adaptive ladder to 5 — `SpreadCards.adaptive_columns` grants the WIDEST aspect-true
+card across the column range, ties keeping the fewer columns — cards GROW instead of
+shrinking, and a cell with width to spare never prints narrower than
+MIN_READABLE_CARD_W 164 unless it is a sliver); PANORAMIC mode is an arc along the
+table's width — cards bottom-align with a parabolic lift (center highest,
+`arc_depth` 24), rotation swinging ±10° end-to-center, overlapping like a held fan
+(min advance 55% of a card width) when the table is narrow — and its honest minimum
+is the FULLY-PACKED span (one grip card: the layout packs that far, never wider, so
+an unattended offer pile cannot shear the table off the screen). Cards keep aspect
+0.68 (w/h) where the cell allows, capped at 330 units tall; 36 units of rotation
+slack reserve height for the rotated bounding boxes.
 
 **Density rhythm:** 12-unit table edge margin, 18-unit pip-rail separation, 20-unit
 card gaps, 6-unit chronicle-row separation, 16-unit header-strip separation. The run
@@ -433,13 +446,20 @@ button chips, 5px on paper panels (theme styleboxes).
 - **CardFace** (`ui/theme/card_face.gd/.tscn`): the face plate — art slot + name plate
   (display face) + solid under-title rule (portrait cue) + role line (soft
   ink). Reflows portrait-stacked vs landscape-side-by-side on its own aspect
-  hysteresis (flip above 1.15, back below 1.0). The plate fit (the
-  readability pass — the 55%/70% clip floors are GONE): a plate's print
-  steps its font down until the WHOLE text fits (shrink-to-full-fit,
-  absolute 8px floor); a clipped print is a bug, a small whole print is
-  density. clip_text stays only as the never-engaged-by-real-copy last
-  resort (the label still fails safe at the plate edge, never past the
-  card).
+  hysteresis (flip above 1.15, back below 1.0). The plate fit (readability
+  r2 — grow, don't shrink): a plate's print steps its font down from its
+  authored base toward the READABILITY FLOOR (12 design units; card titles
+  18) and never past it. A multi-word print that only reaches the
+  small-print line on one plate WRAPS first (whole words, the letterhead's
+  move, when the card has the height for the second line); a print that
+  cannot wrap GROWS the plate (custom minimum to the floor-size print +
+  air) and renders whole. The fit measures the widest LINE (a `\n`-split
+  print is two plates of print) and keeps FIT_MARGIN air so glyphs never
+  print edge-to-edge. clip_text stays only as the render fail-safe at the
+  plate edge, never past the card. At extreme roster density (a 5-column
+  phone grid of 30+ units) the cells are slivers: one-line prints at the
+  12px floor are the density answer, and the floor is the line density
+  cannot cross.
 - **FaceSlot + FaceArt + the print shader** (`ui/theme/face_slot.gd`, `face_art.gd`,
   `face_print.gdshader`): face art resolves through the content art manifest — one
   `atlas_region` cell of the vendored Kenney Toon Character pose sheets (uniform 9×5
@@ -496,7 +516,10 @@ button chips, 5px on paper panels (theme styleboxes).
   reason in soft ink. Buttons with the theme's chip styles (4px radius, 14/9 padding,
   PAPER_DIM rest / PAPER hover / PRESSED-PAPER pressed / FADED-PAPER disabled); focus
   is the red offset pass; the fan is a cyclic focus trap; the hint strip prints
-  "choose — act — back". Disabled chips stay focusable so pad players can read why.
+  "choose — act — back" ON ITS OWN PAPER SLIVER (readability r2: a bare soft-ink
+  caption half-vanished on the dark table wherever the fan overhung a card's
+  edge), and the strip is the fan's last row — grown chips stack above it, never
+  onto it. Disabled chips stay focusable so pad players can read why.
 - **WatchfulEye** (`ui/screens/spread/watchful_eye.gd`): suspicion as a CARD — a
   seal-less frame creeping in from the right-edge perch (position), edge by line form
   (solid watching / dashed closing / struck telegraph-armed), a drawn almond eye whose

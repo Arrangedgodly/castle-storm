@@ -15,25 +15,33 @@ extends BoxContainer
 
 const RULE_SCENE := preload("res://ui/theme/rule_mark.tscn")
 
-## THE PLATE FIT (the readability pass — the 55%/70% clip floors are GONE):
-## a plate's print steps its font DOWN to the plate's width until the
-## WHOLE text fits — shrink-to-full-fit, never a floored clip. The base
-## is re-read from the live theme on every fit (override cleared first),
-## so the TypeScale factor and any whole-view rebind stay authoritative;
-## `p_base` > 0 pins the base instead (plates that bake a LOCAL size —
-## the castle's one-size-down title, the odds roster's rank plates).
-## The only remaining floor is ABSOLUTE (MIN_FIT_SIZE) so a degenerate
-## string cannot step a plate into unreadable nothing: below it the
-## label's clip_text stays as the documented LAST resort (fail-SAFE —
-## the print stops at the plate edge, never past the card). Real content
-## never reaches it: at every roster density the layout grants, pool
-## names and role lines fit whole above the floor (the readability
-## audit, scripts/readability_audit.gd, runs this inventory headless).
-## At extreme roster density the table's arithmetic bounds how wide any
-## card can print; the honest answer there is whole-but-small — a clipped
-## print is a bug, a small whole print is density.
-const MIN_FIT_SIZE := 8
+## THE READABILITY FLOOR (readability r2 — grow, don't shrink): the
+## round-1 shrink-to-full-fit converted CLIP into TINY (the verifier's
+## find: card titles fitted to 8px). The fit now operates ONLY between
+## the authored base and the FLOOR — a print never renders below it:
+##
+##   MIN_FIT_SIZE (12)  — the hard readability floor, every plate.
+##   TITLE_FLOOR (18)   — card-name plates (the display face); clears
+##                        the audit's <17px TINY bar with margin.
+##
+## When the WHOLE text cannot fit the plate even at the floor, THE PLATE
+## GROWS: `custom_minimum_size.x` rises to the floor-size print + air
+## (the card/panel minimums follow it up through the containers), and
+## the print stays whole at the floor. Card TITLES have a wider move
+## first: they WRAP to the plate like every long print in this world
+## (the letterhead's own move — the epithet drops a line), one-line fit
+## preferred, the widest word carried whole. clip_text stays only as the
+## render fail-safe at the plate edge (never past the card) — the floor
+## + wrap + grow chain keeps real copy off it. The fit measures the
+## WIDEST LINE (a "\n" split is two plates of print, never one long
+## line — the round-1 fit measured the castle's wrapped garrison line
+## concatenated and over-stepped it). The fit also keeps AIR inside the
+## plate (FIT_MARGIN a side) so glyphs never print edge-to-edge.
+const MIN_FIT_SIZE := 12
+const TITLE_FLOOR := 18
+const WRAP_BELOW := 17  # one-line prints landing under this wrap first
 const FIT_STEP := 2
+const FIT_MARGIN := 2.0
 
 ## The castle title's one-size-down base is a PROPERTY of the face now
 ## (the old _ready override was silently WIPED by the fit's base re-read
@@ -169,31 +177,52 @@ var _role_fit_key := ""
 
 func _refit_plates() -> void:
 	if _name_label != null:
-		var key := "%s@%.1f@%d" % [_name_label.text, _name_label.size.x, title_base]
+		var wrap := _plates_may_wrap()
+		var key := "%s@%.1f@%d@%s" % [_name_label.text, _name_label.size.x, title_base, wrap]
 		if key != _name_fit_key:
 			_name_fit_key = key
-			fit_label_to_width(_name_label, 0.0, FIT_STEP, title_base)
+			# Titles: the display face keeps its plate down to TITLE_FLOOR
+			# and wraps (paper flow) before any grow.
+			fit_label_to_width(_name_label, 0.0, FIT_STEP, title_base, TITLE_FLOOR, wrap)
 	if _role_label != null:
-		var key := "%s@%.1f" % [_role_label.text, _role_label.size.x]
+		var wrap := _plates_may_wrap()
+		var key := "%s@%.1f@%s" % [_role_label.text, _role_label.size.x, wrap]
 		if key != _role_fit_key:
 			_role_fit_key = key
-			fit_label_to_width(_role_label, 0.0, FIT_STEP)
+			# Roles wrap under the small-print line too (the plate's
+			# height permitting — see the fit's wrap contract).
+			fit_label_to_width(_role_label, 0.0, FIT_STEP, -1, MIN_FIT_SIZE, wrap)
+
+
+## Whether the plates may take a second line: the face must hold the art
+## slot's grip PLUS a two-line plate — a roomy card wraps (paper flow);
+## a sliver cell (the density answer) keeps one-line prints at the floor
+## so the card's honest minimum stays within its row. Read off the FACE's
+## own granted height — one level above the labels — so the fit's outcome
+## can never feed its own input (the label-height version re-entered
+## `resized` mid-sort and recursed; the suite's stack-overflow find).
+func _plates_may_wrap() -> bool:
+	return size.y >= float(Inks.TOUCH_GRIP_MIN) + 2.0 * float(TypeScale.scaled(24))
 
 
 ## THE PLATE FIT, shared by every card grammar surface (the spread's card
 ## faces, the castle card, the assault roster's rank plates): step the
 ## label's font down from its base (THEMED — override cleared, so the
-## TypeScale factor stays authoritative — or `p_base` when pinned) until
-## the WHOLE text fits the label's width. `floor_ratio` is retained in
-## the signature for call-site compatibility and is IGNORED (the old
-## 55%/70% floors clipped; the readability pass replaced them with
-## shrink-to-full-fit). The absolute MIN_FIT_SIZE bounds the step-down;
-## below it the label's clip_text is the last-resort fail-safe (never
-## past the card). Returns the applied size (0 when the label is not
-## measurable yet). Pure given text + theme + width: same state -> same
-## size, so view hashes stay deterministic.
+## TypeScale factor stays authoritative — or `p_base` when pinned) toward
+## `p_floor` (the readability floor; -1 = MIN_FIT_SIZE) until the WHOLE
+## text fits the plate with air (FIT_MARGIN a side). The step-down NEVER
+## passes the floor: below it the plate GROWS (custom_minimum_size.x to
+## the floor-size print + air — the containers carry the plate's minimum
+## up to the card/panel) and the print stays whole at the floor.
+##
+## `allow_wrap` (card TITLES): before growing, a multi-word title wraps
+## to the plate (the letterhead's own move) — one-line fit preferred;
+## only when even the WIDEST WORD cannot fit at the floor does the plate
+## grow. Pure given text + theme + width: same state -> same size, so
+## view hashes stay deterministic. Returns the applied size (0 when the
+## label is not measurable yet).
 static func fit_label_to_width(label: Label, _floor_ratio := 0.0, step := 2,
-		p_base := -1) -> int:
+		p_base := -1, p_floor := -1, allow_wrap := false) -> int:
 	if label == null or not is_instance_valid(label):
 		return 0
 	var width := label.size.x
@@ -208,11 +237,65 @@ static func fit_label_to_width(label: Label, _floor_ratio := 0.0, step := 2,
 		base = label.get_theme_font_size(&"font_size")
 	if base <= 0:
 		return 0
+	var floor_size := TypeScale.scaled(
+		p_floor if p_floor > 0 else MIN_FIT_SIZE)  # authored units -> live factor
+	var target := width - 2.0 * FIT_MARGIN
+	# One-line pass: the largest size at/above the floor whose widest
+	# LINE (" plates" split prints) fits the target.
 	var size := base
-	while size > MIN_FIT_SIZE:
-		if font.get_string_size(label.text, HORIZONTAL_ALIGNMENT_LEFT, -1.0, size).x <= width:
-			break  # the WHOLE text fits at this size — done
-		size = maxi(size - step, MIN_FIT_SIZE)  # the last step lands ON the floor
-	if size != base or p_base > 0:
+	while size > floor_size and _line_width(font, label.text, size) > target:
+		size = maxi(size - step, floor_size)  # the last step lands ON the floor
+	var one_line_fits := _line_width(font, label.text, size) <= target
+	if one_line_fits and size >= TypeScale.scaled(WRAP_BELOW):
+		_apply_size(label, size, base, p_base > 0)
+		return size
+	# The one-line print is unwritable at a readable size (it cannot fit
+	# its floor, or it only fits BELOW the small-print line). Titles and
+	# roles wrap first (paper flow — every line whole, the widest word
+	# carried) when the CALLER granted wrap room (`allow_wrap` — the
+	# caller reads its own stable geometry, never this label's height, so
+	# the fit's outcome cannot feed its own input). Without wrap room the
+	# honest print is the one-line floor.
+	var word_size := base
+	while word_size > floor_size and _word_width(font, label.text, word_size) > target:
+		word_size = maxi(word_size - step, floor_size)
+	if allow_wrap and _word_width(font, label.text, word_size) <= target:
+		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		_apply_size(label, word_size, base, p_base > 0)
+		return word_size
+	label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	# GROW, NOT CLIP (readability r2): the plate's minimum rises to the
+	# floor-size print + air; the print renders whole at the floor. A
+	# one-line print that FITS at its floor stays whole (never grown for
+	# air it already has) — grow only rescues a print that cannot fit.
+	if one_line_fits:
+		_apply_size(label, size, base, p_base > 0)
+		return size
+	var need := _line_width(font, label.text, floor_size) + 2.0 * FIT_MARGIN
+	label.custom_minimum_size.x = maxf(label.custom_minimum_size.x, need)
+	_apply_size(label, floor_size, base, p_base > 0)
+	return floor_size
+
+
+static func _apply_size(label: Label, size: int, base: int, pinned: bool) -> void:
+	if size != base or pinned:
 		label.add_theme_font_size_override(&"font_size", size)
-	return size
+
+
+## The widest LINE of a (possibly "\n"-split) print at one size.
+static func _line_width(font: Font, text: String, size: int) -> float:
+	var widest := 0.0
+	for line in text.split("\n"):
+		widest = maxf(widest,
+			font.get_string_size(line, HORIZONTAL_ALIGNMENT_LEFT, -1.0, size).x)
+	return widest
+
+
+## The widest WORD of a print at one size (the wrap-atomic unit).
+static func _word_width(font: Font, text: String, size: int) -> float:
+	var widest := 0.0
+	for line in text.split("\n"):
+		for word in line.split(" "):
+			widest = maxf(widest,
+				font.get_string_size(word, HORIZONTAL_ALIGNMENT_LEFT, -1.0, size).x)
+	return widest

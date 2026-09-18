@@ -72,6 +72,14 @@ const CARD_ASPECT := 0.68
 ## lone card must not become the whole table.
 const MAX_CARD_HEIGHT := 330.0
 
+## The narrowest card the grid grants when the cell has width to spare
+## (design units — readability r2): 132px of plate + the frame's insets,
+## the width the longest authored role captions print whole at ≥18px
+## ("drills in the yard" measures 123 at 18). Mid-density rosters widen
+## to it; the densest cells (5 columns) stay cell-bound (density — the
+## plates' 12px floor + wrap + grow carry those).
+const MIN_READABLE_CARD_W := 164.0
+
 ## Panoramic arc: lift of the center cards above the end cards, and the
 ## total rotation swing from end to center (degrees, per card at the ends).
 @export var arc_depth: float = 24.0:
@@ -200,13 +208,23 @@ static func panoramic_layout(count: int, bounds: Vector2, space: Vector2 = Vecto
 	return entries
 
 
-## Card size for a grid cell: aspect-true, height-capped, cell-clamped.
+## Card size for a grid cell: height-honest (the cell's height, capped),
+## width the aspect implies — clamped by the cell — then THE PLATES'
+## FLOOR (readability r2): a mid-density cell's aspect-true width can
+## starve the name/role plates into sub-floor steps ("drills in the
+## yard" fitted to 12px at the audited 13-card roster), so when the cell
+## has width to spare the card widens to the readable grant
+## (MIN_READABLE_CARD_W) and the plates keep their air. Height never
+## grows past the cell (the grid's honest rows contract).
 static func _card_size_for_cell(cell_w: float, cell_h: float) -> Vector2:
 	var card_h := minf(cell_h, MAX_CARD_HEIGHT)
 	var card_w := card_h * CARD_ASPECT
 	if card_w > cell_w:
 		card_w = cell_w
 		card_h = card_w / CARD_ASPECT
+	var wanted := minf(cell_w, MIN_READABLE_CARD_W)
+	if card_w < wanted and card_h >= float(Inks.TOUCH_GRIP_MIN * 2):
+		card_w = wanted  # never widen a sliver cell — the grip owns those
 	return Vector2(card_w, card_h)
 
 
@@ -215,8 +233,13 @@ static func _card_size_for_cell(cell_w: float, cell_h: float) -> Vector2:
 
 func _get_minimum_size() -> Vector2:
 	## Honest floor: the grid of card minimums (STACKED) or the
-	## overlap-packed span (PANORAMIC), plus the standing right reserve —
-	## parents sizing below this would clip cards under the touch grip.
+	## fully-packed fan span (PANORAMIC — the layout overlap-packs to a
+	## single card's width, so the floor is one grip card, not the loose
+	## span: a 30-offer pile's 55%-advance span exceeded the window and
+	## the root grew the whole screen past it, shearing the table off the
+	## screen — the r2 audit's landscape find), plus the standing right
+	## reserve — parents sizing below this would clip cards under the
+	## touch grip.
 	var controls: Array[Control] = _card_children()
 	if controls.is_empty():
 		return Vector2.ZERO
@@ -230,8 +253,7 @@ func _get_minimum_size() -> Vector2:
 		return Vector2(
 			float(cols) * cell.x + float(cols - 1) * space.x + right_reserve,
 			float(rows) * cell.y + float(rows - 1) * space.y)
-	return Vector2(
-		cell.x + float(controls.size() - 1) * cell.x * PANORAMA_MIN_ADVANCE + right_reserve,
+	return Vector2(cell.x + right_reserve,
 		cell.y + arc_depth + ROTATION_SLACK)
 
 

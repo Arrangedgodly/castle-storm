@@ -391,12 +391,17 @@ func test_stacked_minimum_size_is_the_grid_of_card_minimums() -> void:
 	assert_float(min_size.y).is_equal_approx(3.0 * 96.0 + 2.0 * 20.0, 0.01)
 
 
-func test_panoramic_minimum_size_is_the_overlap_packed_span() -> void:
+func test_panoramic_minimum_size_is_the_fully_packed_span() -> void:
+	# READABILITY r2 re-pinned: the minimum is ONE grip card wide (the
+	# layout overlap-packs to a single card's width, so that is the honest
+	# floor). The old 55%-advance span made a 30-card pile's minimum
+	# exceed the window and the root grew the whole screen past it — the
+	# table sheared off the screen (the r2 audit's landscape find).
 	var spread := _spread_with_cards(5)
 	spread.mode = CardSpread.Mode.PANORAMIC
 	spread.space = Vector2(20, 20)
 	var min_size: Vector2 = spread.get_combined_minimum_size()
-	assert_float(min_size.x).is_equal_approx(96.0 + 4.0 * 96.0 * CardSpread.PANORAMA_MIN_ADVANCE, 0.01)
+	assert_float(min_size.x).is_equal_approx(96.0, 0.01)
 	assert_float(min_size.y).is_greater_equal(96.0)
 
 

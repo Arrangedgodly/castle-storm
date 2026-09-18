@@ -39,21 +39,27 @@ signal action_refused(action: Dictionary)
 var card_id := ""
 
 var _chips: Array[ActionChip] = []
-var _hint: Label
+var _hint: Control
 
 
 func _ready() -> void:
 	add_theme_constant_override("separation", 6)
 	visible = false
-	_hint = Label.new()
-	_hint.theme_type_variation = &"RoleLine"
-	_hint.text = "choose — act — back"
-	_hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	# The hint's baked size (the readability pass raised it 16 -> 18; it is
-	# a caption, kept one rung under its RoleLine variation).
-	_hint.add_theme_font_size_override("font_size", TypeScale.scaled(18))
-	_hint.add_theme_color_override("font_color", Inks.INK_SOFT)
+	# THE HINT IS PAPER (readability r2): the round-1 hint was a bare
+	# soft-ink Label — over a card's paper it read, but the fan sits ON
+	# the table and its foot overhangs the card edge, where soft ink on
+	# the dark ground VANISHED ("ose — act — back"; the verifier's
+	# occlusion find). The strip is the fan's own paper stock: the hint
+	# legible over any ground, and the VBox contract reserves its row —
+	# grown chips stack ABOVE it, never onto it.
+	_hint = HintStrip.new()
 	add_child(_hint)
+
+
+## Open re-bakes the hint's print (the press-room's live type-scale step
+## re-flows a fan composed at another factor the next time it opens).
+func _sync_hint() -> void:
+	(_hint as HintStrip).reprint()
 
 
 ## Fan out over a card: rebuild the chips from the action model, trap the
@@ -64,7 +70,7 @@ func open(for_card_id: String, actions: Array[Dictionary]) -> void:
 	# The hint's baked size re-applies on every open — the press-room's
 	# live type-scale change (finishing refinement #5) re-flows a fan
 	# composed at another factor the next time it opens.
-	_hint.add_theme_font_size_override("font_size", TypeScale.scaled(18))
+	_sync_hint()
 	for chip in _chips:
 		chip.queue_free()
 	_chips.clear()
@@ -248,3 +254,58 @@ class ActionChip:
 		# The pressed chip re-inks its edge (the press's impression).
 		if pressed:
 			draw_rect(rect.grow(-2.0), Inks.INK, false, 2.0)
+
+
+## The fan hint's own paper strip (readability r2 — see _ready): the
+## "choose — act — back" caption on a small paper quad in the chips'
+## stock, soft ink, printed whole at its baked caption size. The strip's
+## minimum is its measured print + air (a plate grows, never clips);
+## the VBox reserves its row BELOW the chips — grown chips stack above,
+## never onto it (the fan-vs-hint layout contract).
+class HintStrip:
+	extends Control
+
+	const PAD_H := 10.0
+	const STRIP_H := 26.0
+
+	var _label: Label
+
+	func _init() -> void:
+		custom_minimum_size = Vector2(120.0, STRIP_H)
+		size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	func _ready() -> void:
+		_label = Label.new()
+		_label.theme_type_variation = &"RoleLine"
+		_label.text = "choose — act — back"
+		_label.add_theme_color_override("font_color", Inks.INK_SOFT)
+		_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		_label.clip_text = true  # render fail-safe only — the strip grows first
+		_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_label.set_anchors_preset(Control.PRESET_FULL_RECT)
+		_label.offset_left = PAD_H
+		_label.offset_right = -PAD_H
+		add_child(_label)
+		reprint()
+
+	## The strip's minimum is its measured print + air, at the CURRENT
+	## type factor (the open-time re-bake seam).
+	func reprint() -> void:
+		if _label == null:
+			return
+		_label.add_theme_font_size_override("font_size", TypeScale.scaled(18))
+		var font: Font = _label.get_theme_font(&"font")
+		var text_w := 120.0
+		if font != null:
+			text_w = font.get_string_size(_label.text,
+				HORIZONTAL_ALIGNMENT_LEFT, -1.0,
+				_label.get_theme_font_size(&"font_size")).x
+		custom_minimum_size = Vector2(text_w + 2.0 * PAD_H, STRIP_H)
+		queue_redraw()
+
+	func _draw() -> void:
+		# The chips' paper stock, ink-edged — the fan's foot rule.
+		draw_rect(Rect2(Vector2.ZERO, size), Inks.PAPER)
+		draw_rect(Rect2(Vector2.ZERO, size), Inks.INK, false, 1.0)

@@ -611,10 +611,14 @@ func test_fan_chips_are_grips_and_disabled_stay_printed() -> void:
 	fan.open("unit_1", _fan_actions())
 	await get_tree().process_frame
 	assert_int(fan.chips().size()).is_equal(3)
-	# The hint strip prints at the foot and is not focusable.
-	var hint := fan.get_child(fan.get_child_count() - 1) as Label
-	assert_str(hint.text).contains("choose")
+	# The hint strip prints at the foot on its own paper (readability r2:
+	# the bare caption's left glyphs landed on the dark table where the
+	# fan overhung a card and vanished) and is not focusable.
+	var hint := fan.get_child(fan.get_child_count() - 1) as Control
+	var hint_label := hint.get_child(0) as Label
+	assert_str(hint_label.text).contains("choose")
 	assert_int(hint.focus_mode).is_equal(Control.FOCUS_NONE)
+	assert_int(hint_label.focus_mode).is_equal(Control.FOCUS_NONE)
 	for chip in fan.chips():
 		var min_size: Vector2 = chip.get_combined_minimum_size()
 		assert_float(min_size.x).is_greater_equal(float(Inks.TOUCH_GRIP_MIN) - 0.01)

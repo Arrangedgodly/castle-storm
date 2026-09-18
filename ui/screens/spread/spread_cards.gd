@@ -71,23 +71,30 @@ static func rebind_card(frame: Control, card: Dictionary) -> bool:
 	return changed
 
 
-## The stacked-spread column count for a roster at a given table height:
-## the FEWEST columns (from 2) that keep every row at or above a full
-## card grip (2x touch grip), capped at MAX_STACKED_COLUMNS. Pure.
-static func adaptive_columns(card_count: int, bounds_height: float, space: float = 20.0) -> int:
-	if card_count <= 6:
+## The stacked-spread column count for a roster at a given table size:
+## THE READABILITY LADDER (r2 — cards grow, they do not shrink). The
+## round-1 ladder picked the FEWEST columns that kept rows above a grip
+## height — at a 10-card roster that dealt a 5-row grid whose aspect-tied
+## cards were ~116px wide and fitted titles to 8px (the verifier's
+## TINY find). The aspect ties a card's width to its row height, so the
+## readable move is COLUMNS: among 2..MAX_STACKED_COLUMNS this ladder
+## grants the WIDEST aspect-true card (the height the row count implies,
+## capped at the card max; clamped by the cell width when
+## `bounds_width` > 0), ties keeping the FEWER columns (the calmer
+## table). Pure.
+static func adaptive_columns(card_count: int, bounds_height: float,
+		space: float = 20.0, bounds_width: float = 0.0) -> int:
+	if card_count <= 0:
 		return 2
-	# THE GRIP IS A WIDTH (the readability pass): the card's aspect ties
-	# width to height, so a row budget built on the bare 96 height can
-	# grant 90-wide cards whose plates step to 8px — the audit's densest
-	# find. The rows budget uses the height the grip WIDTH implies
-	# (96 / CARD_ASPECT), keeping every card at or above the grip on BOTH
-	# axes; when even the cap cannot honor it, the cap stands and the
-	# plates' full-fit is the density answer.
-	var min_card := float(Inks.TOUCH_GRIP_MIN * 2) / CardSpread.CARD_ASPECT
-	var max_rows := maxi(1, int(bounds_height / (min_card + space)))
+	var best_cols := 2
+	var best_w := -1.0
 	for cols in range(2, MAX_STACKED_COLUMNS + 1):
-		var rows: int = ceil(float(card_count) / float(cols))
-		if rows <= max_rows or cols == MAX_STACKED_COLUMNS:
-			return cols
-	return MAX_STACKED_COLUMNS
+		var rows: int = maxi(1, ceili(float(card_count) / float(cols)))
+		var cell_w := INF if bounds_width <= 0.0 \
+			else maxf(1.0, (bounds_width - float(cols - 1) * space) / float(cols))
+		var cell_h := maxf(1.0, (bounds_height - float(rows - 1) * space) / float(rows))
+		var card_w := minf(minf(cell_h, CardSpread.MAX_CARD_HEIGHT) * CardSpread.CARD_ASPECT, cell_w)
+		if card_w > best_w + 0.5:
+			best_w = card_w
+			best_cols = cols
+	return best_cols

@@ -1529,7 +1529,8 @@ func _bind_cards_list(count_render := true) -> void:
 	if count_render:
 		stats[&"card_list_renders"] += 1
 	var cards: Array = _view["cards"]
-	var columns := SpreadCards.adaptive_columns(cards.size(), _portrait_spread_height())
+	var columns := SpreadCards.adaptive_columns(
+		cards.size(), _portrait_spread_height(), 20.0, _spread_budget().x)
 	for slot: OrientationSlot in [get_portrait_slot(), get_landscape_slot()]:
 		var spread := slot.get_spread() as Container
 		# The table is about to re-deal: any entrance slides still in flight
@@ -1871,10 +1872,25 @@ func _on_layout_changed() -> void:
 		return
 	_apply_columns.call_deferred()
 	_bind_eye.call_deferred()
+	# THE FINALIZATION PASS, AT RUNTIME (readability r2 — the r1 seam was
+	# test-only): a slot's last topology pass can have run at a TRANSIENT
+	# header budget (mid-bind plates, an async name wrap) and the steady
+	# minimum that follows fires no sort of its own — the round-1 audit's
+	# mounts starved the spread band by the transient's height (the
+	# letterhead stranding ~150px of table). Both slots finish every
+	# layout change the way the determinism test finishes its settle: one
+	# explicit topology pass per slot at the steady minimums. Converges:
+	# the steady pass reproduces its own budget and fires nothing further.
+	_finalize_topology.call_deferred()
 	if _suspicion != null:
 		var bounds := _design_bounds().size
 		_suspicion.replace_choice.call_deferred(bounds)
 		_suspicion.replace_quote.call_deferred(bounds, _quote_floor())
+
+
+func _finalize_topology() -> void:
+	get_portrait_slot().layout_topology()
+	get_landscape_slot().layout_topology()
 
 
 ## The adaptive column ladder, re-derived from the CURRENT spread height
@@ -1884,7 +1900,7 @@ func _apply_columns() -> void:
 	if _view.is_empty():
 		return
 	var columns := SpreadCards.adaptive_columns(
-		(_view["cards"] as Array).size(), _portrait_spread_height())
+		(_view["cards"] as Array).size(), _portrait_spread_height(), 20.0, _spread_budget().x)
 	for slot: OrientationSlot in [get_portrait_slot(), get_landscape_slot()]:
 		var spread := slot.get_spread() as Container
 		if spread != null:
@@ -1929,6 +1945,15 @@ func _portrait_spread_height() -> float:
 	## input); degenerates safely to the grip floor before layout.
 	var spread := get_portrait_slot().get_spread() as Control
 	return maxf(spread.size.y, float(Inks.TOUCH_GRIP_MIN * 3))
+
+
+func _spread_budget() -> Vector2:
+	## The stacked spread's granted size (the ladder's width clamp — the
+	## readability ladder grants the widest cell-honest card); the height
+	## half is _portrait_spread_height's contract.
+	var spread := get_portrait_slot().get_spread() as Control
+	return Vector2(maxf(spread.size.x, float(Inks.TOUCH_GRIP_MIN)),
+		maxf(spread.size.y, float(Inks.TOUCH_GRIP_MIN * 3)))
 
 
 func _sync_focus_ids(slot: OrientationSlot) -> void:

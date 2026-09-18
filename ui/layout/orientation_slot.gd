@@ -101,6 +101,27 @@ func _ready() -> void:
 	# Children's minimum sizes settle after one frame (PipMark/ChronicleLine
 	# build their internals in _ready) — lay out then.
 	layout_topology.call_deferred()
+	# THE REGIONS ARE POLICED (readability r2): the slot is a plain
+	# Control, so a region's minimum change fires NO layout of its own —
+	# the chronicle's primer row, the letterhead's async wrap, the
+	# spread's plates-grow honest minimums all landed AFTER the last
+	# topology pass and the rects stayed at the stale budget (the audit's
+	# occlusion finds: the spread's bottom row printed ON the chronicle's
+	# primer; the grid starved by a transient header). Every region's
+	# minimum now re-lays the slot (deferred — one pass per idle frame;
+	# the pure refits make the pass converge: a settled tree reproduces
+	# its own rects and fires nothing further).
+	_rail.minimum_size_changed.connect(_on_region_min_changed)
+	_spread.minimum_size_changed.connect(_on_region_min_changed)
+	_chronicle.minimum_size_changed.connect(_on_region_min_changed)
+	if _header != null:
+		_header.minimum_size_changed.connect(_on_region_min_changed)
+
+
+## One region grew or shrank: re-lay at the fresh budget (deferred so a
+## burst of min-size changes costs one pass).
+func _on_region_min_changed() -> void:
+	layout_topology.call_deferred()
 
 
 func _notification(what: int) -> void:

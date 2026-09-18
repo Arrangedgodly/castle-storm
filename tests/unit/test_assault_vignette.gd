@@ -909,7 +909,7 @@ func test_portrait_lane_spends_the_vertical_reserve() -> void:
 		assert_float(line.position.x).is_greater_equal(13.5)
 		assert_float(line.end.x).is_less_equal(float(bounds.x) - 13.5)
 		# The taller-ranks lever actually delivered at small rosters.
-		var tall := AssaultStage.army_card_size(army, 6, AssaultStage.RANK_MAX_H_PORTRAIT)
+		var tall := AssaultStage.army_card_size(army, 6, AssaultStage.RANK_MAX_H)
 		var cap := AssaultStage.army_card_size(army, 6)
 		assert_float(tall.y).is_greater(cap.y)
 		# Occupancy: no contiguous barren vertical band over 25% at ANY
@@ -919,8 +919,8 @@ func test_portrait_lane_spends_the_vertical_reserve() -> void:
 		var top := title.end.y + 10.0
 		var bottom := chronicle.position.y - 10.0
 		for count in [1, 2, 3, 4, 5, 6, 8, 11, 24]:
-			var seats: Array[Vector2] = AssaultStage.army_seats(army, count, AssaultStage.RANK_MAX_H_PORTRAIT)
-			var card := AssaultStage.army_card_size(army, count, AssaultStage.RANK_MAX_H_PORTRAIT)
+			var seats: Array[Vector2] = AssaultStage.army_seats(army, count, AssaultStage.RANK_MAX_H)
+			var card := AssaultStage.army_card_size(army, count, AssaultStage.RANK_MAX_H)
 			var intervals: Array = []
 			for rect in [castle, meter]:
 				if (rect as Rect2).position.y < bottom and (rect as Rect2).end.y > top:
@@ -943,17 +943,21 @@ func test_portrait_lane_spends_the_vertical_reserve() -> void:
 			assert_float(100.0 * worst / (bottom - top)).is_less_equal(25.0)
 
 
-## Finishing #4's other half: the landscape lane is UNTOUCHED — every
-## rect bit-identical to the pre-refinement formulas (probed at the two
-## landscape common sizes and pinned here so any drift fails loudly).
+## The landscape lane's rect table (probed at the two landscape common
+## sizes and pinned so any drift fails loudly). READABILITY r2 re-pinned
+## the CASTLE: the round-1 210-wide seat starved the garrison plates into
+## 16px steps and the share line's second plate clipped at the card's
+## bottom edge; the card now grows to 244 ("garrison 50 · our ranks"
+## prints whole at its authored 22 with air) and the army band yields the
+## width. Every other rect is unchanged.
 func test_landscape_lane_rects_pinned_bit_identical() -> void:
 	var pinned: Array[Dictionary] = [
 		{
 			"bounds": Vector2(1280, 800),
 			"title": Rect2(Vector2(14.0, 16.0), Vector2(1252.0, 46.0)),
 			"meter": Rect2(Vector2(14.0, 72.0), Vector2(1252.0, 86.0)),
-			"castle": Rect2(Vector2(1056.0, 200.0), Vector2(210.0, 272.0)),
-			"army": Rect2(Vector2(14.0, 168.0), Vector2(1022.0, 336.0)),
+			"castle": Rect2(Vector2(1022.0, 200.0), Vector2(244.0, 272.0)),
+			"army": Rect2(Vector2(14.0, 168.0), Vector2(988.0, 336.0)),
 			"chronicle": Rect2(Vector2(14.0, 616.0), Vector2(1252.0, 96.0)),
 			"quote": Rect2(Vector2(14.0, 514.0), Vector2(1252.0, 92.0)),
 			"actions": Rect2(Vector2(14.0, 726.0), Vector2(1252.0, 60.0)),
@@ -962,8 +966,8 @@ func test_landscape_lane_rects_pinned_bit_identical() -> void:
 			"bounds": Vector2(1920, 1080),
 			"title": Rect2(Vector2(14.0, 16.0), Vector2(1892.0, 46.0)),
 			"meter": Rect2(Vector2(14.0, 72.0), Vector2(1892.0, 86.0)),
-			"castle": Rect2(Vector2(1696.0, 340.0), Vector2(210.0, 272.0)),
-			"army": Rect2(Vector2(14.0, 168.0), Vector2(1662.0, 616.0)),
+			"castle": Rect2(Vector2(1662.0, 340.0), Vector2(244.0, 272.0)),
+			"army": Rect2(Vector2(14.0, 168.0), Vector2(1628.0, 616.0)),
 			"chronicle": Rect2(Vector2(14.0, 896.0), Vector2(1892.0, 96.0)),
 			"quote": Rect2(Vector2(14.0, 794.0), Vector2(1892.0, 92.0)),
 			"actions": Rect2(Vector2(14.0, 1006.0), Vector2(1892.0, 60.0)),

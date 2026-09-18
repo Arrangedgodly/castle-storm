@@ -237,9 +237,18 @@ func test_view_lists_offers_roster_and_built_buildings_in_order() -> void:
 
 
 func test_adaptive_columns_ladder() -> void:
+	# READABILITY r2 (cards grow, not shrink): the ladder grants the
+	# WIDEST aspect-true card across the column range — ties keep the
+	# fewer columns (the calmer table). The round-1 "fewest columns that
+	# keep rows above grip" dealt a 6-card table as 2x3 whose aspect-tied
+	# cards were ~253 tall / 172 wide; the wider 3x2 grant (224) prints
+	# titles at the authored size.
 	assert_int(SpreadCards.adaptive_columns(4, 800.0)).is_equal(2)
-	assert_int(SpreadCards.adaptive_columns(6, 800.0)).is_equal(2)
-	assert_int(SpreadCards.adaptive_columns(30, 100.0)).is_equal(5)  # squeezed: cap
+	assert_int(SpreadCards.adaptive_columns(6, 800.0)).is_equal(3)
+	# A squeezed height fails at EVERY column count equally — the tie
+	# keeps the fewest columns (the cap is reachable only when it wins on
+	# width, e.g. a wide, short table).
+	assert_int(SpreadCards.adaptive_columns(30, 100.0, 20.0, 400.0)).is_equal(2)
 	assert_int(SpreadCards.adaptive_columns(20, 900.0)) \
 		.is_less_equal(SpreadCards.MAX_STACKED_COLUMNS)
 

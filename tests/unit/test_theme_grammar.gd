@@ -245,17 +245,17 @@ func test_face_plate_minimum_size_honors_touch_grip() -> void:
 	remove_child(face)
 
 
-## THE PLATE FIT (the readability pass): at roster-scale widths a plate's
-## print steps its font DOWN until the WHOLE text fits — the old 55%/70%
-## floors that still clipped are GONE (shrink-to-full-fit). Pinned on the
-## longest single-word recruit name AND a long building title at a
-## 5-column phone-roster plate width. THE OLD STRUCTURAL RESIDUE IS
-## CLEARED TOO: at a 60px plate (below the spread's real grip — a
-## hostile stub) the title now fits WHOLE by stepping down, and the
-## clip_text stays only as the never-engaged last resort for degenerate
-## strings below the absolute MIN_FIT_SIZE.
+## THE PLATE FIT (readability r2 — grow, don't shrink): a plate's print
+## steps its font down from its authored base toward the FLOOR — never
+## below it. A multi-word print that can only reach the small-print line
+## on one plate WRAPS instead (whole words, the letterhead's move); a
+## print that cannot wrap (or has no wrap room) GROWS the plate to the
+## floor-size print. The clip fail-safe never engages for real copy.
+## Pinned on the longest single-word recruit name AND a long building
+## title at a 5-column phone-roster plate width, plus the hostile 60px
+## stub (below the spread's grip — no real roster grants it).
 func test_face_plates_step_down_to_fit_before_clipping() -> void:
-	var face := (load("res://ui/theme/card_face.tscn") as PackedScene).instantiate() as CardFace
+	var face := (load("res://ui/theme/card_face.tscn") as PackedScene) 		.instantiate() as CardFace
 	auto_free(face)
 	face.card_name = "Stitches"  # the longest single-word pool name
 	face.role_line = "level 1 · 1/2 workers"
@@ -263,31 +263,42 @@ func test_face_plates_step_down_to_fit_before_clipping() -> void:
 	face.size = Vector2(108.0, 150.0)  # a 5-column phone-roster plate
 	await get_tree().process_frame
 	await get_tree().process_frame
-	var theme: Theme = load("res://ui/theme/spread_theme.tres") as Theme
-	var title_base: int = theme.get_font_size(&"font_size", &"CardTitle")
 	var title: Label = face.name_plate()
-	var applied: int = title.get_theme_font_size(&"font_size")
-	# The fit actually stepped down from the themed base…
-	assert_int(applied).is_less(title_base)
-	# …and the WHOLE title now fits the plate in real font metrics (no
-	# mid-word clip at phone roster scale).
+	var title_applied: int = title.get_theme_font_size(&"font_size")
+	# The title print never renders below the readability floor…
+	assert_int(title_applied).is_greater_equal(TypeScale.scaled(CardFace.TITLE_FLOOR))
+	# …and the WHOLE print fits the plate: one line, or every wrapped
+	# line inside the plate's metrics.
 	var font: Font = title.get_theme_font(&"font")
-	var width: float = font.get_string_size(title.text,
-		HORIZONTAL_ALIGNMENT_LEFT, -1.0, applied).x
-	assert_float(width).is_less_equal(title.size.x + 0.5)
-	# The role plate fits WHOLE the same way.
-	var role_base: int = theme.get_font_size(&"font_size", &"RoleLine")
+	if title.autowrap_mode == TextServer.AUTOWRAP_OFF:
+		var width: float = font.get_string_size(title.text,
+			HORIZONTAL_ALIGNMENT_LEFT, -1.0, title_applied).x
+		assert_float(width).is_less_equal(title.size.x + 0.5)
+	else:
+		var shaped: Vector2 = font.get_multiline_string_size(title.text,
+			HORIZONTAL_ALIGNMENT_LEFT, title.size.x, title_applied)
+		assert_float(shaped.y).is_less_equal(title.size.y + 0.5)
+	# The role plate: a one-line fit under the small-print line WRAPS
+	# (the face has the height), so the applied size stays at the authored
+	# base with every line whole.
 	var role: Label = face.role_plate()
 	var role_applied: int = role.get_theme_font_size(&"font_size")
-	assert_int(role_applied).is_less(role_base)
+	assert_int(role_applied).is_greater_equal(TypeScale.scaled(CardFace.WRAP_BELOW))
 	var role_font: Font = role.get_theme_font(&"font")
-	var role_width: float = role_font.get_string_size(role.text,
-		HORIZONTAL_ALIGNMENT_LEFT, -1.0, role_applied).x
-	assert_float(role_width).is_less_equal(role.size.x + 0.5)
+	if role.autowrap_mode != TextServer.AUTOWRAP_OFF:
+		var widest_word := 0.0
+		for word in role.text.split(" "):
+			widest_word = maxf(widest_word, role_font.get_string_size(String(word),
+				HORIZONTAL_ALIGNMENT_LEFT, -1.0, role_applied).x)
+		assert_float(widest_word).is_less_equal(role.size.x + 0.5)
+	else:
+		var role_width: float = role_font.get_string_size(role.text,
+			HORIZONTAL_ALIGNMENT_LEFT, -1.0, role_applied).x
+		assert_float(role_width).is_less_equal(role.size.x + 0.5)
 	remove_child(face)
-	# THE OLD SUB-FLOOR RESIDUE, re-pinned as CLEARED: a hostile 60px stub
-	# (below the spread's 96 grip — no real roster grants it) still fits
-	# the whole title by stepping down; the fail-safe clip never engages.
+	# THE HOSTILE 60px STUB: too narrow for even the floor-size title, so
+	# THE PLATE GROWS (the r2 contract) — the print renders WHOLE at the
+	# floor and the clip fail-safe never engages.
 	var stub := CardFace.new()
 	auto_free(stub)
 	stub.card_name = "Stitches"
@@ -297,11 +308,13 @@ func test_face_plates_step_down_to_fit_before_clipping() -> void:
 	await get_tree().process_frame
 	var stub_title: Label = stub.name_plate()
 	var stub_size: int = stub_title.get_theme_font_size(&"font_size")
-	assert_int(stub_size).is_greater_equal(CardFace.MIN_FIT_SIZE)
+	assert_int(stub_size).is_greater_equal(TypeScale.scaled(CardFace.TITLE_FLOOR))
 	var stub_font: Font = stub_title.get_theme_font(&"font")
 	var stub_width: float = stub_font.get_string_size(stub_title.text,
 		HORIZONTAL_ALIGNMENT_LEFT, -1.0, stub_size).x
 	assert_float(stub_width).is_less_equal(stub_title.size.x + 0.5)
+	assert_float(stub_title.custom_minimum_size.x) \
+		.is_greater_equal(stub_width + 2.0 * CardFace.FIT_MARGIN - 0.5)
 	remove_child(stub)
 
 
