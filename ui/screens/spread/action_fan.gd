@@ -39,8 +39,27 @@
 ## under it too). With the sheet, a fan opened over a neighbor's title
 ## hides it cleanly UNDER one designed paper edge — the same move as any
 ## card laid over this table — and no glyph fragments peek between the
-## strips. The audit's co-mount rule reads sheet_rect(): a fan print may
-## overlap foreign text ONLY inside the sheet.
+## strips. The audit's co-mount rule reads sheet_rect(): a foreign label
+## meets the sheet DISJOINT or WHOLLY INSIDE it (readability r4).
+##
+## THE SHEET EDGE-SNAP (readability r4): the sheet's edges are ARBITRARY
+## geometry no longer. The raw sheet (the fan + SHEET_PAD of air) is
+## snapped OUTWARD to the nearest CARD boundaries before it prints: the
+## screen hands the fan the mounted table's card footprints at open time
+## (snap_sheet_to), and any card the raw sheet would CUT — its footprint
+## intersecting the sheet without being enclosed — grows the sheet's
+## edges out to that card's bounds, iterated to a fixed point (covering
+## one card can carry an edge across another, so the pass repeats until
+## no footprint straddles an edge). THE GUARANTEE: every foreign card
+## ends fully covered by paper or untouched — a label can never straddle
+## a sheet edge and be sliced mid-glyph (the r3 sheet's arbitrary edges
+## cut "Hob"'s H, sheared a role line to "s by the fire", crossed the
+## "Training Grounds"/"Farm" ink). Expansion, never retreat: a dense
+## grid has no clear space to shrink into (the r3 documented choice), and
+## the fan's own chips must stay on their paper. A footprint is the
+## card's GLOBAL transform footprint (the rotated AABB in the panoramic
+## arc — the axis-aligned sheet must cover the rotated corners too, so
+## its edges snap to the true occupied space).
 class_name ActionFan
 extends VBoxContainer
 
@@ -56,6 +75,11 @@ const SHEET_PAD := 8.0
 
 ## The view-model card id this fan is fanned out from ("" while closed).
 var card_id := ""
+
+## The mounted table's card footprints (GLOBAL) the sheet must not slice —
+## the edge-snap set (see the header). Empty (a standalone fan) leaves the
+## sheet at its raw pad rect.
+var _snap_rects: Array[Rect2] = []
 
 var _chips: Array[ActionChip] = []
 var _hint: Control
@@ -111,15 +135,48 @@ func open(for_card_id: String, actions: Array[Dictionary]) -> void:
 func close() -> void:
 	visible = false
 	card_id = ""
+	_snap_rects.clear()
+
+
+## THE EDGE-SNAP SET (readability r4 — see the header): the screen hands
+## the fan the mounted table's card footprints (GLOBAL) at open time, so
+## the sheet's edges can snap outward to card bounds and never slice one.
+func snap_sheet_to(card_footprints: Array[Rect2]) -> void:
+	_snap_rects = card_footprints.duplicate()
+	queue_redraw()
 
 
 ## The fan's paper sheet in the fan's LOCAL space (the audit's co-mount
-## occlusion rule reads it: a fan print may overlap foreign text ONLY
-## inside this designed surface). The fan is never rotated or scaled on
-## the screen, so local == global axes.
+## occlusion rule reads it: a foreign label meets this designed surface
+## DISJOINT or WHOLLY INSIDE — an ink rect straddling an edge is a sliced
+## print). The rect is the raw fan + air SNAPPED outward to the card
+## bounds set at open time (snap_sheet_to): while any footprint
+## intersects the sheet without being enclosed, the sheet grows to that
+## footprint's bounds — the fixed point is every touched card covered
+## whole. The fan is never rotated or scaled on the screen, so local ==
+## global axes and the global footprints move into local space by
+## translation alone.
 func sheet_rect() -> Rect2:
-	return Rect2(Vector2(-SHEET_PAD, -SHEET_PAD),
+	var sheet := Rect2(Vector2(-SHEET_PAD, -SHEET_PAD),
 		size + Vector2(SHEET_PAD, SHEET_PAD) * 2.0)
+	if _snap_rects.is_empty():
+		return sheet
+	var origin := global_position
+	var guard := 0
+	var changed := true
+	while changed and guard < 64:
+		changed = false
+		guard += 1
+		for footprint: Rect2 in _snap_rects:
+			var local := Rect2(footprint.position - origin, footprint.size)
+			# A boundary-touching card is untouched (a zero-width meet is
+			# no intersection); a card the sheet CUTS grows the sheet out
+			# to the card's own bounds — paper over the whole card, the
+			# same move as any card laid on this table.
+			if sheet.intersects(local) and not sheet.encloses(local):
+				sheet = sheet.merge(local)
+				changed = true
+	return sheet
 
 
 func _draw() -> void:

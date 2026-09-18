@@ -1436,6 +1436,11 @@ func open_fan_for_card(card: Control) -> void:
 	stats[&"fans_opened"] += 1
 	_fan.open(String(view_card["id"]), actions)
 	_place_fan(card)
+	# THE SHEET EDGE-SNAP (readability r4): after placement the fan gets
+	# the table's card footprints, so its paper snaps outward to card
+	# bounds — every card the sheet touches it covers whole or not at all,
+	# and no foreign label is ever sliced by a sheet edge.
+	_fan.snap_sheet_to(_table_card_footprints())
 
 
 ## Fold the fan away; focus returns to the card that opened it.
@@ -1479,6 +1484,37 @@ func _place_fan(card: Control) -> void:
 	var y := clampf(card_rect.get_center().y - fan_size.y * 0.5,
 		8.0, bounds.end.y - fan_size.y - 8.0)
 	_fan.global_position = Vector2(x, y)
+
+
+## Every mounted card's GLOBAL footprint on the ACTIVE table — the r4
+## sheet edge-snap set (ActionFan.snap_sheet_to): the fan's paper may
+## cover a card WHOLE or not at all, so its edges must know where every
+## card actually sits. The footprint is the card's global-transform
+## footprint (the rotated AABB in the panoramic arc — the axis-aligned
+## sheet must cover a rotated card's corners too); for the STACKED grid's
+## unrotated cards it is exactly the card rect.
+func _table_card_footprints() -> Array[Rect2]:
+	var out: Array[Rect2] = []
+	var slot := get_active_slot() as OrientationSlot
+	if slot == null:
+		return out
+	for child in slot.get_spread().get_children():
+		if child is Control:
+			var card := child as Control
+			var xform := card.get_global_transform()
+			var corners: Array[Vector2] = [
+				xform * Vector2.ZERO,
+				xform * Vector2(card.size.x, 0.0),
+				xform * Vector2(0.0, card.size.y),
+				xform * card.size,
+			]
+			var lo := corners[0]
+			var hi := corners[0]
+			for corner: Vector2 in corners:
+				lo = lo.min(corner)
+				hi = hi.max(corner)
+			out.append(Rect2(lo, hi - lo))
+	return out
 
 
 ## A whole-state re-render can retire the fanned card (restart, scatter):

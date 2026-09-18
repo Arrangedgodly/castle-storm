@@ -680,6 +680,196 @@ func test_chip_press_routes_chosen_and_refused() -> void:
 	assert_array(refused).is_equal(["no", "no"])
 
 
+# --- the fan's paper sheet (readability r4: edge-snap + disjoint-or-contained) ------------
+
+
+func test_fan_sheet_snaps_outward_to_card_bounds() -> void:
+	## THE EDGE-SNAP PIN: a card the raw sheet would cut grows the sheet
+	## out to that card's bounds; the expansion's own new edge snaps
+	## AGAIN (card_b only meets the sheet after card_a was covered — the
+	## fixed point takes a second step); a clear card stays untouched;
+	## the sheet never retreats (the fan's chips must keep their paper).
+	var fan := _mounted_fan()
+	auto_free(fan)
+	fan.position = Vector2(120.0, 140.0)
+	fan.open("unit_1", _fan_actions())
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var raw_local: Rect2 = fan.sheet_rect()  # no snap set yet — the raw pad rect
+	assert_float(raw_local.size.x - fan.size.x).is_equal_approx(16.0, 0.01)
+	assert_float(raw_local.size.y - fan.size.y).is_equal_approx(16.0, 0.01)
+	var raw := Rect2(raw_local.position + fan.global_position, raw_local.size)
+	# card_a: the raw sheet's right edge cuts 20px into it.
+	var card_a := Rect2(Vector2(raw.end.x - 20.0, raw.position.y + 10.0), Vector2(110.0, 170.0))
+	# card_b: clear of the RAW sheet; only the sheet EXPANDED over card_a
+	# reaches it — the snap must iterate to its fixed point.
+	var card_b := Rect2(Vector2(card_a.end.x - 30.0, raw.position.y + 30.0), Vector2(110.0, 170.0))
+	# card_c: far clear of any possible sheet — untouched, forever.
+	var card_c := Rect2(Vector2(raw.end.x + 400.0, raw.position.y + 500.0), Vector2(110.0, 170.0))
+	var footprints: Array[Rect2] = [card_a, card_b, card_c]
+	fan.snap_sheet_to(footprints)
+	var local: Rect2 = fan.sheet_rect()
+	var snapped := Rect2(local.position + fan.global_position, local.size)
+	assert_bool(snapped.encloses(card_a)).is_true()
+	assert_bool(snapped.encloses(card_b)).is_true()
+	assert_bool(snapped.encloses(raw)).is_true()  # expansion only — never a retreat
+	assert_float(snapped.intersection(card_c).size.x).is_zero()
+	assert_float(snapped.intersection(card_c).size.y).is_zero()
+	# Untouched edges stay where the raw sheet had them.
+	assert_float(snapped.position.x).is_equal_approx(raw.position.x, 0.01)
+	assert_float(snapped.position.y).is_equal_approx(raw.position.y, 0.01)
+
+
+func _estate_host_31337() -> GameHost:
+	## THE VERIFIER'S EXACT REPRO SHAPE (readability r4): seed 31337,
+	## accept every offer as it arrives, fast-forward between arrivals,
+	## to a 20-card estate — the density whose r3 fan sheet sliced
+	## "Hob"'s H, sheared a role line to "s by the fire", and crossed the
+	## "Training Grounds"/"Farm" ink.
+	_dir_seq += 1
+	var root := "user://cs_ui04_tests/estate-%02d" % _dir_seq
+	_erase_dir(root)
+	var host := GameHost.new(31337, root)
+	host.autosave_interval_ticks = 0
+	host.boot(0)
+	var hours := 0
+	while hours < 40 and (SpreadPresenter.cards_view(host) as Array).size() < 20:
+		var guard := 0
+		while host.units().pending_offers() > 0 and guard < 50:
+			var offers := host.units().offer_ids()
+			if offers.is_empty():
+				break
+			host.submit(&"recruit_accept", &"", offers[0])
+			host.fast_forward(SimEngine.TICKS_PER_SIM_HOUR / 4)
+			guard += 1
+		host.fast_forward(SimEngine.TICKS_PER_SIM_HOUR - SimEngine.TICKS_PER_SIM_HOUR / 4)
+		hours += 1
+	return host
+
+
+func _screen_cards(screen: SpreadScreen) -> Array[Control]:
+	var out: Array[Control] = []
+	var active := screen.get_active_slot() as OrientationSlot
+	for child in active.get_spread().get_children():
+		if child is Control:
+			out.append(child as Control)
+	return out
+
+
+func _labels_of(node: Node) -> Array[Label]:
+	var out: Array[Label] = []
+	if node is Label:
+		out.append(node as Label)
+	for child in node.get_children():
+		out.append_array(_labels_of(child))
+	return out
+
+
+## The label's shaped GLYPH ink rect in global space (alignment-offset,
+## plate-bounded) — the r4 grade surface: a plate may straddle paper
+## without slicing a glyph; ink cannot.
+func _ink_rect(label: Label) -> Rect2:
+	var plate := label.get_global_rect()
+	var font: Font = label.get_theme_font(&"font")
+	if font == null or label.text.is_empty():
+		return plate
+	var size := label.get_theme_font_size(&"font_size")
+	if size <= 0:
+		return plate
+	var shaped: Vector2
+	if label.autowrap_mode != TextServer.AUTOWRAP_OFF:
+		shaped = font.get_multiline_string_size(label.text,
+			HORIZONTAL_ALIGNMENT_LEFT, maxf(label.size.x, 1.0), size)
+	else:
+		shaped = font.get_string_size(label.text,
+			HORIZONTAL_ALIGNMENT_LEFT, -1.0, size)
+	var off := Vector2.ZERO
+	match label.horizontal_alignment:
+		HORIZONTAL_ALIGNMENT_CENTER: off.x = (label.size.x - shaped.x) * 0.5
+		HORIZONTAL_ALIGNMENT_RIGHT: off.x = label.size.x - shaped.x
+	match label.vertical_alignment:
+		VERTICAL_ALIGNMENT_CENTER: off.y = (label.size.y - shaped.y) * 0.5
+		VERTICAL_ALIGNMENT_BOTTOM: off.y = label.size.y - shaped.y
+	return Rect2(plate.position + off, shaped).intersection(plate)
+
+
+func _settle_window(screen: SpreadScreen, window_size: Vector2i, want_portrait: bool) -> void:
+	## The spread suite's settle seam: inject time for the router's dwell
+	## poll only, hand the true clock back before geometry reads, and
+	## give the mount finalization its deferred frames.
+	get_window().size = window_size
+	var router := screen.get_router()
+	Engine.time_scale = 60.0
+	for i in 240:
+		await get_tree().process_frame
+		if router.is_portrait() == want_portrait and router.design_size().x > 1.0:
+			break
+	for i in 12:  # the bounded mount finalization's deferred passes
+		await get_tree().process_frame
+	Engine.time_scale = 1.0
+	await get_tree().process_frame
+
+
+func test_estate_fan_sheet_disjoint_or_whole_both_orientations() -> void:
+	## THE R4 REPRO PIN: the seed-31337 20-card estate with the fan
+	## co-mounted on EVERY actionable card at BOTH orientations. THE
+	## CONTRACT: every visible foreign label's glyph ink meets the fan's
+	## sheet DISJOINT or WHOLLY CONTAINED — a partial intersection (the
+	## r3 sheet's mid-glyph slices) can never render; the snap must
+	## ENGAGE at this density (some sheet grows past its raw rect); and
+	## in the repro orientation the fan really does sit over foreign ink
+	## (the pin is never empty — covered titles are WHOLLY hidden).
+	var host := _estate_host_31337()
+	for spec: Dictionary in [
+		{"size": Vector2i(720, 1280), "portrait": true},
+		{"size": Vector2i(1280, 800), "portrait": false},
+	]:
+		var screen: SpreadScreen = await _mounted_screen(host)
+		await _settle_window(screen, spec["size"], spec["portrait"])
+		var cards := _screen_cards(screen)
+		assert_int(cards.size()).is_greater_equal(20)  # the dense repro shape
+		var fan: ActionFan = screen._fan
+		var opened := 0
+		var engaged := 0  # sheets that grew past their raw pad rect
+		var covered := 0  # foreign inks wholly under the designed paper
+		var sliced: Array[String] = []
+		for card in cards:
+			screen.open_fan_for_card(card)
+			await get_tree().process_frame
+			await get_tree().process_frame
+			if not fan.is_open():
+				continue
+			opened += 1
+			var raw := Rect2(fan.global_position - Vector2(8.0, 8.0),
+				fan.size + Vector2(16.0, 16.0))
+			var sheet: Rect2 = fan.sheet_rect()
+			sheet.position += fan.global_position
+			if not sheet.is_equal_approx(raw):
+				engaged += 1
+			for label in _labels_of(screen):
+				if fan.is_ancestor_of(label):
+					continue
+				if label.text.is_empty() or not label.is_visible_in_tree():
+					continue
+				var ink := _ink_rect(label)
+				var inter := sheet.intersection(ink)
+				if inter.size.x < 4.0 or inter.size.y < 4.0:
+					continue  # disjoint at ink level — no slice
+				if sheet.encloses(ink):
+					covered += 1
+					continue
+				sliced.append("%s ink %s vs sheet %s" % [label.text, ink, sheet])
+			screen.close_fan()
+			await get_tree().process_frame
+		assert_int(opened).is_greater(0)
+		assert_int(engaged).is_greater(0)
+		if bool(spec["portrait"]):
+			assert_int(covered).is_greater(0)
+		assert_array(sliced).is_empty()
+		screen.queue_free()
+		await get_tree().process_frame
+
+
 # --- the screen wiring -------------------------------------------------------------------
 
 

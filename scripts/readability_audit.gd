@@ -21,10 +21,20 @@
 ##               state a player sees: the screen's own fan OPEN ON THE
 ##               TABLE, its chips + hint strip printing across neighbor
 ##               cards' titles. The audit now opens the real fan on
-##               every actionable card (gate table AND estate) and grades
-##               fan-print vs foreign-text overlap as a defect unless
-##               the fan's own paper SHEET (the designed surface —
-##               ActionFan.sheet_rect) covers the overlap.
+##               every actionable card (gate table AND estate). r4: THE
+##               PREDICATE IS DISJOINT-OR-CONTAINED at ink level — a
+##               foreign label's shaped GLYPH ink meets the fan's paper
+##               sheet WHOLE or NOT AT ALL; an ink rect that straddles a
+##               sheet edge is a sliced print (the r3 sheet's arbitrary
+##               edges cut "Hob"'s H, sheared a role line to "s by the
+##               fire"). The r3 form graded only the OVERLAP RECTANGLE
+##               between the fan print and the foreign label
+##               (sheet.encloses(fan ∩ foreign)) — a straddling label
+##               PASSED because its covered part held the whole overlap
+##               while the rest of the label stuck out past the paper.
+##               That rule is deleted. The sheet itself is geometry now:
+##               ActionFan snaps its edges outward to card bounds (the
+##               edge-snap), so the predicate and the drawn paper agree.
 ##   STALLED   — a visible label with text whose plate never got laid
 ##               (either axis <= 1px): the plate renders no print. The
 ##               r2 audit SKIPPED these ("not laid out yet") — the skip
@@ -47,7 +57,8 @@
 ##               populated, the estate actually dense) — a broken mount
 ##               invalidates the pass
 ##
-## THE PASS BAR (readability r3 — co-mounted): at 1.0x, BOTH
+## THE PASS BAR (readability r3 co-mount, r4 disjoint-or-contained): at
+## 1.0x, BOTH
 ## orientations: 0 CLIP, 0 OVERFLOW, 0 WRAP-CLIP, 0 OCCLUSION, 0
 ## STALLED, 0 PAST-EDGE, 0 OFFSCREEN, 0 SUB-FLOOR, 0 MOUNT, and TINY <=
 ## the round-1 baseline (10). The 1.3x pass is FLOOR-CHECK ONLY (fixed
@@ -191,15 +202,19 @@ func _audit_assault(tag: String, size: Vector2i) -> void:
 	await _frames(2)
 
 
-## THE CO-MOUNTED FAN AUDIT (readability r3): open the screen's own fan
-## on every actionable card (the real `open_fan_for_card` path — the
-## same one a press or tap drives) and, while it is open, walk ALL
-## visible labels of the screen. A fan print (chip label, refusal
-## reason, hint print) overlapping a FOREIGN text label (>= 4px both
-## axes — the audit's overlay rule) is a DEFECT unless the fan's own
-## paper sheet covers the overlap: covering text is legitimate ONLY
-## when the covering paper is a designed surface. Foreign-vs-foreign
-## pairs stay policed by the ordinary walk.
+## THE CO-MOUNTED FAN AUDIT (readability r3, predicate r4): open the
+## screen's own fan on every actionable card (the real
+## `open_fan_for_card` path — the same one a press or tap drives) and,
+## while it is open, grade EVERY visible foreign label of the screen
+## against the fan's paper sheet: the label's shaped GLYPH ink meets the
+## sheet DISJOINT or WHOLLY CONTAINED — a partial intersection is an
+## OCCLUSION (a print sliced mid-glyph by the paper's edge, covered
+## title or not). Covering text is legitimate ONLY when the covering
+## paper is a designed surface AND the text lies wholly under it. The r3
+## rule (sheet.encloses(fan_print ∩ foreign_label)) is DELETED — it
+## passed a straddling label whose intersection with the fan print sat
+## inside the sheet while the rest of the label stuck out. Foreign-vs-
+## foreign pairs stay policed by the ordinary walk.
 func _audit_fan_co_mounted(screen: Control, tag: String) -> void:
 	var fan: ActionFan = screen._fan
 	if fan == null:
@@ -207,7 +222,8 @@ func _audit_fan_co_mounted(screen: Control, tag: String) -> void:
 		return
 	var cards: Array[Control] = _spread_cards(screen, tag)
 	var opened := 0
-	var sheeted := 0  # fan-print/foreign overlaps excused BY the sheet (informational)
+	var covered := 0  # foreign inks wholly under the sheet (informational)
+	var sliced := 0  # straddled inks (each also a(n informational-past-the-wall) finding)
 	for card in cards:
 		screen.open_fan_for_card(card)
 		await _frames(8)  # the chips' plates settle their granted widths
@@ -218,11 +234,10 @@ func _audit_fan_co_mounted(screen: Control, tag: String) -> void:
 			_note(tag, "action_fan", "co-mounted fan open on card %s (%d chips)" % [
 				card.get_meta(&"spread_card_id", ""), fan.chips().size()])
 		# The sheet's GLOBAL rect (the fan is never rotated or scaled on
-		# the screen — local == global axes).
+		# the screen — local == global axes). Geometry is the SNAPPED
+		# sheet (r4): the same rect the fan draws.
 		var sheet: Rect2 = fan.sheet_rect()
 		sheet.position += fan.global_position
-		var fan_labels: Array[Label] = []
-		_collect_labels(fan, fan_labels)
 		var foreign: Array[Label] = []
 		var all_labels: Array[Label] = []
 		_collect_labels(screen, all_labels)
@@ -230,28 +245,27 @@ func _audit_fan_co_mounted(screen: Control, tag: String) -> void:
 			if fan.is_ancestor_of(label):
 				continue
 			foreign.append(label)
-		for fan_label in fan_labels:
-			if fan_label.text.is_empty() or not fan_label.is_visible_in_tree():
+		for other in foreign:
+			if other.text.is_empty() or not other.is_visible_in_tree():
 				continue
-			for other in foreign:
-				if other.text.is_empty() or not other.is_visible_in_tree():
-					continue
-				var inter: Rect2 = fan_label.get_global_rect().intersection(other.get_global_rect())
-				if inter.size.x < OVERLAP_MIN or inter.size.y < OVERLAP_MIN:
-					continue
-				if sheet.encloses(inter):
-					sheeted += 1  # the designed paper covers it — the veil grammar
-					continue
-				_finding(tag, "action_fan", "OCCLUSION",
-					"fan print \"%s\" on foreign \"%s\" %s OUTSIDE the fan's sheet" % [
-						_short(fan_label.text), _short(other.text), inter])
+			var ink := _ink_rect(other)
+			var inter: Rect2 = sheet.intersection(ink)
+			if inter.size.x < OVERLAP_MIN or inter.size.y < OVERLAP_MIN:
+				continue  # DISJOINT at ink level — a boundary graze slices no glyph
+			if sheet.encloses(ink):
+				covered += 1  # FULLY-CONTAINED — the veil grammar (wholly hidden under paper)
+				continue
+			sliced += 1
+			_finding(tag, "action_fan", "OCCLUSION",
+				"foreign \"%s\" ink %s straddles the fan sheet edge %s — sliced mid-glyph" % [
+					_short(other.text), ink, sheet])
 		screen.close_fan()
 		await _frames(2)
 	if opened == 0:
 		_finding(tag, "action_fan", "MOUNT", "no card offered actions — the fan was never co-mounted")
 	else:
-		_note(tag, "action_fan", "%d fans co-mounted; %d fan-print/foreign overlaps, all sheeted" % [
-			opened, sheeted])
+		_note(tag, "action_fan", "%d fans co-mounted; %d foreign inks wholly under paper, %d sliced" % [
+			opened, covered, sliced])
 
 
 ## THE DENSE ESTATE (readability r3 — the r2 finalization's unfinished
@@ -402,23 +416,28 @@ func _audit_occlusion(a: Label, b: Label, tag: String, surface: Node) -> void:
 	var overlap := ra.intersection(rb)
 	if overlap.size.x < OVERLAP_MIN or overlap.size.y < OVERLAP_MIN:
 		return
-	# THE FAN'S SHEET RULE (readability r3): a fan print may cover
-	# foreign text ONLY under the fan's own designed paper sheet — the
-	# co-mount audit grades the identical rule while each fan is open;
-	# this keeps the ordinary walk honest if it ever runs under an open
-	# fan. The r2 whitelist here ("a fan label against an outside label
-	# is the design, never a defect") was the other half of the
-	# audit-blindness: it excused every fan-print-on-text overlap.
+	# THE FAN'S SHEET RULE (readability r4 — disjoint-or-contained): the
+	# FOREIGN label's shaped glyph ink meets the fan's sheet WHOLE or NOT
+	# AT ALL; an ink rect straddling the sheet edge is a sliced print.
+	# (The r3 form here graded only the overlap rectangle between the two
+	# labels — a straddling label passed when its covered part held the
+	# overlap. The co-mount audit grades the identical r4 predicate while
+	# each fan is open; this keeps the ordinary walk honest if it ever
+	# runs under an open fan.)
 	var fan_of_a := _fan_over(a, surface)
 	var fan_of_b := _fan_over(b, surface)
 	if fan_of_a != fan_of_b and (fan_of_a != null or fan_of_b != null):
 		var fan := fan_of_a if fan_of_a != null else fan_of_b
 		var sheet: Rect2 = fan.sheet_rect()
 		sheet.position += fan.global_position
-		if not sheet.encloses(overlap):
-			_finding(tag, "occlusion", "OCCLUSION", "%s \"%s\" [%dx%d @ %v] over %s \"%s\" OUTSIDE the fan's sheet" % [
-				_path_of(a), _short(a.text), int(overlap.size.x), int(overlap.size.y),
-				overlap.position, _path_of(b), _short(b.text)])
+		var foreign: Label = b if fan_of_a != null else a
+		var ink := _ink_rect(foreign)
+		var inter: Rect2 = sheet.intersection(ink)
+		if inter.size.x >= OVERLAP_MIN and inter.size.y >= OVERLAP_MIN \
+				and not sheet.encloses(ink):
+			_finding(tag, "occlusion", "OCCLUSION",
+				"%s \"%s\" ink straddles the fan's sheet edge %s — sliced" % [
+					_path_of(foreign), _short(foreign.text), sheet])
 		return
 	# Designed paper overlays: the Watchful Eye's perch plate (paper on
 	# the table's corner) and the PANORAMIC spread's held-fan overlap
@@ -441,6 +460,36 @@ func _fan_over(label: Label, surface: Node) -> ActionFan:
 			return node as ActionFan
 		node = node.get_parent()
 	return null
+
+
+## The label's shaped GLYPH ink rect in GLOBAL space (the r4 predicate's
+## grade surface — a plate may straddle paper without slicing a glyph;
+## ink cannot). The label's own shaped print, offset by its alignment
+## and bounded by its plate (a clipped plate bounds the ink it actually
+## draws — CLIP is that check's finding, not this one's).
+func _ink_rect(label: Label) -> Rect2:
+	var plate := label.get_global_rect()
+	var font: Font = label.get_theme_font(&"font")
+	if font == null or label.text.is_empty():
+		return plate
+	var size := label.get_theme_font_size(&"font_size")
+	if size <= 0:
+		return plate
+	var shaped: Vector2
+	if label.autowrap_mode != TextServer.AUTOWRAP_OFF:
+		shaped = font.get_multiline_string_size(label.text,
+			HORIZONTAL_ALIGNMENT_LEFT, maxf(label.size.x, 1.0), size)
+	else:
+		shaped = font.get_string_size(label.text,
+			HORIZONTAL_ALIGNMENT_LEFT, -1.0, size)
+	var off := Vector2.ZERO
+	match label.horizontal_alignment:
+		HORIZONTAL_ALIGNMENT_CENTER: off.x = (label.size.x - shaped.x) * 0.5
+		HORIZONTAL_ALIGNMENT_RIGHT: off.x = label.size.x - shaped.x
+	match label.vertical_alignment:
+		VERTICAL_ALIGNMENT_CENTER: off.y = (label.size.y - shaped.y) * 0.5
+		VERTICAL_ALIGNMENT_BOTTOM: off.y = label.size.y - shaped.y
+	return Rect2(plate.position + off, shaped).intersection(plate)
 
 
 ## True when both labels live under one common DESIGNED overlay: the
