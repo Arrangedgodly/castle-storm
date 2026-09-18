@@ -145,12 +145,40 @@ const KEY_TOKENS: Dictionary = {
 	# --- the chronicle screen's empty page (ChroniclePresenter) ---
 	&"chronicle_empty_1": [],
 	&"chronicle_empty_2": [],
-	# --- the first session's printed cues (FirstSession, T-UI-10) ---
+	# --- the guided objectives' note lines (FirstSession, T-UI-10's
+	# upgrade: the pinned clerk's note consumes these as the CURRENT
+	# objective, in the world's own words; the trickle keeps its strip
+	# payoff print) ---
 	&"first_gate": [&"name"],
 	&"first_assign": [&"name"],
 	&"first_build": [&"building"],
 	&"first_trickle": [&"amount", &"resource"],
-	&"first_train": [&"name"],
+	&"objective_train": [],
+	&"objective_gear": [],
+	&"objective_promote": [],
+	&"objective_storm": [],
+	&"objective_graduated": [],
+	# --- the contextual first-time hints (FirstSession's hint half):
+	# once-EVER plain-language lines on first exposure to the key
+	# moments — one variant set each, strip rows ---
+	&"hint_promote": [],
+	&"hint_warn": [],
+	&"hint_odds": [],
+	&"hint_bank": [&"points"],
+	# --- the how-to pamphlet (HowToScreen): the printed primer's body —
+	# static content in the clerk's one voice (the legacy-tree precedent:
+	# 1 variant, table == floor), wrap surfaces on the scrollable page ---
+	&"howto_goal": [],
+	&"howto_table_1": [],
+	&"howto_table_2": [],
+	&"howto_edges_solid": [],
+	&"howto_edges_dashed": [],
+	&"howto_edges_struck": [],
+	&"howto_stores": [],
+	&"howto_eye": [],
+	&"howto_legacy": [],
+	&"howto_escalation": [],
+	&"howto_offer": [],
 	# --- the finishing refinements (refinement #2) ---
 	&"primer_lineform": [],
 	&"autosave_filed": [&"hours"],

@@ -296,7 +296,9 @@ const DEFAULTS: Dictionary = {
 	&"chronicle_empty_2": [
 		"The first hand is still on the table.",
 	],
-	# --- the first session's printed cues (FirstSession, T-UI-10) ---
+	# --- the guided objectives' note lines (FirstSession, T-UI-10's
+	# upgrade): the pinned clerk's note shows the CURRENT objective; the
+	# trickle keeps its strip payoff print ---
 	&"first_gate": [
 		"New paper at the gate — touch {name}'s card to answer.",
 	],
@@ -309,8 +311,77 @@ const DEFAULTS: Dictionary = {
 	&"first_trickle": [
 		"The stores tally the first {resource}: +{amount}.",
 	],
-	&"first_train": [
-		"{name} joins the drill line — the conspiracy counts soldiers.",
+	&"objective_train": [
+		"The yard makes soldiers — tap a rested militia card, then Begin training.",
+		"Rested militia wait on the yard — tap a card, then Begin training.",
+	],
+	&"objective_gear": [
+		"A drilled hand waits on steel — tap the waiting card and fit the gear.",
+		"Steel makes the soldier — tap the waiting card and fit its gear.",
+	],
+	&"objective_promote": [
+		"Fully geared and ready — tap the waiting card, then Promote.",
+		"The waiting card is knight-ready — tap it, then Promote.",
+	],
+	&"objective_storm": [
+		"The knight floor is met — tap an army card and Storm the castle.",
+		"The army stands at the floor — tap a soldier, then Storm the castle.",
+	],
+	&"objective_graduated": [
+		"The clerk folds the note. The table is yours.",
+		"The note is folded away — the table is yours now.",
+	],
+	# --- the contextual first-time hints (once-ever strip rows) ---
+	&"hint_promote": [
+		"A geared trainee waits — Promote makes a knight.",
+		"Steel on, oath waiting — Promote makes the knight.",
+	],
+	&"hint_warn": [
+		"The Crown's eye warns. The card offers quiet verbs.",
+		"The eye warns — keep hands quiet, or thin the gate.",
+	],
+	&"hint_odds": [
+		"Storm on the second press; retreat is free.",
+		"The second press casts the storm; retreat is free.",
+	],
+	&"hint_bank": [
+		"The bank keeps {points} — The Legacy spends it.",
+		"{points} points banked for keeps — The Legacy awaits.",
+	],
+	# --- the how-to pamphlet (HowToScreen): static content, the clerk's
+	# one voice (the legacy-tree precedent — 1 variant, wrap surfaces) ---
+	&"howto_goal": [
+		"Grow the conspiracy until your knights are many and armed — then storm the castle.",
+	],
+	&"howto_table_1": [
+		"Every card is yours: people at the gate, hands at work, plots where buildings rise.",
+	],
+	&"howto_table_2": [
+		"Take recruits in, put hands to work, drill and arm them — militia, trainees, knights, archers.",
+	],
+	&"howto_edges_solid": [
+		"Solid — ready: the card can act.",
+	],
+	&"howto_edges_dashed": [
+		"Dashed — work in hand: drills run, queues wait.",
+	],
+	&"howto_edges_struck": [
+		"Struck — lost or locked: struck from the ledger.",
+	],
+	&"howto_stores": [
+		"Food feeds the table. Timber builds; iron forges gear. The pips at the table edge keep the count.",
+	],
+	&"howto_eye": [
+		"The Watchful Eye is the Crown's suspicion. It warns at 35; riders crack down at 70; at 100 the dream is crushed — and a crushed hand still banks its legacy.",
+	],
+	&"howto_legacy": [
+		"Every hand banks its points for keeps — The Legacy deck spends them between hands.",
+	],
+	&"howto_escalation": [
+		"Every victory garrisons the castle with your own veterans — the next hand storms a harder wall.",
+	],
+	&"howto_offer": [
+		"The clerk slides a printed page across the table — the whole craft, one read long.",
 	],
 	# --- the finishing refinements (refinement #2) ---
 	&"primer_lineform": [
@@ -576,11 +647,30 @@ const CONSUMERS: Dictionary = {
 	&"assault_loss_note": "assault outcome block — AssaultPresenter.outcome_rows",
 	&"chronicle_empty_1": "chronicle empty page — ChroniclePresenter",
 	&"chronicle_empty_2": "chronicle empty page — ChroniclePresenter",
-	&"first_gate": "first-session strip hint (the gate) — FirstSession",
-	&"first_assign": "first-session strip hint (the role fan) — FirstSession",
-	&"first_build": "first-session strip hint (the build order) — FirstSession",
+	&"first_gate": "guided objective note line (the gate) — FirstSession",
+	&"first_assign": "guided objective note line (the role choice) — FirstSession",
+	&"first_build": "guided objective note line (the build order) — FirstSession",
 	&"first_trickle": "first-session strip line (the first produce) — FirstSession",
-	&"first_train": "first-session strip line (the drill line) — FirstSession",
+	&"objective_train": "guided objective note line (the yard) — FirstSession",
+	&"objective_gear": "guided objective note line (the gear) — FirstSession",
+	&"objective_promote": "guided objective note line (the promotion) — FirstSession",
+	&"objective_storm": "guided objective note line (the storm) — FirstSession",
+	&"objective_graduated": "graduation strip line — FirstSession",
+	&"hint_promote": "contextual first-time hint strip row (promotion available) — FirstSession hints",
+	&"hint_warn": "contextual first-time hint strip row (the first suspicion warn) — FirstSession hints",
+	&"hint_odds": "contextual first-time hint strip row (the odds table's first opening) — FirstSession hints",
+	&"hint_bank": "contextual first-time hint strip row (the first legacy bank) — FirstSession hints",
+	&"howto_goal": "how-to pamphlet, THE GOAL line — HowToScreen",
+	&"howto_table_1": "how-to pamphlet, THE TABLE line 1 — HowToScreen",
+	&"howto_table_2": "how-to pamphlet, THE TABLE line 2 — HowToScreen",
+	&"howto_edges_solid": "how-to pamphlet, edge legend (solid) — HowToScreen",
+	&"howto_edges_dashed": "how-to pamphlet, edge legend (dashed) — HowToScreen",
+	&"howto_edges_struck": "how-to pamphlet, edge legend (struck) — HowToScreen",
+	&"howto_stores": "how-to pamphlet, THE STORES line — HowToScreen",
+	&"howto_eye": "how-to pamphlet, THE WATCHFUL EYE line — HowToScreen",
+	&"howto_legacy": "how-to pamphlet, THE LONG GAME line (legacy) — HowToScreen",
+	&"howto_escalation": "how-to pamphlet, THE LONG GAME line (escalation) — HowToScreen",
+	&"howto_offer": "how-to pamphlet, the first-boot offer's line — HowToScreen",
 	&"primer_lineform": "line-form primer strip row (first dashed edge of a session) — SpreadScreen",
 	&"autosave_filed": "autosave strip row (the background flush) — SpreadScreen",
 	&"daysheet_empty_1": "day-sheet empty page — DaySheetScreen.view_for",

@@ -110,10 +110,15 @@ const KEY_BUDGETS: Dictionary = {
 	&"intro_win_veterans": PACKET_BUDGET,
 	&"intro_regime_veterans": STRIP_BUDGET,
 	&"garrison_detail": STRIP_BUDGET,
-	# the first session's printed cues (T-UI-10) — strip rows
+	# the first session's guided objectives (T-UI-10's upgrade) — the
+	# note lines print on the clerk's note plate, which WRAPS (its own
+	# wrap pin lives beside the arc's tests); the trickle payoff stays a
+	# strip row
 	&"first_gate": STRIP_BUDGET, &"first_assign": STRIP_BUDGET,
 	&"first_build": STRIP_BUDGET, &"first_trickle": STRIP_BUDGET,
-	&"first_train": STRIP_BUDGET,
+	# the contextual first-time hints — strip rows, budget-pinned
+	&"hint_promote": STRIP_BUDGET, &"hint_warn": STRIP_BUDGET,
+	&"hint_odds": STRIP_BUDGET, &"hint_bank": STRIP_BUDGET,
 	# the finishing refinements (refinement #2) — strip rows that also
 	# print on the day-sheet's ~560px row label, pinned at the tighter
 	# quote budget

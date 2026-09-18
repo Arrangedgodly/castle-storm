@@ -218,10 +218,28 @@ answer to "which screens got which templates". Shape of the table:
   by the battle's own visual-sequence hash.
 - **The chronicle's empty page** (`chronicle_empty_*`) — rotor 0
   always (an empty chronicle means run 0).
-- **The first session's printed cues** (`first_gate`, `first_assign`,
-  `first_build`, `first_trickle`, `first_train`) — once-only teaching
-  lines in the strip (T-UI-10), rotor = the beat's own tick (the line
-  a player reads is fixed by when the world brought the moment).
+- **The guided objectives' note lines** (`first_gate`, `first_assign`,
+  `first_build` — the arc's opening steps — plus `objective_train`,
+  `objective_gear`, `objective_promote`, `objective_storm`,
+  `objective_graduated`) — the pinned clerk's note shows the CURRENT
+  objective in the world's own words and advances on the real command
+  (T-UI-10's tutorial upgrade); the note plate wraps, so these are
+  wrap-surface lines pinned by the arc's own tests, not the strip
+  budget. `first_trickle` keeps its strip payoff print (the real first
+  increase), rotor = the beat's own tick.
+- **The contextual first-time hints** (`hint_promote`, `hint_warn`,
+  `hint_odds`, `hint_bank`) — once-EVER plain-language strip rows at
+  the key moments (the geared trainee, the first warn, the odds
+  table's first opening, the first legacy bank with its real score),
+  flag-gated in the META domain, budget-pinned at the strip.
+- **The how-to pamphlet** (`howto_goal`, `howto_table_1/2`,
+  `howto_edges_solid/dashed/struck`, `howto_stores`, `howto_eye`,
+  `howto_legacy`, `howto_escalation`, `howto_offer`) — the printed
+  primer's body (HowToScreen): static content in the clerk's one
+  voice (the legacy-tree precedent: 1 variant, table == floor), wrap
+  surfaces on the scrollable page; the Eye's line carries the sim's
+  own thresholds (35 / 70 / 100) — the pamphlet cannot lie about the
+  game it teaches.
 - **The legacy tree's voice** (`unlock_branch_<branch>`,
   `unlock_flavor_<node_id>` — L1-B): one branch-name key per branch
   plate and one flavor key per node card, literal lines (no tokens,
@@ -304,7 +322,8 @@ punished — the copy IS the policy's tone).
 |---|---|
 | `content/schema/copy_table.gd` | The key/token vocabulary, variant caps, rotating keys, banned list (validated) |
 | `content/mvp/copy_table.tres` | THE shipped voice — 131 keys, 1–4 variants each |
-| `ui/screens/spread/first_session.gd` | The first session's five printed cues (T-UI-10) |
+| `ui/screens/spread/first_session.gd` | The guided objective arc + the once-ever hints (T-UI-10's upgrade) |
+| `ui/screens/howto/howto_screen.gd` | The how-to pamphlet + the first-boot offer (the tutorial's primer) |
 | `content/schema/identity_pools.gd` + `content/mvp/identity_pools.tres` | The names (firsts, epithets, tags, recruits, traits) |
 | `sim/copy_deck.gd` | The renderer: variant selection, substitution, fallback floor, coverage report |
 | `sim/systems/suspicion_system.gd` | The suspicion beats' render query (seq-rotated) |

@@ -158,11 +158,23 @@ func test_live_run_save_mounts_continue_primary_and_new_run_secondary() -> void:
 	# CONTINUE is the seeded primary; the live-hand line names the leader.
 	assert_bool(shell._continue_chip.has_focus()).is_true()
 	assert_bool(String(shell._flavor_label.text).contains(leader)).is_true()
-	# The two doors cycle focus between themselves (pad never escapes).
+	# The doors cycle focus through the How-to-Play chip and back to
+	# CONTINUE (pad never escapes the card; the tutorial upgrade added
+	# the always-present pamphlet verb to the cycle).
 	assert_bool(shell._continue_chip.focus_neighbor_bottom
 		== shell._new_run_chip.get_path()).is_true()
 	assert_bool(shell._new_run_chip.focus_neighbor_bottom
+		== shell._howto_chip.get_path()).is_true()
+	assert_bool(shell._howto_chip.focus_neighbor_bottom
 		== shell._continue_chip.get_path()).is_true()
+	# The How to Play chip: always present, opens the pamphlet paper,
+	# and focus returns to it when the paper folds.
+	assert_bool(String(shell._howto_chip._label.text) == "How to Play").is_true()
+	shell._howto_chip.pressed.emit()
+	assert_bool(shell._howto.is_open()).is_true()
+	assert_bool(String(shell._howto.sheet()._title_label.text) == "HOW TO PLAY").is_true()
+	shell._howto.close()
+	assert_bool(shell._howto_chip.has_focus()).is_true()
 	await _retire(shell)
 
 

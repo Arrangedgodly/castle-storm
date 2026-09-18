@@ -121,6 +121,12 @@ run-game:
 #   CS_SPREAD_SHOT=/path.png CS_SPREAD_ESCALATION=3 make run-demo  # L2-C: the REAL capture end to end — the storm's victory
 #                                                                # capture beat, the win reveal it deals (.reveal.png), and the
 #                                                                # chronicle entry's escalation line
+#   CS_SPREAD_SHOT=/path.png CS_SPREAD_HOWTO=1 make run-demo   # the tutorial: the FIRST-FRESH-BOOT OFFER (the clerk's pamphlet paper,
+#                                                               # two verbs: Read the pamphlet / I know this table)
+#   CS_SPREAD_SHOT=/path.png CS_SPREAD_HOWTO=2 make run-demo   # the HOW-TO PAMPHLET open via the header verb, captured BOTH
+#                                                               # orientations (720x1280 portrait + .landscape.png)
+#   CS_SPREAD_SHOT=/path.png CS_SPREAD_HOWTO=3 make run-demo   # the PINNED OBJECTIVE NOTE mid-arc — the gate objective at the
+#                                                               # reserved left lane, the offer card focused beside it
 #   CS_SPREAD_SHOT=/path.png CS_SPREAD_FIRST=1 make run-demo    # the first session, moment 1: the EMPTY SPREAD (staked plots)
 #                                                               # + the first gate hint at the 7-minute arrival (T-UI-10)
 #   CS_SPREAD_SHOT=/path.png CS_SPREAD_FIRST=2 make run-demo    # moment 2: the assignment + build-order hints, focus on the plot

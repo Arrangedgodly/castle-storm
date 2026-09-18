@@ -107,6 +107,8 @@ const INTRO_SCENE := preload("res://ui/screens/intro/intro_screen.tscn")
 const ChronicleScreenScript := preload("res://ui/screens/chronicle/chronicle_screen.gd")
 const CHRONICLE_SCENE := preload("res://ui/screens/chronicle/chronicle_screen.tscn")
 const DaySheetScreenScript := preload("res://ui/screens/spread/day_sheet_screen.gd")
+const HowToScreenScript := preload("res://ui/screens/howto/howto_screen.gd")
+const OBJECTIVE_NOTE_SCRIPT := preload("res://ui/screens/spread/objective_note.gd")
 const PressRoomScreenScript := preload("res://ui/screens/spread/press_room_screen.gd")
 const LegacyScreenScript := preload("res://ui/screens/legacy/legacy_screen.gd")
 
@@ -154,6 +156,9 @@ var stats := {
 	&"day_sheets_opened": 0, &"day_sheets_closed": 0,
 	&"press_rooms_opened": 0, &"press_rooms_closed": 0,
 	&"legacies_opened": 0, &"legacies_closed": 0,
+	&"howtos_opened": 0, &"howtos_closed": 0,
+	&"howto_offers": 0, &"howto_answered": 0,
+	&"note_skips": 0, &"objective_advances": 0, &"hint_rows": 0,
 	&"type_scale_changes": 0, &"motion_changes": 0,
 	&"catch_up_prints": 0, &"quiet_lines": 0,
 	&"first_nudges": 0, &"first_focuses": 0,
@@ -212,6 +217,18 @@ var _press_room: PressRoomScreen
 ## REAL host command (unlock_purchase) and apply at the next run start
 ## (the L1-A rule, printed honestly when a hand is live).
 var _legacy: LegacyScreen
+## THE HOW-TO PAMPHLET (the tutorial upgrade): the printed primer —
+## paper like its siblings, opened from the title card's chip and the
+## header's How-to-Play verb, and OFFERED once on the first fresh boot
+## (a small declinable paper: "I know this table"). The offer's answer
+## persists in the META domain (the first_session "howto" flag).
+var _howto: HowToScreenScript
+## This boot was the one true fresh first deal (the boot intro's own
+## rule, snapshotted at mount) — the offer rides its intro's fold.
+var _fresh_first_deal := false
+## The pamphlet was opened from a chip (focus returns there when it
+## folds); the offer path returns focus to the table instead.
+var _howto_from_chip := false
 ## The line-form primer's session latch (finishing refinement #2, P2):
 ## one printed teaching line at the first dashed (in-progress) edge the
 ## session shows — once per session, the lightest honest cadence.
@@ -290,6 +307,8 @@ func _ready() -> void:
 	_build_day_sheet_screen()
 	_build_press_room_screen()
 	_build_legacy_screen()
+	_build_howto_screen()
+	_build_objective_notes()
 	_build_chronicle_screen()
 	host.event_observed.connect(_on_event)
 	host.sim_advanced.connect(_on_ticks)
@@ -301,9 +320,12 @@ func _ready() -> void:
 	# THE FIRST SESSION (T-UI-10): arm the once-only nudge layer on the
 	# one true first deal — the fresh boot's "seen" flag persists here,
 	# so every later boot of this install (resume, restart, new hand) is
-	# nudge-free by construction.
+	# nudge-free by construction. The fresh-first-deal snapshot (the
+	# boot intro's own rule) is what offers the pamphlet once.
 	first_session = FirstSession.new()
 	first_session.begin(host)
+	_fresh_first_deal = host.is_run_running() and host.meta.runs_recorded == 0 \
+		and host.engine.tick_count <= 1
 	# DEFERRED: the slots lay themselves out via a deferred call at their
 	# own _ready (queued before this one), so the first bind must land
 	# AFTER settled slot rects — column ladders and the Eye's perch read
@@ -395,6 +417,7 @@ func refresh_from_state() -> void:
 	_bind_header()
 	_bind_phase()
 	_bind_chronicle()
+	_bind_objective_note()
 	_entrances_armed = true
 	_validate_open_fan()
 
@@ -451,11 +474,21 @@ func _on_event(event: Dictionary) -> void:
 	# so run-boundary events reach the layer even on the "full" path
 	# (graduation); the ROW prints now (newest strip line — the row was
 	# already pushed above), while the FOCUS nudge defers to the end of
-	# the frame so the event's own card rebinds exist first.
+	# the frame so the event's own card rebinds exist first. The arc's
+	# objective triggers ride the same call; the note re-binds after.
 	if first_session != null:
 		var nudge: Dictionary = first_session.on_event(event, host)
 		if not nudge.is_empty():
 			_deliver_nudge(nudge)
+	_bind_objective_note()
+	# THE CONTEXTUAL FIRST-TIME HINTS (the tutorial upgrade): once-EVER
+	# plain-language lines at the key moments (the first warn, the first
+	# legacy bank), flag-gated in the META domain. One strip row, ever.
+	var hint: Dictionary = FirstSession.hint_on_event(event, host)
+	if not hint.is_empty():
+		stats[&"hint_rows"] += 1
+		presenter.push_row(hint["row"])
+		_bind_chronicle()
 	_on_suspicion_event(event)
 	# A run ENDED by failure (the suspicion crush; the thin abort): the
 	# CRUSHED BEAT plays first when the death was a real crush (the table
@@ -577,13 +610,20 @@ func _on_ticks(ticks: int) -> void:
 	_bind_pips()
 	_rebind_training_cards()
 	_bind_phase()
-	# The first-session per-batch beats (T-UI-10): the build-order choice
-	# (affordability is state, not an event) and the trickle watch
-	# (production settles silently — the same channel the pips ride).
+	# The first-session per-batch beats (T-UI-10): the trickle watch
+	# (production settles silently — the same channel the pips ride) and
+	# the crowded-table graduation. The contextual promotion hint rides
+	# the same batch (its moment is a state, not an event).
 	if first_session != null:
 		var nudge: Dictionary = first_session.on_ticks(host)
 		if not nudge.is_empty():
 			_deliver_nudge(nudge)
+	var state_hint: Dictionary = FirstSession.hint_on_ticks(host)
+	if not state_hint.is_empty():
+		stats[&"hint_rows"] += 1
+		presenter.push_row(state_hint["row"])
+		_bind_chronicle()
+	_bind_objective_note()
 	if demo_policy != null and demo_policy.on_ticks(ticks):
 		demo_policy.apply(host)
 
@@ -600,8 +640,10 @@ func _on_ticks(ticks: int) -> void:
 ## open or story paper (choice card, vignette, reveal, quote) is up.
 func _deliver_nudge(nudge: Dictionary) -> void:
 	stats[&"first_nudges"] += 1
-	presenter.push_row(nudge["row"])
-	_bind_chronicle()
+	if nudge.has("row"):
+		presenter.push_row(nudge["row"])
+		_bind_chronicle()
+	_bind_objective_note()
 	var focus_id := String(nudge.get("focus", ""))
 	if focus_id.is_empty():
 		return
@@ -630,6 +672,163 @@ func _apply_nudge_focus(focus_id: String) -> void:
 	if node != null:
 		stats[&"first_focuses"] += 1
 		node.grab_focus()
+
+
+# --- the guided objective note (the tutorial upgrade) ---------------------------------------
+
+
+## Build the clerk's note ONCE per slot (the Eye's rule: both slots carry
+## their own, equivalence across orientation swaps). The note is paper
+## pinned at the table's LEFT edge; the table makes way through
+## CardSpread.left_reserve for exactly as long as the note stands.
+func _build_objective_notes() -> void:
+	for slot: OrientationSlot in [get_portrait_slot(), get_landscape_slot()]:
+		var note := OBJECTIVE_NOTE_SCRIPT.new()
+		note.name = "ObjectiveNote"
+		slot.add_child(note)
+		note.skip_pressed.connect(_on_note_skip)
+
+
+func _note_of(slot: OrientationSlot) -> OBJECTIVE_NOTE_SCRIPT:
+	for child in slot.get_children():
+		if child is OBJECTIVE_NOTE_SCRIPT:
+			return child as OBJECTIVE_NOTE_SCRIPT
+	return null
+
+
+## The note's bind + the lane's honest enforcement: when the note stands,
+## the spread reserves its lane (cards never under-print it); when it
+## folds, the lane lifts and the table re-centers. The bind is cheap and
+## idempotent — called from the full refresh and after every event/batch
+## the arc's hooks ride.
+func _bind_objective_note() -> void:
+	if host == null:
+		return
+	var objective := {}
+	if first_session != null and first_session.active:
+		objective = FirstSession.current_objective(host)
+	var lane := 0.0
+	if not objective.is_empty():
+		lane = OBJECTIVE_NOTE_SCRIPT.note_lane()
+	for slot: OrientationSlot in [get_portrait_slot(), get_landscape_slot()]:
+		var spread := slot.get_spread() as CardSpread
+		if spread != null and absf(float(spread.get("left_reserve")) - lane) > 0.01:
+			# A re-sort must never strand a settling card short of its seat.
+			CardMotion.snap_all(spread)
+			spread.set("left_reserve", lane)
+			spread.queue_sort()
+		var note := _note_of(slot)
+		if note == null:
+			continue
+		if not objective.is_empty():
+			_place_note(slot, note)
+		note.bind(objective)
+
+
+## The note's seat: the spread band's LEFT edge, vertically centered —
+## the Eye's perch mirrored (always fully inside the slot).
+func _place_note(slot: OrientationSlot, note: OBJECTIVE_NOTE_SCRIPT) -> void:
+	var spread_rect: Rect2 = slot.get_spread().get_global_rect()
+	var rect := OBJECTIVE_NOTE_SCRIPT.note_rect(spread_rect)
+	note.size = rect.size
+	note.global_position = rect.position
+
+
+## The skip verb ("I know this"): the current objective is struck from
+## the arc, the note advances (or folds at the arc's end), and focus
+## never strands on the folded paper.
+func _on_note_skip() -> void:
+	if first_session == null:
+		return
+	if first_session.skip_current(host):
+		stats[&"note_skips"] += 1
+	_bind_objective_note()
+	_focus_first_card()
+
+
+# --- the how-to pamphlet (the tutorial upgrade) ----------------------------------------------
+
+
+## Build the pamphlet ONCE, beside its sibling table papers (the papers
+## are mutually exclusive — whichever opens folds the others; the
+## chronicle stays topmost). Paper over the table while open, never
+## modal chrome.
+func _build_howto_screen() -> void:
+	_howto = HowToScreenScript.new()
+	_howto.name = "HowToScreen"
+	_howto.set_anchors_preset(Control.PRESET_FULL_RECT)
+	add_child(_howto)
+	_howto.closed.connect(_on_howto_closed)
+	_howto.offer_answered.connect(_on_howto_offer_answered)
+
+
+## Open the pamphlet (the header's How-to-Play verb): the other table
+## papers fold first (one paper at a time owns the table). No run needs
+## to be live — the primer reads just as well between hands. The read
+## answers the first-boot offer too (the flag is the offer's receipt).
+func open_howto() -> void:
+	if _howto == null or host == null:
+		return
+	stats[&"howtos_opened"] += 1
+	_howto_from_chip = true
+	close_fan()
+	if _chronicle != null and _chronicle.is_open():
+		_chronicle.close()
+	if _day_sheet != null and _day_sheet.is_open():
+		_day_sheet.close()
+	if _press_room != null and _press_room.is_open():
+		_press_room.close()
+	if _legacy != null and _legacy.is_open():
+		_legacy.close()
+	_mark_howto_answered()
+	_howto.open(host)
+
+
+## The pamphlet folded away: focus returns to the chip that opened it,
+## else the table's first card (a screen must never strand focus).
+func _on_howto_closed() -> void:
+	stats[&"howtos_closed"] += 1
+	if _howto_from_chip:
+		_howto_from_chip = false
+		var active := get_active_slot() as OrientationSlot
+		var chip := header_chip(active, "howto_chip") if active != null else null
+		if chip != null:
+			chip.grab_focus()
+			return
+	_focus_first_card()
+
+
+## The FIRST-FRESH-BOOT OFFER (once, declinable): the boot reveal's fold
+## is the table's quiet moment — the clerk's small paper slides out with
+## the pamphlet's two verbs. Answered exactly once; the receipt
+## persists in the META domain either way.
+func _maybe_offer_howto() -> void:
+	if _howto == null or host == null or not _fresh_first_deal:
+		return
+	if host.meta.first_session_flag(&"howto"):
+		return
+	if not host.is_run_running():
+		return
+	stats[&"howto_offers"] += 1
+	close_fan()
+	if _chronicle != null and _chronicle.is_open():
+		_chronicle.close()
+	_howto.offer(host)
+
+
+## Either offer verb (and every chip-open) marks the receipt: the offer
+## is answered once per install, persisted at once.
+func _on_howto_offer_answered(p_read: bool) -> void:
+	stats[&"howto_answered"] += 1
+	_mark_howto_answered()
+	if not p_read:
+		_howto_from_chip = false
+		# decline: the panel folds via the screen's own close -> _on_howto_closed
+
+
+func _mark_howto_answered() -> void:
+	if host.meta.set_first_session_flag(&"howto"):
+		host.save_manager.save_meta(host.meta)
 
 
 # --- the assault vignette (T-UI-07) -------------------------------------------------------
@@ -720,6 +919,8 @@ func open_chronicle() -> void:
 		_press_room.close()
 	if _legacy != null and _legacy.is_open():
 		_legacy.close()
+	if _howto != null and _howto.is_open():
+		_howto.close()
 	_chronicle.open(host, get_router())
 
 
@@ -739,6 +940,8 @@ func open_day_sheet() -> void:
 		_press_room.close()
 	if _legacy != null and _legacy.is_open():
 		_legacy.close()
+	if _howto != null and _howto.is_open():
+		_howto.close()
 	_day_sheet.open(host, get_router(), presenter)
 
 
@@ -771,6 +974,8 @@ func open_press_room() -> void:
 		_day_sheet.close()
 	if _legacy != null and _legacy.is_open():
 		_legacy.close()
+	if _howto != null and _howto.is_open():
+		_howto.close()
 	_press_room.open(host, get_router())
 
 
@@ -804,6 +1009,8 @@ func open_legacy() -> void:
 		_day_sheet.close()
 	if _press_room != null and _press_room.is_open():
 		_press_room.close()
+	if _howto != null and _howto.is_open():
+		_howto.close()
 	_legacy.open(host)
 
 
@@ -929,6 +1136,8 @@ func _close_chronicle() -> void:
 		_press_room.close()
 	if _legacy != null and _legacy.is_open():
 		_legacy.close()
+	if _howto != null and _howto.is_open():
+		_howto.close()
 
 
 ## Open the assault odds table (the army card's storm action, or the
@@ -941,6 +1150,21 @@ func open_assault() -> void:
 	_pre_assault_focus = get_viewport().gui_get_focus_owner()
 	close_fan()
 	_close_chronicle()
+	# THE FIRST ODDS HINT (the tutorial upgrade): the odds table's first
+	# opening prints one plain-language line (commit storms, retreat is
+	# free) — strip row, once per install, budget-pinned.
+	var hint: Dictionary = FirstSession.hint_odds_if_first(host)
+	if not hint.is_empty():
+		stats[&"hint_rows"] += 1
+		presenter.push_row(hint["row"])
+		_bind_chronicle()
+	# The storm objective performed: opening the odds completes the arc
+	# (the farewell nudge — note folded, one printed line — delivers now).
+	if first_session != null:
+		var storm_nudge: Dictionary = first_session.complete_storm(host)
+		if not storm_nudge.is_empty():
+			_deliver_nudge(storm_nudge)
+		_bind_objective_note()
 	_assault.open(host, get_router())
 
 
@@ -1053,6 +1277,9 @@ func _on_intro_closed(variant: StringName) -> void:
 		_crush_after_intro = false
 		_start_crush_beat()
 		return
+	# THE FIRST-BOOT OFFER (the tutorial upgrade): the reveal folded on
+	# the one true fresh deal — the pamphlet's offer papers out now, once.
+	_maybe_offer_howto()
 	if variant == IntroPresenter.VARIANT_RESUMED:
 		var report := _pending_catch_up
 		_pending_catch_up = {}
@@ -1854,6 +2081,10 @@ func _build_ledger_verbs() -> Control:
 	row.add_child(_ledger_chip("day_sheet_chip", "The Day-Sheet", open_day_sheet))
 	row.add_child(_ledger_chip("press_room_chip", "The Press-Room", open_press_room))
 	row.add_child(_ledger_chip("legacy_chip", "The Legacy", open_legacy))
+	# THE HOW-TO CHIP (the tutorial upgrade): the pamphlet one verb away,
+	# in-run, for the player who missed the first-boot offer — or wants
+	# the edges legend again. The flow wraps; the row's refit carries it.
+	row.add_child(_ledger_chip("howto_chip", "How to Play", open_howto))
 	return row
 
 
@@ -2028,9 +2259,14 @@ func _portrait_spread_height() -> float:
 func _spread_budget() -> Vector2:
 	## The stacked spread's granted size (the ladder's width clamp — the
 	## readability ladder grants the widest cell-honest card); the height
-	## half is _portrait_spread_height's contract.
+	## half is _portrait_spread_height's contract. The objective note's
+	## reserved lane is subtracted — the ladder picks columns for the
+	## cards' REAL width, never for width the pinned note owns.
 	var spread := get_portrait_slot().get_spread() as Control
-	return Vector2(maxf(spread.size.x, float(Inks.TOUCH_GRIP_MIN)),
+	var lane := 0.0
+	if spread is CardSpread:
+		lane = float((spread as CardSpread).get("left_reserve"))
+	return Vector2(maxf(spread.size.x - lane, float(Inks.TOUCH_GRIP_MIN)),
 		maxf(spread.size.y, float(Inks.TOUCH_GRIP_MIN * 3)))
 
 
@@ -2248,6 +2484,8 @@ func _capture_hook() -> void:
 		_legacy_then_capture(int(OS.get_environment("CS_SPREAD_LEGACY")), settle)
 	elif not OS.get_environment("CS_SPREAD_ESCALATION").is_empty():
 		_escalation_then_capture(int(OS.get_environment("CS_SPREAD_ESCALATION")), settle)
+	elif not OS.get_environment("CS_SPREAD_HOWTO").is_empty():
+		_howto_then_capture(int(OS.get_environment("CS_SPREAD_HOWTO")), settle)
 	elif OS.get_environment("CS_SPREAD_LOUD") == "1":
 		# The loud/pressure drive owns its prelude (see _unfold_boot_intro):
 		# its captures were among the four veil-contaminated finds.
@@ -2283,6 +2521,91 @@ func _unfold_boot_intro(mount_frames := 90) -> void:
 			await get_tree().process_frame
 			if not _intro.is_open():
 				break
+
+
+## CS_SPREAD_HOWTO=1: the FIRST-FRESH-BOOT OFFER — the reveal folds and
+## the clerk's small paper slides out with its two verbs (the capture
+## waits for it; the offer line is printed for the log).
+## =2: the PAMPHLET open via the header verb, captured in BOTH
+## orientations (720x1280 portrait, 1280x800 landscape).
+## =3: the PINNED OBJECTIVE NOTE mid-arc — the offer is declined through
+## its real verb, the first arrival pins the gate objective at the
+## table's reserved left lane, and the capture shows note + lane + the
+## focused offer card.
+func _howto_then_capture(mode: int, settle: float) -> void:
+	host.time_scale = 1.0
+	time_scale_index = 0
+	demo_policy = null  # the player's session — no autopilot
+	get_window().size = Vector2i(720, 1280)
+	await _frames_for(0.4)
+	if mode == 1:
+		for i in 240:
+			await get_tree().process_frame
+			if _intro != null and _intro.is_open():
+				break
+		if _intro != null and _intro.is_open():
+			_intro.unfold()
+			for i in 300:
+				await get_tree().process_frame
+				if not _intro.is_open():
+					break
+		for i in 90:
+			await get_tree().process_frame
+			if _howto != null and _howto.is_open():
+				break
+		print("[spread] howto capture (offer): state %d, line '%s'" % [
+			_howto.state, String(_howto.offer_panel().line_label().text)])
+		_settle_then_capture(settle if settle > 0.0 else 0.4)
+		return
+	await _unfold_boot_intro(240)
+	if mode == 2:
+		open_howto()
+		for i in 90:
+			await get_tree().process_frame
+			if get_viewport().gui_get_focus_owner() != null:
+				break
+		print("[spread] howto capture (pamphlet): sections %d, legend rows %d, hash %d" % [
+			_howto.sheet().headings().size(), _howto.sheet().legend_rows().size(),
+			_howto.sheet().snapshot_hash()])
+		await _frames_for(0.5)
+		var portrait := get_viewport().get_texture().get_image()
+		portrait.save_png(_capture_path())
+		print("[spread] screenshot %s — pamphlet portrait" % _capture_path())
+		get_window().size = Vector2i(1280, 800)
+		await _frames_for(1.2)
+		var landscape := get_viewport().get_texture().get_image()
+		var path := _capture_path()
+		path = path.substr(0, path.length() - 4) + ".landscape" + path.substr(path.length() - 4)
+		landscape.save_png(path)
+		print("[spread] screenshot %s — pamphlet landscape" % path)
+		get_tree().quit(0)
+		return
+	# mode 3: the note mid-arc. Decline the offer through its real verb
+	# (the capture shows the NOTE, not the paper that answered it).
+	if _howto != null and _howto.is_open() and _howto.state == HowToScreenScript.State.OFFER:
+		_howto.offer_panel().decline_chip().pressed.emit()
+		for i in 30:
+			await get_tree().process_frame
+	while int(host.units().pending_offers()) == 0 and host.engine.tick_count < 1200:
+		host.fast_forward(1)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var note := _note_of(get_active_slot() as OrientationSlot)
+	print("[spread] howto capture (note): visible %s, objective '%s' — lane %.0f" % [
+		str(note != null and note.visible),
+		String(note.objective_label().text) if note != null else "-",
+		float((get_active_slot().get_spread() as CardSpread).get("left_reserve"))])
+	var focus := get_viewport().gui_get_focus_owner()
+	print("[spread]   focus on an offer card: %s" % str(
+		focus != null and focus.has_meta(&"spread_card_id")
+		and String(focus.get_meta(&"spread_card_id")).begins_with("offer_")))
+	_settle_then_capture(settle if settle > 0.0 else 0.4)
+
+
+## The capture drives' frame wait (wall frames at the driven pace).
+func _frames_for(seconds: float) -> void:
+	for i in int(seconds * 60.0):
+		await get_tree().process_frame
 
 
 ## CS_SPREAD_SUSPICION=1: the telegraph CHOICE CARD as it slides onto the

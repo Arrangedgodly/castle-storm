@@ -43,6 +43,7 @@ extends Control
 const SPREAD_SCENE := preload("res://ui/screens/spread/spread_screen.tscn")
 const SpreadScreen := preload("res://ui/screens/spread/spread_screen.gd")
 const LegacyScreenScript := preload("res://ui/screens/legacy/legacy_screen.gd")
+const HowToScreenScript := preload("res://ui/screens/howto/howto_screen.gd")
 const GROUND_SCENE := preload("res://ui/theme/table_ground.tscn")
 const RULE_SCRIPT := preload("res://ui/theme/rule_mark.gd")
 
@@ -70,6 +71,10 @@ const GAME_NAME := "CASTLE STORM"
 ## The front door's Legacy chip label (L1-C — the code-side verb
 ## grammar, the header verbs row's own).
 const LEGACY_CHIP_LABEL := "The Legacy"
+
+## The front door's How-to-Play chip label (the tutorial upgrade — the
+## pamphlet one gesture away from the very first door, every route).
+const HOWTO_CHIP_LABEL := "How to Play"
 
 ## The REAL engine host this shell booted (null before _ready).
 var host: GameHost
@@ -101,6 +106,13 @@ var _new_run_chip: ActionFan.ActionChip
 ## hand has ended (the bank is why a player returns) — the growing deck
 ## opens as paper over the title's own table.
 var _legacy_chip: ActionFan.ActionChip
+## The How-to-Play chip on the title card (the tutorial upgrade): ALWAYS
+## present, every route — the printed primer is one gesture from the
+## front door.
+var _howto_chip: ActionFan.ActionChip
+## The how-to pamphlet composed over the title (null until first opened;
+## the title's own paper, like the legacy deck).
+var _howto: HowToScreenScript
 ## The NEW-RUN confirm latch (the odds-COMMIT grammar's armed step).
 var _new_run_armed := false
 ## The legacy deck composed over the title (null until first opened).
@@ -279,6 +291,11 @@ func _build_chips() -> Control:
 		_begin_chip = _chip(CopyDeck.line(table, key, rotor), true)
 		_begin_chip.pressed.connect(_on_begin)
 		rows.add_child(_begin_chip)
+	# THE HOW-TO CHIP (the tutorial upgrade): always — the new player's
+	# door to the pamphlet, before anything else is asked of them.
+	_howto_chip = _chip(HOWTO_CHIP_LABEL, false)
+	_howto_chip.pressed.connect(_on_howto)
+	rows.add_child(_howto_chip)
 	if show_legacy_chip_for(host.meta.runs_recorded):
 		_legacy_chip = _chip(LEGACY_CHIP_LABEL, false)
 		_legacy_chip.pressed.connect(_on_legacy)
@@ -305,7 +322,7 @@ func _wire_chip_cycle() -> void:
 
 func _wire_chip_cycle_paths() -> void:
 	var column: Array[Control] = []
-	for chip: ActionFan.ActionChip in [_continue_chip, _new_run_chip, _legacy_chip]:
+	for chip: ActionFan.ActionChip in [_continue_chip, _new_run_chip, _howto_chip, _legacy_chip]:
 		if chip != null:
 			column.append(chip)
 	if _begin_chip != null:
@@ -417,6 +434,25 @@ func _on_legacy_closed() -> void:
 		_legacy_chip.grab_focus()
 
 
+## HOW TO PLAY (the tutorial upgrade): the printed primer opens as PAPER
+## OVER THE TITLE'S OWN TABLE (the legacy deck's composition rule — no
+## modal chrome at the front door either). Closing returns focus to the
+## chip that opened it.
+func _on_howto() -> void:
+	if _howto == null:
+		_howto = HowToScreenScript.new()
+		_howto.name = "HowToScreen"
+		_howto.set_anchors_preset(Control.PRESET_FULL_RECT)
+		_title_layer.add_child(_howto)
+		_howto.closed.connect(_on_howto_closed)
+	_howto.open(host)
+
+
+func _on_howto_closed() -> void:
+	if _howto_chip != null:
+		_howto_chip.grab_focus()
+
+
 ## The whole title card is the single-chip modes' affordance (the intro
 ## packet's precedent — touch parity: a tap anywhere on the paper is the
 ## gesture). The continue mode carries two doors; only the chips answer.
@@ -480,7 +516,9 @@ func _release_title() -> void:
 	_continue_chip = null
 	_new_run_chip = null
 	_legacy_chip = null
+	_howto_chip = null
 	_legacy = null  # the deck is the title's own paper — it folds with it
+	_howto = null  # the primer is the title's own paper — it folds with it
 
 
 # --- the platform seams -------------------------------------------------------------
