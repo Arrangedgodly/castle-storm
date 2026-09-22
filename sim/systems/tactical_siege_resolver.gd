@@ -286,6 +286,7 @@ func execute_tactic(tactic_id: StringName) -> Dictionary:
 	# Check if army was completely destroyed
 	if current_army_power <= 0:
 		_handle_defeat()
+		round_result["text"] = log_text + " Your forces have been routed and repelled!"
 
 	return round_result
 

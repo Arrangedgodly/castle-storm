@@ -25,15 +25,8 @@ Redesign Castle Storm into an accessible, visually rich, and intuitive medieval 
 
 ---
 
-## Epic 2: Tactical Siege Combat
+## Epic 2: Tactical Siege Combat (Completed)
 Expands the assault from an instant binary dice roll into an interactive, multi-stage siege with tactical casualty choices, breach stances, duel challenges, and strategic retreat.
-
-### Dependency Graph
-- TS-01: Multi-Phase Siege Rules & Combat Resolver (Base: feature/redesign-t08-acceptance)
-  └──> TS-02: Tactical Siege Presenter & Telemetry Contracts (Base: feature/siege-ts01-resolver) [Stacked on TS-01]
-       └──> TS-03: Interactive Siege Tactical Viewport (Base: feature/siege-ts02-presenter) [Stacked on TS-02]
-            └──> TS-04: SiegePanel & GameplayScreen Tactical Integration (Base: feature/siege-ts03-ui) [Stacked on TS-03]
-                 └──> TS-05: Full Tactical Siege Acceptance Sweep (Base: feature/siege-ts04-integration) [Stacked on TS-04]
 
 ### Epic 2 Task Ledger
 | ID | Title | Branch | Base | Mode | Blocked By | Status | PR URL | Linked? |
@@ -42,9 +35,28 @@ Expands the assault from an instant binary dice roll into an interactive, multi-
 | TS-02 | Tactical Siege Presenter & Contracts | feature/siege-ts02-presenter | feature/siege-ts01-resolver | autonomous | TS-01 | pr-open | https://github.com/Arrangedgodly/castle-storm/pull/10 | Yes |
 | TS-03 | Interactive Siege Tactical Viewport | feature/siege-ts03-ui | feature/siege-ts02-presenter | autonomous | TS-02 | pr-open | https://github.com/Arrangedgodly/castle-storm/pull/11 | Yes |
 | TS-04 | SiegePanel & GameplayScreen Integration | feature/siege-ts04-integration | feature/siege-ts03-ui | autonomous | TS-03 | pr-open | https://github.com/Arrangedgodly/castle-storm/pull/12 | Yes |
-| TS-05 | Full Tactical Siege Acceptance Sweep | feature/siege-ts05-acceptance | feature/siege-ts04-integration | autonomous | TS-04 | ready | - | - |
+| TS-05 | Full Tactical Siege Acceptance Sweep | feature/siege-ts05-acceptance | feature/siege-ts04-integration | autonomous | TS-04 | pr-open | https://github.com/Arrangedgodly/castle-storm/pull/13 | Yes |
+
+---
+
+## Epic 3: Clandestine Operations & Infiltration
+Expands pre-assault strategy with covert operations (bribing gatekeepers, poisoning garrison supplies, smuggling weapons, planting informants) that create tactical breach advantages.
+
+### Dependency Graph
+- CO-01: Covert Operations Rules & Simulation System (Base: feature/siege-ts05-acceptance)
+  └──> CO-02: Covert Ops Presenter & Telemetry Contracts (Base: feature/covert-co01-system) [Stacked on CO-01]
+       └──> CO-03: Covert Infiltration Panel & Operation Cards (Base: feature/covert-co02-presenter) [Stacked on CO-02]
+            └──> CO-04: GameplayScreen Integration & Acceptance Sweep (Base: feature/covert-co03-ui) [Stacked on CO-03]
+
+### Epic 3 Task Ledger
+| ID | Title | Branch | Base | Mode | Blocked By | Status | PR URL | Linked? |
+|---|---|---|---|---|---|---|---|---|
+| CO-01 | Covert Operations Simulation System | feature/covert-co01-system | feature/siege-ts05-acceptance | autonomous | None | ready | - | - |
+| CO-02 | Covert Ops Presenter & Contracts | feature/covert-co02-presenter | feature/covert-co01-system | autonomous | CO-01 | blocked | - | - |
+| CO-03 | Covert Infiltration Panel & Operation Cards | feature/covert-co03-ui | feature/covert-co02-presenter | autonomous | CO-02 | blocked | - | - |
+| CO-04 | GameplayScreen Integration & Acceptance Sweep | feature/covert-co04-integration | feature/covert-co03-ui | autonomous | CO-03 | blocked | - | - |
 
 ## Execution Protocol
-- **Stacking**: Stacked sequential layers built on top of `feature/redesign-t08-acceptance`.
+- **Stacking**: Stacked sequential layers built on top of `feature/siege-ts05-acceptance`.
 - **Validation**: Every slice must pass unit tests via `cmd.exe /c "..."` before PR creation.
 - **Thread Linking**: Every PR is linked via `link_pull_request` MCP tool immediately upon opening.
