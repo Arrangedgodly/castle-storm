@@ -21,7 +21,7 @@ Redesign Castle Storm from the minimalist ink-on-paper tarot card table into an 
 | ID | Title | Branch | Base | Mode | Blocked By | Status | PR URL | Linked? |
 |---|---|---|---|---|---|---|---|---|
 | T-01 | Playable Action & Presenter Contracts | feature/redesign-t01-contracts | main | autonomous | None | pr-open | https://github.com/Arrangedgodly/castle-storm/pull/1 | Yes |
-| T-02 | Dedicated Top HUD & Resource Bar | feature/redesign-t02-hud | feature/redesign-t01-contracts | autonomous | None (T-01 pr-open) | ready | - | - |
+| T-02 | Dedicated Top HUD & Resource Bar | feature/redesign-t02-hud | feature/redesign-t01-contracts | autonomous | None (T-01 pr-open) | pr-open | https://github.com/Arrangedgodly/castle-storm/pull/2 | Yes |
 | T-03 | Village & Production Panel | feature/redesign-t03-village | feature/redesign-t01-contracts | autonomous | None (T-01 pr-open) | ready | - | - |
 | T-04 | Roster & Military Armory Panel | feature/redesign-t04-roster | feature/redesign-t01-contracts | autonomous | None (T-01 pr-open) | ready | - | - |
 | T-05 | Castle Siege & Threat Panel | feature/redesign-t05-siege | feature/redesign-t01-contracts | autonomous | None (T-01 pr-open) | ready | - | - |
@@ -30,6 +30,6 @@ Redesign Castle Storm from the minimalist ink-on-paper tarot card table into an 
 | T-08 | Acceptance & Playability Sweep | feature/redesign-t08-acceptance | feature/redesign-t07-visuals | autonomous | T-07 | pending | - | - |
 
 ## Execution Protocol
-- **Stacking**: Branching tasks T-02 through T-05 will be created from `feature/redesign-t01-contracts`.
+- **Stacking**: Branching tasks T-02 through T-05 are created from `feature/redesign-t01-contracts`.
 - **Validation**: Every slice must pass unit tests via `cmd.exe /c "..."` before PR creation.
 - **Thread Linking**: Every PR is linked via `link_pull_request` MCP tool immediately upon opening.
