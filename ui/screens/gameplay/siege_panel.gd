@@ -6,6 +6,7 @@ class_name SiegePanel
 extends PanelContainer
 
 signal assault_committed
+signal tactical_siege_initiated
 
 const GameplayPresenter := preload("res://ui/screens/gameplay/gameplay_presenter.gd")
 
@@ -20,6 +21,7 @@ var odds_meter: ProgressBar
 var odds_label: Label
 var assessment_label: Label
 var assault_button: Button
+var tactical_button: Button
 
 
 func _init() -> void:
@@ -127,10 +129,18 @@ func _build_ui() -> void:
 	# --- Assault Command Section ---
 	var assault_box := VBoxContainer.new()
 	assault_box.alignment = BoxContainer.ALIGNMENT_CENTER
+	assault_box.add_theme_constant_override("separation", 8)
+
+	tactical_button = Button.new()
+	tactical_button.text = "COMMAND TACTICAL BREACH"
+	tactical_button.custom_minimum_size = Vector2(0, 36)
+	tactical_button.disabled = true
+	tactical_button.pressed.connect(_on_tactical_pressed)
+	assault_box.add_child(tactical_button)
 
 	assault_button = Button.new()
-	assault_button.text = "STORM THE CASTLE"
-	assault_button.custom_minimum_size = Vector2(0, 44)
+	assault_button.text = "STORM THE CASTLE (Auto-Resolve)"
+	assault_button.custom_minimum_size = Vector2(0, 32)
 	assault_button.disabled = true
 	assault_button.pressed.connect(_on_assault_pressed)
 	assault_box.add_child(assault_button)
@@ -163,39 +173,34 @@ func bind_siege_data(data: Dictionary) -> void:
 	army_label.text = "Conspirator Army: %d Power" % army_power
 
 	if floor_met:
-		floor_label.text = "Minimum Assault Floor: %d (Floor Met)" % floor_power
+		floor_label.text = "Minimum Floor: %d (Met - Ready to Assault)" % floor_power
 		floor_label.add_theme_color_override("font_color", Inks.INK)
 	else:
-		floor_label.text = "Minimum Assault Floor: %d (Needs %d More Power)" % [
-			floor_power, maxi(0, floor_power - army_power)
-		]
-		floor_label.add_theme_color_override("font_color", Inks.RED)
+		floor_label.text = "Minimum Floor: %d (Unmet - Recruit More Knights/Soldiers)" % floor_power
+		floor_label.add_theme_color_override("font_color", Inks.INK_SOFT)
 
-	odds_label.text = "Calculated Win Odds: %.1f%%" % win_odds
 	odds_meter.value = win_odds
+	odds_label.text = "Calculated Win Odds: %.1f%%" % win_odds
 
-	# Assessment text
-	if not floor_met:
-		assessment_label.text = "Below Assault Floor"
-		assessment_label.add_theme_color_override("font_color", Inks.RED)
-	elif win_odds < 25.0:
-		assessment_label.text = "Desperate Odds"
-		assessment_label.add_theme_color_override("font_color", Inks.RED)
-	elif win_odds < 50.0:
-		assessment_label.text = "Risky Engagement"
-		assessment_label.add_theme_color_override("font_color", Inks.INK_SOFT)
-	elif win_odds < 75.0:
-		assessment_label.text = "Favorable Position"
-		assessment_label.add_theme_color_override("font_color", Inks.INK)
-	else:
+	if win_odds >= 75.0:
 		assessment_label.text = "Decisive Advantage"
-		assessment_label.add_theme_color_override("font_color", Inks.INK)
+	elif win_odds >= 50.0:
+		assessment_label.text = "Favorable Position"
+	elif win_odds >= 30.0:
+		assessment_label.text = "Risky Engagement"
+	else:
+		assessment_label.text = "Severe Peril"
 
 	assault_button.disabled = not can_assault
+	tactical_button.disabled = not can_assault
 
 
 func _on_assault_pressed() -> void:
+	if _host == null:
+		return
+	GameplayPresenter.commit_assault(_host)
 	assault_committed.emit()
-	if _host != null:
-		GameplayPresenter.commit_assault(_host)
-		update_from_host(_host)
+
+
+func _on_tactical_pressed() -> void:
+	tactical_siege_initiated.emit()

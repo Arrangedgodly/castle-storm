@@ -11,6 +11,9 @@ const RosterPanel := preload("res://ui/screens/gameplay/roster_panel.gd")
 const SiegePanel := preload("res://ui/screens/gameplay/siege_panel.gd")
 const GameplayPresenter := preload("res://ui/screens/gameplay/gameplay_presenter.gd")
 const GameplayStyle := preload("res://ui/screens/gameplay/gameplay_style.gd")
+const TacticalSiegeResolver := preload("res://sim/systems/tactical_siege_resolver.gd")
+const TacticalSiegePresenter := preload("res://ui/screens/gameplay/tactical_siege_presenter.gd")
+const TacticalSiegeView := preload("res://ui/screens/gameplay/tactical_siege_view.gd")
 
 var host: GameHost:
 	set(value):
@@ -24,12 +27,15 @@ var village_panel: VillagePanel
 var roster_panel: RosterPanel
 var siege_panel: SiegePanel
 var tab_container: TabContainer
+var tactical_view: TacticalSiegeView
+var tactical_siege: TacticalSiegeResolver
 
 # Dedicated tabs
 var dashboard_hbox: HBoxContainer
 var tab_village_wrapper: MarginContainer
 var tab_roster_wrapper: MarginContainer
 var tab_siege_wrapper: MarginContainer
+var tab_tactical_wrapper: MarginContainer
 
 # Status & Event ticker
 var event_ticker_label: Label
@@ -98,9 +104,27 @@ func _build_ui() -> void:
 	siege_panel = SiegePanel.new()
 	siege_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	siege_panel.size_flags_stretch_ratio = 0.9
+	siege_panel.tactical_siege_initiated.connect(_on_tactical_siege_initiated)
 	dashboard_hbox.add_child(siege_panel)
 
 	tab_container.add_child(dash_margin)
+
+	# Tab 1: Tactical Siege View
+	tab_tactical_wrapper = MarginContainer.new()
+	tab_tactical_wrapper.name = "🏹 Tactical Siege"
+	tab_tactical_wrapper.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tab_tactical_wrapper.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	tab_tactical_wrapper.add_theme_constant_override("margin_left", 8)
+	tab_tactical_wrapper.add_theme_constant_override("margin_top", 8)
+	tab_tactical_wrapper.add_theme_constant_override("margin_right", 8)
+	tab_tactical_wrapper.add_theme_constant_override("margin_bottom", 8)
+
+	tactical_view = TacticalSiegeView.new()
+	tactical_view.tactic_selected.connect(_on_tactical_tactic_selected)
+	tactical_view.retreat_requested.connect(_on_tactical_retreat_requested)
+	tactical_view.siege_closed.connect(_on_tactical_siege_closed)
+	tab_tactical_wrapper.add_child(tactical_view)
+	tab_container.add_child(tab_tactical_wrapper)
 
 	# --- 3. Bottom Ticker & Controls ---
 	var bottom_bar := PanelContainer.new()
@@ -159,6 +183,47 @@ func refresh() -> void:
 	village_panel.update_from_host(host)
 	roster_panel.update_from_host(host)
 	siege_panel.update_from_host(host)
+	_refresh_tactical_view()
+
+
+func _on_tactical_siege_initiated() -> void:
+	if host == null or host.engine == null:
+		return
+	tactical_siege = TacticalSiegeResolver.new(host.engine)
+	var start_event := tactical_siege.start_siege(host.engine)
+	event_ticker_label.text = "Chronicle: " + str(start_event.get("text", "The siege begins!"))
+	_refresh_tactical_view()
+	# Switch to tactical siege tab
+	tab_container.current_tab = tab_container.get_tab_count() - 1
+
+
+func _on_tactical_tactic_selected(tactic_id: StringName) -> void:
+	if tactical_siege == null:
+		return
+	var res := TacticalSiegePresenter.execute_tactic(tactical_siege, tactic_id)
+	event_ticker_label.text = "Chronicle: " + str(res.get("text", "Tactical order executed."))
+	_refresh_tactical_view()
+	refresh()
+
+
+func _on_tactical_retreat_requested() -> void:
+	if tactical_siege == null:
+		return
+	var res := TacticalSiegePresenter.order_retreat(tactical_siege)
+	event_ticker_label.text = "Chronicle: " + str(res.get("text", "Retreat sounded!"))
+	_refresh_tactical_view()
+	refresh()
+
+
+func _on_tactical_siege_closed() -> void:
+	tab_container.current_tab = 0
+
+
+func _refresh_tactical_view() -> void:
+	if tactical_view == null:
+		return
+	var view_data := TacticalSiegePresenter.format_siege_view(tactical_siege)
+	tactical_view.bind_view(view_data)
 
 
 func _on_advance_1h() -> void:
