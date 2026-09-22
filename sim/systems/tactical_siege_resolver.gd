@@ -383,6 +383,7 @@ func _handle_victory() -> void:
 	var run = _engine.get_system(&"run")
 	if run != null and run.has_method("resolve_victory"):
 		run.resolve_victory(_engine, true, current_army_power)
+		_engine.tick()
 
 
 func _handle_defeat() -> void:
@@ -397,3 +398,42 @@ func _handle_defeat() -> void:
 		var susp = _engine.get_system(&"suspicion")
 		if susp != null and susp.has_method("apply_external_bump"):
 			susp.apply_external_bump(_engine, &"siege_defeat", 25, true)
+		if current_army_power <= 0:
+			var run = _engine.get_system(&"run")
+			if run != null and run.has_method("resolve_victory"):
+				run.resolve_victory(_engine, false, 0)
+				_engine.tick()
+
+
+## Returns a comprehensive debrief summary of the siege climax for run resolution.
+func get_climax_summary() -> Dictionary:
+	var outcome_str := "in_progress"
+	match status:
+		SiegeStatus.VICTORY:
+			outcome_str = "victory"
+		SiegeStatus.REPELLED:
+			outcome_str = "repelled"
+		SiegeStatus.RETREATED:
+			outcome_str = "retreated"
+
+	var cycle: int = 0
+	var banked_pts: int = 0
+	var captured_garrison: Dictionary = {}
+
+	if _engine != null:
+		var run = _engine.get_system(&"run")
+		if run != null and "meta" in run and run.meta != null:
+			cycle = int(run.meta.escalation_cycle)
+			banked_pts = int(run.meta.legacy_points)
+			captured_garrison = run.meta.escalation_garrison
+
+	return {
+		"status": status,
+		"outcome": outcome_str,
+		"initial_army_power": initial_army_power,
+		"current_army_power": current_army_power,
+		"casualties_suffered": casualties_suffered,
+		"escalation_cycle": cycle,
+		"banked_legacy_points": banked_pts,
+		"captured_garrison": captured_garrison
+	}
