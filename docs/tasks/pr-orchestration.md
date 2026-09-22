@@ -64,8 +64,8 @@ Unlocks the core roguelite loop: victory captures your winning army as the next 
 ### Epic 4 Task Ledger
 | ID | Title | Branch | Base | Thread / Worker | Blocked By | Status | PR URL | Linked? |
 |---|---|---|---|---|---|---|---|---|
-| CY-01 | Run Climax, Legacy Points & Garrison Capture | feature/cycle-cy01-engine | feature/covert-co04-integration | autonomous | None | ready | - | - |
-| CY-02 | Legacy Tree Presenter & Meta Persistence | feature/cycle-cy02-presenter | feature/cycle-cy01-engine | autonomous | CY-01 | blocked | - | - |
+| CY-01 | Run Climax, Legacy Points & Garrison Capture | feature/cycle-cy01-engine | feature/covert-co04-integration | autonomous | None | pr-open | https://github.com/Arrangedgodly/castle-storm/pull/18 | Pending Retry |
+| CY-02 | Legacy Tree Presenter & Meta Persistence | feature/cycle-cy02-presenter | feature/cycle-cy01-engine | autonomous | None (CY-01 pr-open) | ready | - | - |
 | CY-03 | Legacy Vault Panel & Run Rebirth Modal | feature/cycle-cy03-ui | feature/cycle-cy02-presenter | autonomous | CY-02 | blocked | - | - |
 | CY-04 | Full Loop Integration & Multi-Cycle Acceptance | feature/cycle-cy04-acceptance | feature/cycle-cy03-ui | autonomous | CY-03 | blocked | - | - |
 
