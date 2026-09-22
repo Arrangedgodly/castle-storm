@@ -42,12 +42,6 @@ Expands the assault from an instant binary dice roll into an interactive, multi-
 ## Epic 3: Clandestine Operations & Infiltration (Completed)
 Expands pre-assault strategy with covert operations (bribing gatekeepers, poisoning garrison supplies, smuggling weapons, planting informants) that create tactical breach advantages.
 
-### Dependency Graph
-- CO-01: Covert Operations Rules & Simulation System (Base: feature/siege-ts05-acceptance)
-  └──> CO-02: Covert Ops Presenter & Telemetry Contracts (Base: feature/covert-co01-system) [Stacked on CO-01]
-       └──> CO-03: Covert Infiltration Panel & Operation Cards (Base: feature/covert-co02-presenter) [Stacked on CO-02]
-            └──> CO-04: GameplayScreen Integration & Acceptance Sweep (Base: feature/covert-co03-ui) [Stacked on CO-03]
-
 ### Epic 3 Task Ledger
 | ID | Title | Branch | Base | Mode | Blocked By | Status | PR URL | Linked? |
 |---|---|---|---|---|---|---|---|---|
@@ -56,7 +50,26 @@ Expands pre-assault strategy with covert operations (bribing gatekeepers, poison
 | CO-03 | Covert Infiltration Panel & Operation Cards | feature/covert-co03-ui | feature/covert-co02-presenter | autonomous | CO-02 | pr-open | https://github.com/Arrangedgodly/castle-storm/pull/16 | Yes |
 | CO-04 | GameplayScreen Integration & Acceptance Sweep | feature/covert-co04-integration | feature/covert-co03-ui | autonomous | CO-03 | pr-open | https://github.com/Arrangedgodly/castle-storm/pull/17 | Yes |
 
+---
+
+## Epic 4: Roguelite Cycle, Legacy Upgrades & Enemy Escalation ("The Cycle of Kings")
+Unlocks the core roguelite loop: victory captures your winning army as the next cycle's garrison ("you become what you fought"), run completion awards Legacy Points, persistent Legacy Tree unlocks survive resets, and a rebirth eulogy crowns the next rebellion.
+
+### Dependency Graph
+- CY-01: Run Climax Resolution, Legacy Points Accrual & Enemy Garrison Capture (Base: feature/covert-co04-integration)
+  └──> CY-02: Legacy Unlock Tree Presenter & Meta Persistence Adapter (Base: feature/cycle-cy01-engine) [Stacked on CY-01]
+       └──> CY-03: Legacy Vault Panel & Run Rebirth Modal UI (Base: feature/cycle-cy02-presenter) [Stacked on CY-02]
+            └──> CY-04: Full Roguelite Loop Integration & Acceptance Sweep (Base: feature/cycle-cy03-ui) [Stacked on CY-03]
+
+### Epic 4 Task Ledger
+| ID | Title | Branch | Base | Thread / Worker | Blocked By | Status | PR URL | Linked? |
+|---|---|---|---|---|---|---|---|---|
+| CY-01 | Run Climax, Legacy Points & Garrison Capture | feature/cycle-cy01-engine | feature/covert-co04-integration | autonomous | None | pr-open | https://github.com/Arrangedgodly/castle-storm/pull/18 | Pending Retry |
+| CY-02 | Legacy Tree Presenter & Meta Persistence | feature/cycle-cy02-presenter | feature/cycle-cy01-engine | autonomous | None (CY-01 pr-open) | ready | - | - |
+| CY-03 | Legacy Vault Panel & Run Rebirth Modal | feature/cycle-cy03-ui | feature/cycle-cy02-presenter | autonomous | CY-02 | blocked | - | - |
+| CY-04 | Full Loop Integration & Multi-Cycle Acceptance | feature/cycle-cy04-acceptance | feature/cycle-cy03-ui | autonomous | CY-03 | blocked | - | - |
+
 ## Execution Protocol
-- **Stacking**: Stacked sequential layers built on top of `feature/siege-ts05-acceptance`.
+- **Stacking**: Stacked sequential layers built on top of `feature/covert-co04-integration`.
 - **Validation**: Every slice must pass unit tests via `cmd.exe /c "..."` before PR creation.
 - **Thread Linking**: Every PR is linked via `link_pull_request` MCP tool immediately upon opening.
