@@ -3,6 +3,7 @@
 ## Replaces single-tick blind dice rolls with interactive, multi-stage
 ## breach phases (Outer Gate -> Courtyard -> Keep) featuring tactical stances,
 ## risk-adjusted casualty choices, captain duels, and orderly retreats.
+## Integrates with CovertOpsSystem for clandestine sabotage advantages.
 class_name TacticalSiegeResolver
 extends RefCounted
 
@@ -42,6 +43,7 @@ var phase_defender_hp: int = 0
 
 var casualties_suffered: int = 0
 var combat_log: Array[Dictionary] = []
+var covert_bonuses: Dictionary = {}
 
 var _engine: SimEngine
 
@@ -51,7 +53,7 @@ func _init(engine: SimEngine = null) -> void:
 
 
 ## Begins a new tactical siege engagement against the castle garrison.
-func start_siege(engine: SimEngine) -> Dictionary:
+func start_siege(engine: SimEngine, covert_system = null) -> Dictionary:
 	_engine = engine
 	var units = engine.get_system(&"units")
 	var assault = engine.get_system(&"assault")
@@ -65,7 +67,16 @@ func start_siege(engine: SimEngine) -> Dictionary:
 		var army_dict: Dictionary = odds_info.get("army", {})
 		raw_army = int(army_dict.get("power", raw_army))
 
-	initial_army_power = maxi(20, raw_army)
+	covert_bonuses.clear()
+	if covert_system != null and covert_system.has_method("get_bonuses"):
+		covert_bonuses = covert_system.get_bonuses()
+
+	# Clandestine sabotage modifiers
+	if bool(covert_bonuses.get("wells_poisoned", false)):
+		garrison_target = maxi(10, int(round(float(garrison_target) * 0.75)))
+
+	var bonus_army: int = 15 if bool(covert_bonuses.get("arms_smuggled", false)) else 0
+	initial_army_power = maxi(20, raw_army) + bonus_army
 	current_army_power = initial_army_power
 	total_garrison_power = maxi(10, garrison_target)
 
@@ -86,6 +97,14 @@ func start_siege(engine: SimEngine) -> Dictionary:
 		"text": "The war horns blow! The siege engines roll toward the Outer Gate."
 	}
 	combat_log.append(start_event)
+
+	if bool(covert_bonuses.get("wells_poisoned", false)):
+		combat_log.append({"kind": &"covert_bonus", "text": "Clandestine Op: Tainted cisterns weakened the garrison (-25% power)."})
+	if bool(covert_bonuses.get("arms_smuggled", false)):
+		combat_log.append({"kind": &"covert_bonus", "text": "Clandestine Op: Smuggled weapons armed sympathizers (+15 vanguard power)."})
+	if bool(covert_bonuses.get("gatekeeper_bribed", false)):
+		combat_log.append({"kind": &"covert_bonus", "text": "Clandestine Op: The bribed gatekeeper unlatched the portcullis (-50% Outer Gate defense)."})
+
 	return start_event
 
 
@@ -93,7 +112,10 @@ func _init_phase_defenses(phase: Phase) -> void:
 	match phase:
 		Phase.OUTER_GATE:
 			# ~35% of garrison power
-			phase_defender_max_hp = maxi(5, int(round(total_garrison_power * 0.35)))
+			var gate_hp: int = maxi(5, int(round(total_garrison_power * 0.35)))
+			if bool(covert_bonuses.get("gatekeeper_bribed", false)):
+				gate_hp = maxi(2, int(round(float(gate_hp) * 0.50)))
+			phase_defender_max_hp = gate_hp
 		Phase.COURTYARD:
 			# ~35% of garrison power
 			phase_defender_max_hp = maxi(5, int(round(total_garrison_power * 0.35)))
@@ -374,4 +396,4 @@ func _handle_defeat() -> void:
 	if _engine != null:
 		var susp = _engine.get_system(&"suspicion")
 		if susp != null and susp.has_method("apply_external_bump"):
-			susp.apply_external_bump(_engine, &"assault_failed", 20, true)
+			susp.apply_external_bump(_engine, &"siege_defeat", 25, true)
