@@ -25,7 +25,7 @@ Redesign Castle Storm into an accessible, visually rich, and intuitive medieval 
 
 ---
 
-## Epic 2: Tactical Siege Combat
+## Epic 2: Tactical Siege Combat (Completed)
 Expands the assault from an instant binary dice roll into an interactive, multi-stage siege with tactical casualty choices, breach stances, duel challenges, and strategic retreat.
 
 ### Dependency Graph
@@ -42,7 +42,7 @@ Expands the assault from an instant binary dice roll into an interactive, multi-
 | TS-02 | Tactical Siege Presenter & Contracts | feature/siege-ts02-presenter | feature/siege-ts01-resolver | autonomous | TS-01 | pr-open | https://github.com/Arrangedgodly/castle-storm/pull/10 | Yes |
 | TS-03 | Interactive Siege Tactical Viewport | feature/siege-ts03-ui | feature/siege-ts02-presenter | autonomous | TS-02 | pr-open | https://github.com/Arrangedgodly/castle-storm/pull/11 | Yes |
 | TS-04 | SiegePanel & GameplayScreen Integration | feature/siege-ts04-integration | feature/siege-ts03-ui | autonomous | TS-03 | pr-open | https://github.com/Arrangedgodly/castle-storm/pull/12 | Yes |
-| TS-05 | Full Tactical Siege Acceptance Sweep | feature/siege-ts05-acceptance | feature/siege-ts04-integration | autonomous | TS-04 | pr-open | - | - |
+| TS-05 | Full Tactical Siege Acceptance Sweep | feature/siege-ts05-acceptance | feature/siege-ts04-integration | autonomous | TS-04 | pr-open | https://github.com/Arrangedgodly/castle-storm/pull/13 | Yes |
 
 ## Execution Protocol
 - **Stacking**: Stacked sequential layers built on top of `feature/redesign-t08-acceptance`.
