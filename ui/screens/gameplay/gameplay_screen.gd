@@ -10,6 +10,7 @@ const VillagePanel := preload("res://ui/screens/gameplay/village_panel.gd")
 const RosterPanel := preload("res://ui/screens/gameplay/roster_panel.gd")
 const SiegePanel := preload("res://ui/screens/gameplay/siege_panel.gd")
 const GameplayPresenter := preload("res://ui/screens/gameplay/gameplay_presenter.gd")
+const GameplayStyle := preload("res://ui/screens/gameplay/gameplay_style.gd")
 
 var host: GameHost:
 	set(value):
@@ -134,6 +135,9 @@ func _build_ui() -> void:
 	bottom_hbox.add_child(pass_day_btn)
 
 	root_vbox.add_child(bottom_bar)
+
+	# Apply theme styling
+	GameplayStyle.dress_gameplay_screen(self)
 
 
 func _bind_host() -> void:
