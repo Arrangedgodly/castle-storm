@@ -51,8 +51,8 @@ Expands pre-assault strategy with covert operations (bribing gatekeepers, poison
 ### Epic 3 Task Ledger
 | ID | Title | Branch | Base | Mode | Blocked By | Status | PR URL | Linked? |
 |---|---|---|---|---|---|---|---|---|
-| CO-01 | Covert Operations Simulation System | feature/covert-co01-system | feature/siege-ts05-acceptance | autonomous | None | ready | - | - |
-| CO-02 | Covert Ops Presenter & Contracts | feature/covert-co02-presenter | feature/covert-co01-system | autonomous | CO-01 | blocked | - | - |
+| CO-01 | Covert Operations Simulation System | feature/covert-co01-system | feature/siege-ts05-acceptance | autonomous | None | pr-open | - | - |
+| CO-02 | Covert Ops Presenter & Contracts | feature/covert-co02-presenter | feature/covert-co01-system | autonomous | CO-01 | ready | - | - |
 | CO-03 | Covert Infiltration Panel & Operation Cards | feature/covert-co03-ui | feature/covert-co02-presenter | autonomous | CO-02 | blocked | - | - |
 | CO-04 | GameplayScreen Integration & Acceptance Sweep | feature/covert-co04-integration | feature/covert-co03-ui | autonomous | CO-03 | blocked | - | - |
 
