@@ -1,7 +1,7 @@
-## GameplayScreen — Unified Playable Game Viewport for Castle Storm (T-06).
+## GameplayScreen — Unified playable strategy viewport for Castle Storm (T-06).
 ##
-## Composes the HUDBar, VillagePanel, RosterPanel, and SiegePanel into an
-## intuitive, accessible, multi-view medieval strategy dashboard.
+## Integrates HUD, Village & Production, Roster & Armory, Castle Siege,
+## Tactical Siege combat view, and Clandestine Espionage into a unified interface.
 class_name GameplayScreen
 extends Control
 
@@ -11,9 +11,11 @@ const RosterPanel := preload("res://ui/screens/gameplay/roster_panel.gd")
 const SiegePanel := preload("res://ui/screens/gameplay/siege_panel.gd")
 const GameplayPresenter := preload("res://ui/screens/gameplay/gameplay_presenter.gd")
 const GameplayStyle := preload("res://ui/screens/gameplay/gameplay_style.gd")
-const TacticalSiegeResolver := preload("res://sim/systems/tactical_siege_resolver.gd")
-const TacticalSiegePresenter := preload("res://ui/screens/gameplay/tactical_siege_presenter.gd")
 const TacticalSiegeView := preload("res://ui/screens/gameplay/tactical_siege_view.gd")
+const TacticalSiegePresenter := preload("res://ui/screens/gameplay/tactical_siege_presenter.gd")
+const TacticalSiegeResolver := preload("res://sim/systems/tactical_siege_resolver.gd")
+const CovertOpsPanel := preload("res://ui/screens/gameplay/covert_ops_panel.gd")
+const CovertOpsSystem := preload("res://sim/systems/covert_ops_system.gd")
 
 var host: GameHost:
 	set(value):
@@ -21,14 +23,18 @@ var host: GameHost:
 		if is_inside_tree() and host != null:
 			_bind_host()
 
-# Sub-components
+# Subcomponents
 var hud_bar: HUDBar
 var village_panel: VillagePanel
 var roster_panel: RosterPanel
 var siege_panel: SiegePanel
 var tab_container: TabContainer
+
+# Tactical Siege & Espionage Subcomponents
 var tactical_view: TacticalSiegeView
 var tactical_siege: TacticalSiegeResolver
+var covert_panel: CovertOpsPanel
+var covert_system: CovertOpsSystem
 
 # Dedicated tabs
 var dashboard_hbox: HBoxContainer
@@ -36,6 +42,7 @@ var tab_village_wrapper: MarginContainer
 var tab_roster_wrapper: MarginContainer
 var tab_siege_wrapper: MarginContainer
 var tab_tactical_wrapper: MarginContainer
+var tab_covert_wrapper: MarginContainer
 
 # Status & Event ticker
 var event_ticker_label: Label
@@ -126,6 +133,22 @@ func _build_ui() -> void:
 	tab_tactical_wrapper.add_child(tactical_view)
 	tab_container.add_child(tab_tactical_wrapper)
 
+	# Tab 2: Espionage & Infiltration
+	tab_covert_wrapper = MarginContainer.new()
+	tab_covert_wrapper.name = "🕵️ Espionage"
+	tab_covert_wrapper.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tab_covert_wrapper.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	tab_covert_wrapper.add_theme_constant_override("margin_left", 8)
+	tab_covert_wrapper.add_theme_constant_override("margin_top", 8)
+	tab_covert_wrapper.add_theme_constant_override("margin_right", 8)
+	tab_covert_wrapper.add_theme_constant_override("margin_bottom", 8)
+
+	covert_system = CovertOpsSystem.new()
+	covert_panel = CovertOpsPanel.new()
+	covert_panel.operation_executed.connect(_on_covert_operation_executed)
+	tab_covert_wrapper.add_child(covert_panel)
+	tab_container.add_child(tab_covert_wrapper)
+
 	# --- 3. Bottom Ticker & Controls ---
 	var bottom_bar := PanelContainer.new()
 	bottom_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -164,12 +187,22 @@ func _build_ui() -> void:
 	GameplayStyle.dress_gameplay_screen(self)
 
 
+## Binds an active GameHost instance to all screens and views.
+func setup_host(game_host: GameHost) -> void:
+	self.host = game_host
+	if host != null:
+		_bind_host()
+
+
 func _bind_host() -> void:
 	if host == null:
 		return
 
 	if not host.sim_advanced.is_connected(refresh):
 		host.sim_advanced.connect(refresh)
+
+	if covert_panel != null:
+		covert_panel.setup_host(host, covert_system)
 
 	refresh()
 
@@ -183,6 +216,8 @@ func refresh() -> void:
 	village_panel.update_from_host(host)
 	roster_panel.update_from_host(host)
 	siege_panel.update_from_host(host)
+	if covert_panel != null:
+		covert_panel.refresh()
 	_refresh_tactical_view()
 
 
@@ -190,11 +225,11 @@ func _on_tactical_siege_initiated() -> void:
 	if host == null or host.engine == null:
 		return
 	tactical_siege = TacticalSiegeResolver.new(host.engine)
-	var start_event := tactical_siege.start_siege(host.engine)
+	var start_event := tactical_siege.start_siege(host.engine, covert_system)
 	event_ticker_label.text = "Chronicle: " + str(start_event.get("text", "The siege begins!"))
 	_refresh_tactical_view()
 	# Switch to tactical siege tab
-	tab_container.current_tab = tab_container.get_tab_count() - 1
+	tab_container.current_tab = 1
 
 
 func _on_tactical_tactic_selected(tactic_id: StringName) -> void:
@@ -217,6 +252,12 @@ func _on_tactical_retreat_requested() -> void:
 
 func _on_tactical_siege_closed() -> void:
 	tab_container.current_tab = 0
+
+
+func _on_covert_operation_executed(result: Dictionary) -> void:
+	if result.has("text"):
+		event_ticker_label.text = "Chronicle: " + str(result["text"])
+	refresh()
 
 
 func _refresh_tactical_view() -> void:

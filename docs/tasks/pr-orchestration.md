@@ -39,7 +39,7 @@ Expands the assault from an instant binary dice roll into an interactive, multi-
 
 ---
 
-## Epic 3: Clandestine Operations & Infiltration
+## Epic 3: Clandestine Operations & Infiltration (Completed)
 Expands pre-assault strategy with covert operations (bribing gatekeepers, poisoning garrison supplies, smuggling weapons, planting informants) that create tactical breach advantages.
 
 ### Dependency Graph
@@ -54,7 +54,7 @@ Expands pre-assault strategy with covert operations (bribing gatekeepers, poison
 | CO-01 | Covert Operations Simulation System | feature/covert-co01-system | feature/siege-ts05-acceptance | autonomous | None | pr-open | https://github.com/Arrangedgodly/castle-storm/pull/14 | Yes |
 | CO-02 | Covert Ops Presenter & Contracts | feature/covert-co02-presenter | feature/covert-co01-system | autonomous | CO-01 | pr-open | https://github.com/Arrangedgodly/castle-storm/pull/15 | Yes |
 | CO-03 | Covert Infiltration Panel & Operation Cards | feature/covert-co03-ui | feature/covert-co02-presenter | autonomous | CO-02 | pr-open | https://github.com/Arrangedgodly/castle-storm/pull/16 | Yes |
-| CO-04 | GameplayScreen Integration & Acceptance Sweep | feature/covert-co04-integration | feature/covert-co03-ui | autonomous | CO-03 | ready | - | - |
+| CO-04 | GameplayScreen Integration & Acceptance Sweep | feature/covert-co04-integration | feature/covert-co03-ui | autonomous | CO-03 | pr-open | - | - |
 
 ## Execution Protocol
 - **Stacking**: Stacked sequential layers built on top of `feature/siege-ts05-acceptance`.
