@@ -38,8 +38,8 @@ Expands the assault from an instant binary dice roll into an interactive, multi-
 ### Epic 2 Task Ledger
 | ID | Title | Branch | Base | Mode | Blocked By | Status | PR URL | Linked? |
 |---|---|---|---|---|---|---|---|---|
-| TS-01 | Multi-Phase Siege Rules & Combat Resolver | feature/siege-ts01-resolver | feature/redesign-t08-acceptance | autonomous | None | in-progress | - | - |
-| TS-02 | Tactical Siege Presenter & Contracts | feature/siege-ts02-presenter | feature/siege-ts01-resolver | autonomous | TS-01 | pending | - | - |
+| TS-01 | Multi-Phase Siege Rules & Combat Resolver | feature/siege-ts01-resolver | feature/redesign-t08-acceptance | autonomous | None | pr-open | https://github.com/Arrangedgodly/castle-storm/pull/9 | Yes |
+| TS-02 | Tactical Siege Presenter & Contracts | feature/siege-ts02-presenter | feature/siege-ts01-resolver | autonomous | TS-01 | ready | - | - |
 | TS-03 | Interactive Siege Tactical Viewport | feature/siege-ts03-ui | feature/siege-ts02-presenter | autonomous | TS-02 | pending | - | - |
 | TS-04 | SiegePanel & GameplayScreen Integration | feature/siege-ts04-integration | feature/siege-ts03-ui | autonomous | TS-03 | pending | - | - |
 | TS-05 | Full Tactical Siege Acceptance Sweep | feature/siege-ts05-acceptance | feature/siege-ts04-integration | autonomous | TS-04 | pending | - | - |
